@@ -537,6 +537,7 @@ function startNewSeason(){
     SEASON_FIELDS.forEach(k=>DB[k]=[]);
     pending=null;pendingName='';selSess=null;
     saveDB();
+    renderAll();
     switchMainTab('master');
     updateStats();
     showAlert('New season started \u2014 Master File preserved ('+DB.master.length+' athletes). Session data cleared and archived to your downloads.','ok');
