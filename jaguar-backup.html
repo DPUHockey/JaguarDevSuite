@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Jaguar Suite — Data Backup Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--gold:#C9A84C;--gold-light:#E8CC7A;--gold-faint:rgba(201,168,76,0.08);--border-gold:rgba(201,168,76,0.25);
+--black:#0A0A0A;--surface:#181818;--border:#2A2A2A;--white:#F5F3EE;--white-dim:rgba(245,243,238,0.65);}
+body{min-height:100vh;background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:34px 30px;max-width:520px;width:100%;display:flex;flex-direction:column;gap:18px;}
+h1{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:4px;color:var(--gold);line-height:1;}
+.sub{font-size:13px;color:var(--white-dim);line-height:1.6;}
+.found{font-size:13px;background:var(--gold-faint);border:1px solid var(--border-gold);border-radius:4px;padding:12px 14px;line-height:1.6;}
+.found b{color:var(--gold-light);}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+button{font-family:'Barlow',sans-serif;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;color:var(--gold);background:transparent;border:1px solid var(--border-gold);border-radius:3px;padding:12px 20px;cursor:pointer;transition:background .15s;}
+button:hover{background:var(--gold-faint);}
+button.gold{background:var(--gold);color:#000;border-color:var(--gold);}
+.msg{font-size:12px;min-height:16px;}
+.msg.ok{color:var(--gold-light);} .msg.err{color:#d97070;}
+.confirm{display:none;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;background:var(--gold-faint);border:1px solid var(--border-gold);border-radius:4px;padding:12px 14px;}
+.hint{font-size:11px;color:var(--white-dim);border-top:1px solid var(--border);padding-top:14px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>JAGUAR DATA TOOL</h1>
+  <div class="sub">Backs up all Jaguar Suite data stored in <b>this browser at this location</b> (Dev Database, Coach Hours, ADM Roster, InHouse Roster) to a single file — and restores it anywhere.</div>
+  <div class="found" id="found">Scanning&hellip;</div>
+  <div class="row">
+    <button class="gold" onclick="jagBackup()">&#x2193; Download Backup</button>
+    <button onclick="document.getElementById('rf').click()">&#x2B06; Restore From File</button>
+    <input type="file" id="rf" accept=".json,application/json" style="display:none;" onchange="jagRestorePick(this)"/>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="confirm" id="confirm">
+    <span id="confirm-text"></span>
+    <button class="gold" onclick="jagRestoreConfirm()">Yes, Restore</button>
+    <button onclick="jagRestoreCancel()">Cancel</button>
+  </div>
+  <div class="hint"><b>To move data to the new site:</b> open this page the same way you open your current Jaguar Home (same folder / same address), tap Download Backup, then on the new GitHub site open Home &rarr; Data &rarr; Restore Data and pick the file.</div>
+</div>
+<script>
+var JAG_DATA_PREFIXES = ['jaguar_','jag_','rm_','adm_'];
+
+function jagCollectData(){
+  var out={}, n=0;
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    for(var p=0;p<JAG_DATA_PREFIXES.length;p++){
+      if(k.indexOf(JAG_DATA_PREFIXES[p])===0){ out[k]=localStorage.getItem(k); n++; break; }
+    }
+  }
+  return {keys:out, count:n};
+}
+function refreshFound(){
+  var c=jagCollectData();
+  var el=document.getElementById('found');
+  if(c.count===0){
+    el.innerHTML='<b>No Jaguar Suite data found here.</b> If your data lives somewhere else, open this tool from that same location — data is tied to where the apps run.';
+  }else{
+    var names=Object.keys(c.keys).sort().join(', ');
+    el.innerHTML='Found <b>'+c.count+' data set'+(c.count!==1?'s':'')+'</b>: '+names;
+  }
+}
+function msg(t,cls){
+  var el=document.getElementById('msg');
+  el.textContent=t; el.className='msg '+(cls||'');
+}
+function jagBackup(){
+  try{
+    var c=jagCollectData();
+    if(c.count===0){ msg('Nothing to back up here.','err'); return; }
+    var payload={ app:'jaguar-suite-backup', v:1, exported:new Date().toISOString(), keyCount:c.count, data:c.keys };
+    var d=new Date();
+    var fname='jaguar-backup-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=fname;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href); a.remove();},1500);
+    msg('Backup downloaded ('+c.count+' data sets): '+fname,'ok');
+  }catch(e){ msg('Backup failed \u2014 '+e.message,'err'); }
+}
+var _pending=null;
+function jagRestorePick(input){
+  var f=input.files && input.files[0];
+  input.value='';
+  if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var p=JSON.parse(r.result);
+      var data=(p && p.app==='jaguar-suite-backup' && p.data) ? p.data : (p && typeof p==='object' ? p : null);
+      if(!data) throw new Error('not a backup file');
+      var keys=Object.keys(data).filter(function(k){
+        return JAG_DATA_PREFIXES.some(function(pre){return k.indexOf(pre)===0;}) && typeof data[k]==='string';
+      });
+      if(keys.length===0) throw new Error('no suite data inside this file');
+      _pending={data:data,keys:keys};
+      document.getElementById('confirm-text').textContent=
+        'Restore '+keys.length+' data set'+(keys.length!==1?'s':'')+(p.exported?' from '+p.exported.slice(0,10):'')+'? This overwrites matching data in this browser.';
+      document.getElementById('confirm').style.display='flex';
+      msg('','');
+    }catch(e){ msg('Could not read that file \u2014 '+e.message,'err'); }
+  };
+  r.onerror=function(){ msg('Could not read that file.','err'); };
+  r.readAsText(f);
+}
+function jagRestoreCancel(){ _pending=null; document.getElementById('confirm').style.display='none'; }
+function jagRestoreConfirm(){
+  if(!_pending) return;
+  var ok=0;
+  try{
+    _pending.keys.forEach(function(k){ localStorage.setItem(k,_pending.data[k]); ok++; });
+    msg('Restored '+ok+' data sets.','ok');
+  }catch(e){ msg('Restore stopped after '+ok+' \u2014 '+e.message,'err'); }
+  jagRestoreCancel();
+  refreshFound();
+}
+refreshFound();
+</script>
+</body>
+</html>
