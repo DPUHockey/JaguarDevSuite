@@ -1915,11 +1915,21 @@ function resetPlanningData(){
     return;
   }
   if(btn){btn.dataset.confirming='';btn.textContent='Reset All';btn.style.borderColor='';btn.style.color='';}
+  try{
+    const archive={app:'jaguar-coach-planning-archive',v:1,exported:new Date().toISOString(),
+      planData:planData,blockedDates:Array.from(blockedDates),activeDates:Array.from(activeDates)};
+    const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
+    const a=document.createElement('a'),d=new Date();
+    a.href=URL.createObjectURL(blob);
+    a.download='jaguar-planning-archive-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(e){}
   planData={};savePlanData();
   blockedDates=new Set();saveBlockedDates();
   activeDates=new Set();saveActiveDates(activeDates);
   buildPlanCalendar();buildCalMonthNav();buildCalendar();
-  toast('Planning data reset');
+  toast('Planning data reset \u2014 backup downloaded to your files');
 }
 
 function switchPlanTab(n){
