@@ -1809,11 +1809,39 @@ function renderGroupTab(sNum,grp,rows){
 }
 
 function masterKey(r){return(r.first_name||'').toLowerCase().trim()+'|'+(r.last_name||'').toLowerCase().trim()+'|'+(r.birthdate||r.birth_year||'').trim();}
+// Returns a complete roadmap for a player: their recorded promotion history, plus a
+// backfilled entry for whatever level they must have STARTED at if that's missing.
+// New players get their starting level recorded automatically (see upsertMaster below),
+// but players already in the system before that existed would otherwise "lose" their
+// entry level the moment they get promoted past it, since it was never on record --
+// this reconstructs it from the earliest promotion we do have, using their original
+// entry date as the best available date for it.
+function getFullPromoHistory(m){
+  const hist=(m._promoHistory||[]).slice();
+  if(!hist.length){
+    if(m.level)hist.push({level:(m.level||'').toUpperCase().replace(/\s/g,''),date:m.date_added||''});
+    return hist;
+  }
+  const idxs=hist.map(h=>LEVEL_ORDER.indexOf(h.level)).filter(i=>i>=0);
+  if(idxs.length){
+    const minIdx=Math.min(...idxs);
+    if(minIdx>0){
+      const impliedStart=LEVEL_ORDER[minIdx-1];
+      if(!hist.some(h=>h.level===impliedStart))hist.unshift({level:impliedStart,date:m.date_added||''});
+    }
+  }
+  return hist;
+}
 function upsertMaster(row,sn){
   const mk=masterKey(row);if(mk.startsWith('||'))return;
   const ei=DB.master.findIndex(m=>masterKey(m)===mk);
   if(ei>=0){const m=DB.master[ei];if(!m._sessions)m._sessions=[];const sess='Session '+sn;if(sn&&!m._sessions.includes(sess))m._sessions.push(sess);if(row.level)m.level=row.level;return;}
-  DB.master.push(Object.assign({},row,{_sessions:sn?['Session '+sn]:[],_promoHistory:[],date_added:row.date_added||new Date().toISOString().slice(0,10)}));
+  const dateAdded=row.date_added||new Date().toISOString().slice(0,10);
+  // The player's very first level is a real milestone on their roadmap, not just a
+  // starting point that gets overwritten -- record it with the date they entered the
+  // program so the full history (entry level -> every promotion since) stays intact.
+  const startingHistory=row.level?[{level:(row.level||'').toUpperCase().replace(/\s/g,''),date:dateAdded}]:[];
+  DB.master.push(Object.assign({},row,{_sessions:sn?['Session '+sn]:[],_promoHistory:startingHistory,date_added:dateAdded}));
 }
 function findDuplicate(row){const mk=masterKey(row);return DB.master.find(m=>masterKey(m)===mk)||null;}
 function mergeDuplicateMasterEntries(){
@@ -1915,7 +1943,7 @@ function buildMasterTableInner(rows,disp,idx,sort){
   if(!rows.length)return'<div class="empty-state"><p>No players yet.</p></div>';
   const thead='<thead><tr>'+th('first_name','First')+th('last_name','Last')+th('birthdate','Age')+th('date_added','Started')+'<th>Yrs</th>'+th('level','Level')+th('status','Status')+th('waiver','Waiver')+'<th>Sessions</th>'+PROMO_TRACK.map(l=>'<th style="min-width:68px;font-size:10px;letter-spacing:.5px;">'+l+'</th>').join('')+'<th style="min-width:52px;">Actions</th></tr></thead>';
   const tbody='<tbody>'+idx.map(({r})=>{
-    const hm={};(r._promoHistory||[]).forEach(h=>{hm[h.level]=h.date;});
+    const hm={};getFullPromoHistory(r).forEach(h=>{hm[h.level]=h.date;});
     for(let s=1;s<=6;s++){(DB['promo'+s]||[]).forEach(p=>{if(masterKey(p)===masterKey(r)&&p.to_level&&!hm[p.to_level])hm[p.to_level]=p.promoted_on||'';});}
     const cl=(r.level||'').toUpperCase().replace(/\s/g,'');
     const pc=PROMO_TRACK.map(l=>{
@@ -1951,7 +1979,7 @@ function renderMasterTab(){
 function exportMasterCSV(){
   const rows=DB.master;if(!rows.length){showAlert('No data','err');return;}
   const cols=['first_name','last_name','birthdate','date_added','level','status','waiver','notes',...PROMO_TRACK.map(l=>l+'_date')];
-  const data=rows.map(r=>{const hm={};(r._promoHistory||[]).forEach(h=>{hm[h.level]=h.date;});for(let s=1;s<=6;s++){(DB['promo'+s]||[]).forEach(p=>{if(masterKey(p)===masterKey(r)&&p.to_level&&!hm[p.to_level])hm[p.to_level]=p.promoted_on||'';});}const obj={...r};PROMO_TRACK.forEach(l=>{obj[l+'_date']=hm[l]||'';});return obj;});
+  const data=rows.map(r=>{const hm={};getFullPromoHistory(r).forEach(h=>{hm[h.level]=h.date;});for(let s=1;s<=6;s++){(DB['promo'+s]||[]).forEach(p=>{if(masterKey(p)===masterKey(r)&&p.to_level&&!hm[p.to_level])hm[p.to_level]=p.promoted_on||'';});}const obj={...r};PROMO_TRACK.forEach(l=>{obj[l+'_date']=hm[l]||'';});return obj;});
   downloadCSV(rowsToCSV(data,cols),'jaguar-master-file.csv');
 }
 function undoLastPromotion(idx){
@@ -1981,7 +2009,7 @@ function undoLastPromotion(idx){
 }
 function openPlayerCard(idx){
   const r=DB.master[idx];if(!r)return;
-  const hm={};(r._promoHistory||[]).forEach(h=>{hm[h.level]=h.date;});
+  const hm={};getFullPromoHistory(r).forEach(h=>{hm[h.level]=h.date;});
   for(let s=1;s<=6;s++){(DB['promo'+s]||[]).forEach(p=>{if(masterKey(p)===masterKey(r)&&p.to_level&&!hm[p.to_level])hm[p.to_level]=p.promoted_on||'';});}
   const cl=(r.level||'').toUpperCase().replace(/\s/g,'');
   const tl=PROMO_TRACK.filter(l=>hm[l]||l===cl).map(l=>{const c=l.startsWith('LJ')?'#5CCC88':'#F07050',ia=l===cl;return'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);"><div style="width:6px;height:6px;border-radius:50%;background:'+c+';flex-shrink:0;"></div>'+lvBadge(l)+'<span style="font-size:11px;color:var(--dim);">'+(hm[l]||r.date_added||'')+'</span>'+(ia?'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;margin-left:auto;">CURRENT</span>':'')+'</div>';}).join('');
