@@ -997,9 +997,17 @@ function confirmPromo(){
   const promoNotes=v('promo-notes');const promoSt='Confirmed';
   const promoRecord={first_name:row.first_name,last_name:row.last_name,birthdate:row.birthdate,from_level:fromLevel,to_level:toLevel,promoted_on:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),promo_status:promoSt,notes:promoNotes,parent1_name:row.parent1_name,parent1_email:row.parent1_email,parent1_phone:row.parent1_phone,parent2_name:row.parent2_name,parent2_email:row.parent2_email,parent2_phone:row.parent2_phone};
   if(!DB['promo'+sNum])DB['promo'+sNum]=[];
-  const _ei=DB['promo'+sNum].findIndex(p=>p.first_name===promoRecord.first_name&&p.last_name===promoRecord.last_name&&p.birthdate===promoRecord.birthdate);
+  // Match on the exact transition (name+birthdate+from+to), not just name+birthdate --
+  // otherwise a second promotion later in the same session (e.g. LJ2->LJ3 after an
+  // earlier LJ1->LJ2) would overwrite the first one instead of being recorded separately.
+  const _ei=DB['promo'+sNum].findIndex(p=>p.first_name===promoRecord.first_name&&p.last_name===promoRecord.last_name&&p.birthdate===promoRecord.birthdate&&p.from_level===promoRecord.from_level&&p.to_level===promoRecord.to_level);
   if(_ei>=0)DB['promo'+sNum][_ei]=promoRecord;else DB['promo'+sNum].push(promoRecord);
   recordMasterPromo(row,fromLevel,toLevel,promoRecord.promoted_on);
+  // Move the player to their new level right away -- in this session's roster (so they
+  // show under the correct LJ/PH group immediately) and carry their attendance forward.
+  const pk=playerKey(row);
+  updateSessionRowLevel(row,toLevel);
+  migrateAttendOnPromo(sNum,pk,fromLevel,toLevel);
   // If confirming an existing pending promo, update its status too
   if(window._promoModalOverride!==undefined){
     const existingIdx=window._promoModalOverride;
@@ -1846,11 +1854,38 @@ function mergeDuplicateMasterEntries(){
     showAlert(dupCount?('Merged '+dupCount+' duplicate record'+(dupCount!==1?'s':'')+' \u2014 Master File now has '+DB.master.length+' unique athletes.'):'No duplicates found.','ok');
   });
 }
+// When a promotion is confirmed, the player needs to actually move to their new level
+// in the session roster (not just in Master File) so they show up correctly in the
+// right LJ/PH group and their attendance grouping updates immediately.
+function updateSessionRowLevel(masterRow,newLevel){
+  for(let s=1;s<=6;s++){
+    const sk='session'+s;
+    if(!DB[sk])continue;
+    const row=DB[sk].find(r=>masterKey(r)===masterKey(masterRow));
+    if(row)row.level=newLevel;
+  }
+}
+// Attendance check-ins are stored per sub-level group (lj1, lj2, ph1, etc). When a kid
+// gets promoted mid-session, copy (not move) their existing check-ins into the new
+// group's bucket so their attendance history carries forward. The old bucket is left
+// untouched -- if the promotion later gets undone, reverting the level automatically
+// restores the correct grouping without needing any separate undo-side migration.
+function migrateAttendOnPromo(sNum,pk,fromLevel,toLevel){
+  const oldSg=(fromLevel||'').toLowerCase(),newSg=(toLevel||'').toLowerCase();
+  if(!oldSg||!newSg||oldSg===newSg)return;
+  const oldRec=attendData[sNum]&&attendData[sNum][oldSg]&&attendData[sNum][oldSg][pk];
+  if(!oldRec)return;
+  if(!attendData[sNum])attendData[sNum]={};
+  if(!attendData[sNum][newSg])attendData[sNum][newSg]={};
+  attendData[sNum][newSg][pk]=Object.assign({},oldRec,attendData[sNum][newSg][pk]||{});
+  saveAttendData();
+}
 function recordMasterPromo(row,from,to,date){
   const m=DB.master.find(e=>masterKey(e)===masterKey(row));if(!m)return;
   if(!m._promoHistory)m._promoHistory=[];
   const ei=m._promoHistory.findIndex(h=>h.level===to);
   if(ei>=0)m._promoHistory[ei].date=date;else m._promoHistory.push({level:to,date});
+  m.level=to;
 }
 function syncMasterFromSessions(){
   const seen=new Map();DB.master.forEach((m,i)=>seen.set(masterKey(m),i));
@@ -1936,6 +1971,7 @@ function undoLastPromotion(idx){
       const i=LEVEL_ORDER.indexOf(last.level);
       if(i>0)r.level=LEVEL_ORDER[i-1];
     }
+    updateSessionRowLevel(r,r.level);
     saveDB();
     renderAll();
     updateStats();
