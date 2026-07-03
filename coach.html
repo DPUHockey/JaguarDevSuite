@@ -531,11 +531,8 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
   <div class="modal" style="max-width:340px">
     <div class="modal-header"><div class="modal-title">Which Session?</div><button class="modal-close" onclick="cancelSessionPick()">✕</button></div>
     <p style="color:var(--white-dim);font-size:13px;line-height:1.6;margin-bottom:12px;">This is the start of a new block of dates for <span id="sessionPickStreamLabel" style="color:var(--gold-light);"></span>. Every date you check from here will belong to this session until you mark &#127937; End Session.</p>
-    <div class="form-group"><label class="form-label">Session Number</label>
-      <select class="form-select" id="sessionPickSelect">
-        <option value="1">Session 1</option><option value="2">Session 2</option><option value="3">Session 3</option>
-        <option value="4">Session 4</option><option value="5">Session 5</option><option value="6">Session 6</option>
-      </select>
+    <div class="form-group"><label class="form-label" id="sessionPickLabel">Session Number</label>
+      <select class="form-select" id="sessionPickSelect"></select>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="cancelSessionPick()">Cancel</button><button class="btn btn-gold" onclick="confirmSessionPick()">Use This Session</button></div>
   </div>
@@ -2198,13 +2195,20 @@ function togglePlanSlot(sk,checked){
     if(mostRecent&&!mostRecent.endSession&&mostRecent.sessionNum){
       applyPlanCheck(sk,mostRecent.sessionNum);
     } else {
-      // suggest the next session number after whatever's already used in this stream
+      const isPeriodProgram=stream.startsWith('adm_')||stream.startsWith('ih_');
+      const cap=isPeriodProgram?4:6;
+      // suggest the next number after whatever's already used in this stream
       const used=Object.keys(planData).filter(k=>planData[k]&&planData[k].checked&&slotStreamKey(k)===stream).map(k=>planData[k].sessionNum||0);
       const maxUsed=used.length?Math.max(...used):0;
-      const suggested=maxUsed>0?Math.min(6,maxUsed+((mostRecent&&mostRecent.endSession)?1:0)):1;
+      const suggested=maxUsed>0?Math.min(cap,maxUsed+((mostRecent&&mostRecent.endSession)?1:0)):1;
       _pendingSessionPick={sk,checked};
       document.getElementById('sessionPickStreamLabel').textContent=STREAM_LABELS[stream]||stream;
-      document.getElementById('sessionPickSelect').value=String(Math.min(6,Math.max(1,suggested||1)));
+      document.getElementById('sessionPickLabel').textContent=isPeriodProgram?'Period':'Session Number';
+      const sel=document.getElementById('sessionPickSelect');
+      sel.innerHTML=isPeriodProgram
+        ?['Fall','Winter','Spring','Summer'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')
+        :[1,2,3,4,5,6].map(n=>`<option value="${n}">Session ${n}</option>`).join('');
+      sel.value=String(Math.min(cap,Math.max(1,suggested||1)));
       document.getElementById('modalSessionPick').classList.remove('hidden');
     }
   } else {
@@ -2254,143 +2258,107 @@ function buildPlanSummary(){
   const labels=computeSessionLabels();
   const content=document.getElementById('planSummaryContent');
   if(!content)return;
+
+  // Group by program type → session → entries
+  const programs=[
+    {key:'lj_wed',title:'Little Jaguars / Pre-Hockey — Wednesday',color:'#ffb6c1',filter:e=>e.slot.code==='lj'&&e.dt.getDay()!==0},
+    {key:'lj_sun',title:'Little Jaguars / Pre-Hockey — Sunday',color:'#ffc8d8',filter:e=>e.slot.code==='lj'&&e.dt.getDay()===0},
+    {key:'adm_prac',title:'ADM — Practices',color:'#90ee90',filter:e=>e.slot.code==='adm'&&e.dt.getDay()!==0},
+    {key:'adm_game',title:'ADM — Games (Sunday)',color:'#a0e88f',filter:e=>e.slot.code==='adm'&&e.dt.getDay()===0},
+    {key:'ih_prac',title:'InHouse — Practices',color:'#ffa500',filter:e=>e.slot.code==='ih'&&e.dt.getDay()!==0},
+    {key:'ih_game',title:'InHouse — Games (Sunday)',color:'#7ec8ff',filter:e=>e.slot.code==='ih'&&e.dt.getDay()===0},
+  ];
+
   const allEntries=Object.values(labels);
   const fmtDate2=dt=>dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 
-  // LJ/PH: Wednesday and Sunday are independent streams but share session numbering
-  // (the "Which Session?" picker tags both consistently) -- combine them per session here.
-  const ljEntries=allEntries.filter(e=>e.slot.code==='lj').sort((a,b)=>a.dt-b.dt);
-  const ljSessions={};
-  ljEntries.forEach(e=>{
-    const sn=e.sessionName;
-    if(!ljSessions[sn])ljSessions[sn]={wed:[],sun:[]};
-    (e.dt.getDay()===0?ljSessions[sn].sun:ljSessions[sn].wed).push(e);
-  });
+  let html='';
+  programs.forEach(prog=>{
+    const entries=allEntries.filter(prog.filter).sort((a,b)=>a.dt-b.dt);
+    if(!entries.length)return;
 
-  // ADM / InHouse: practice and game are independent streams, grouped by period
-  // (Fall/Winter/Spring/Summer) -- combine practice+game counts per period here.
-  function buildPeriodGroups(code){
-    const entries=allEntries.filter(e=>e.slot.code===code).sort((a,b)=>a.dt-b.dt);
-    const groups={};
+    // Group into sessions
+    const sessions={};
     entries.forEach(e=>{
       const sn=e.sessionName;
-      if(!groups[sn])groups[sn]={prac:[],game:[]};
-      (e.dt.getDay()===0?groups[sn].game:groups[sn].prac).push(e);
+      if(!sessions[sn])sessions[sn]=[];
+      sessions[sn].push(e);
     });
-    return groups;
-  }
-  const admGroups=buildPeriodGroups('adm');
-  const ihGroups=buildPeriodGroups('ih');
 
-  let html='';
+    const totalEntries=entries.length;
+    const sessionCount=Object.keys(sessions).length;
 
-  if(Object.keys(ljSessions).length){
-    const snCount=Object.keys(ljSessions).length;
     html+=`<div class="plan-summary-section">
-      <div class="plan-prog-title" style="color:#ffb6c1">Little Jaguars / Pre-Hockey
-        <span style="font-family:'Barlow';font-size:12px;color:var(--white-dim);margin-left:10px">${snCount} session${snCount!==1?'s':''}</span>
+      <div class="plan-prog-title" style="color:${prog.color}">${prog.title}
+        <span style="font-family:'Barlow';font-size:12px;color:var(--white-dim);margin-left:10px">${sessionCount} session${sessionCount!==1?'s':''} · ${totalEntries} total</span>
       </div>`;
-    Object.entries(ljSessions).forEach(([sName,g])=>{
-      const total=g.wed.length+g.sun.length;
-      const endItem=g.wed.concat(g.sun).find(e=>e.endSession);
+
+    Object.entries(sessions).forEach(([sessionName,items])=>{
+      const endItem=items.find(e=>e.endSession);
+      const isType=items[0]?.gameNum!==undefined?'games':'classes';
       html+=`<div class="plan-session-block">
         <div class="plan-session-header">
-          <span class="plan-session-title" style="color:#ffb6c1">${sName}</span>
-          <span style="font-family:'Barlow Condensed';font-size:11px;color:var(--white-dim)">${g.wed.length} Wednesday${g.wed.length!==1?'s':''} + ${g.sun.length} Sunday${g.sun.length!==1?'s':''} = ${total} total${endItem?' · 🏁 session ends '+fmtDate2(endItem.dt):''}</span>
+          <span class="plan-session-title" style="color:${prog.color}">${sessionName}</span>
+          <span style="font-family:'Barlow Condensed';font-size:11px;color:var(--white-dim)">${items.length} ${isType}${endItem?' · 🏁 session ends '+fmtDate2(endItem.dt):''}</span>
         </div>
-        <div class="plan-class-grid">
-          ${g.wed.concat(g.sun).sort((a,b)=>a.dt-b.dt).map(e=>{
-            const isEnd=e.endSession;
-            const dow=e.dt.getDay()===0?'Sun':'Wed';
-            return `<div class="plan-class-card" style="border-color:${isEnd?'#e74c3c':'#ffb6c144'}">
-              <div class="plan-class-date">${dow} · Class ${e.classNum}${isEnd?' 🏁':''}</div>
-              <div class="plan-class-detail">${fmtDate2(e.dt)}</div>
-              <div class="plan-class-detail" style="color:#ffb6c1">${e.slot.time}</div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
+        <div class="plan-class-grid">`;
+      items.forEach(e=>{
+        const num=e.classNum!==undefined?`Class ${e.classNum}`:`Game ${e.gameNum}`;
+        const isEnd=e.endSession;
+        html+=`<div class="plan-class-card" style="border-color:${isEnd?'#e74c3c':prog.color+'44'}">
+          <div class="plan-class-date">${num}${isEnd?' 🏁':''}</div>
+          <div class="plan-class-detail">${fmtDate2(e.dt)}</div>
+          <div class="plan-class-detail" style="color:${prog.color}">${e.slot.time}</div>
+        </div>`;
+      });
+      html+=`</div></div>`;
     });
     html+=`</div>`;
-  }
-
-  function renderPeriodProgram(title,color,groups){
-    const periodKeys=Object.keys(groups);
-    if(!periodKeys.length)return'';
-    let h=`<div class="plan-summary-section">
-      <div class="plan-prog-title" style="color:${color}">${title}
-        <span style="font-family:'Barlow';font-size:12px;color:var(--white-dim);margin-left:10px">${periodKeys.length} period${periodKeys.length!==1?'s':''}</span>
-      </div>`;
-    periodKeys.forEach(pName=>{
-      const g=groups[pName];
-      const total=g.prac.length+g.game.length;
-      const endItem=g.prac.concat(g.game).find(e=>e.endSession);
-      h+=`<div class="plan-session-block">
-        <div class="plan-session-header">
-          <span class="plan-session-title" style="color:${color}">${pName}</span>
-          <span style="font-family:'Barlow Condensed';font-size:11px;color:var(--white-dim)">${g.prac.length} Practice${g.prac.length!==1?'s':''} + ${g.game.length} Game${g.game.length!==1?'s':''} = ${total} total slots${endItem?' · 🏁 period ends '+fmtDate2(endItem.dt):''}</span>
-        </div>
-        <div class="plan-class-grid">
-          ${g.prac.concat(g.game).sort((a,b)=>a.dt-b.dt).map(e=>{
-            const isGame=e.dt.getDay()===0;
-            const isEnd=e.endSession;
-            const num=isGame?`Game ${e.gameNum}`:`Practice ${e.classNum}`;
-            return `<div class="plan-class-card" style="border-color:${isEnd?'#e74c3c':color+'44'}">
-              <div class="plan-class-date">${num}${isEnd?' 🏁':''}</div>
-              <div class="plan-class-detail">${fmtDate2(e.dt)}</div>
-              <div class="plan-class-detail" style="color:${color}">${e.slot.time}</div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-    });
-    h+=`</div>`;
-    return h;
-  }
-  html+=renderPeriodProgram('ADM','#90ee90',admGroups);
-  html+=renderPeriodProgram('InHouse','#ffa500',ihGroups);
+  });
 
   if(!html){
     html='<div style="color:var(--white-dim);padding:24px;text-align:center">No sessions planned yet. Go to the Calendar tab and check dates to build your season.</div>';
   }
 
-  const ljTotal=ljEntries.length;
-  const admTotal=allEntries.filter(e=>e.slot.code==='adm').length;
-  const ihTotal=allEntries.filter(e=>e.slot.code==='ih').length;
-  const grandTotal=ljTotal+admTotal+ihTotal;
+  // Build per-program per-session totals for the top summary
+  const summaryRows=programs.map(prog=>{
+    const entries=allEntries.filter(prog.filter).sort((a,b)=>a.dt-b.dt);
+    if(!entries.length)return null;
+    // Group by sessionName
+    const sessions={};
+    entries.forEach(e=>{
+      if(!sessions[e.sessionName])sessions[e.sessionName]=0;
+      sessions[e.sessionName]++;
+    });
+    return{prog,sessions,total:entries.length};
+  }).filter(Boolean);
 
-  function totalsBlock(title,color,groups,isLj){
-    const keys=Object.keys(groups);
-    if(!keys.length)return'';
-    return `<div style="background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:7px;overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--gray-border)">
-        <span style="font-family:'Barlow Condensed';font-size:13px;font-weight:600;color:${color};letter-spacing:.5px">${title}</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:0;padding:6px 8px">
-        ${keys.map(k=>{
-          const g=groups[k];
-          const total=isLj?(g.wed.length+g.sun.length):(g.prac.length+g.game.length);
-          const sub=isLj?`${g.wed.length}W + ${g.sun.length}S`:`${g.prac.length}P + ${g.game.length}G`;
-          return `<div style="display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-right:1px solid var(--gray-border);min-width:90px">
-            <div style="font-family:'Barlow Condensed';font-size:10px;color:var(--white-dim);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">${k}</div>
-            <div style="font-family:'Bebas Neue';font-size:22px;color:${color};line-height:1">${total}</div>
-            <div style="font-family:'Barlow Condensed';font-size:9px;color:var(--gray-light)">${sub}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
+  const grandTotal=summaryRows.reduce((a,r)=>a+r.total,0);
 
   const totalsHtml=`
   <div style="margin-bottom:20px">
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap">
       <div style="font-family:'Bebas Neue';font-size:22px;color:var(--gold);letter-spacing:1px">Season Totals</div>
-      <div style="font-family:'Barlow Condensed';font-size:13px;color:var(--white-dim)">${grandTotal} slots planned across all programs</div>
+      <div style="font-family:'Barlow Condensed';font-size:13px;color:var(--white-dim)">${grandTotal} sessions planned across all programs</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      ${totalsBlock('Little Jaguars / Pre-Hockey','#ffb6c1',ljSessions,true)}
-      ${totalsBlock('ADM','#90ee90',admGroups,false)}
-      ${totalsBlock('InHouse','#ffa500',ihGroups,false)}
+    ${summaryRows.map(({prog,sessions,total})=>`
+      <div style="background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:7px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--gray-border)">
+          <span style="font-family:'Barlow Condensed';font-size:13px;font-weight:600;color:${prog.color};letter-spacing:.5px">${prog.title}</span>
+          <span style="font-family:'Bebas Neue';font-size:18px;color:${prog.color}">${total} total</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0;padding:6px 8px">
+          ${Object.entries(sessions).map(([sName,count])=>`
+            <div style="display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-right:1px solid var(--gray-border);last-child:border-right:none;min-width:90px">
+              <div style="font-family:'Barlow Condensed';font-size:10px;color:var(--white-dim);letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px">${sName}</div>
+              <div style="font-family:'Bebas Neue';font-size:22px;color:${prog.color};line-height:1">${count}</div>
+              <div style="font-family:'Barlow Condensed';font-size:9px;color:var(--gray-light)">session${count!==1?'s':''}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('')}
     </div>
   </div>
   <hr class="div">`;
