@@ -1217,7 +1217,7 @@ function openAddModal(tabKey, idx){
     // rows themselves don't carry _promoHistory, so we look it up by identity)
     const promoEl = document.getElementById('add-modal-promo-summary');
     const masterRow = DB.master.find(m=>masterKey(m)===masterKey(row));
-    const hist = (masterRow&&masterRow._promoHistory)||[];
+    const hist = masterRow?getFullPromoHistory(masterRow):[];
     if(hist.length){
       promoEl.style.display='block';
       promoEl.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;">Promotion Status</div>'
@@ -1920,7 +1920,7 @@ function syncMasterFromSessions(){
   for(let s=1;s<=6;s++){(DB['session'+s]||[]).forEach(row=>{
     const mk=masterKey(row);if(!mk||mk.startsWith('||'))return;
     if(seen.has(mk)){const m=DB.master[seen.get(mk)];if(!m._sessions)m._sessions=[];const sess='Session '+s;if(!m._sessions.includes(sess))m._sessions.push(sess);}
-    else{DB.master.push(Object.assign({},row,{_sessions:['Session '+s],_promoHistory:[],date_added:row.date_added||''}));seen.set(mk,DB.master.length-1);}
+    else{const da=row.date_added||'';const startHist=row.level?[{level:(row.level||'').toUpperCase().replace(/\s/g,''),date:da}]:[];DB.master.push(Object.assign({},row,{_sessions:['Session '+s],_promoHistory:startHist,date_added:da}));seen.set(mk,DB.master.length-1);}
   });}
 }
 const PROMO_TRACK=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','InHouse','Travel'];
@@ -2219,9 +2219,10 @@ function openPromoHistory(sNum, promoIdx){
     +'</div>';
   }).join('');
 
-  const masterHistory=master&&master._promoHistory&&master._promoHistory.length
+  const masterFullHist=master?getFullPromoHistory(master):[];
+  const masterHistory=masterFullHist.length
     ?'<div style="margin-top:16px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">Master File Track</div>'
-      +master._promoHistory.map(h=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">'+lvBadge(h.level)+'<span style="font-size:11px;color:var(--dim);">'+h.date+'</span></div>').join('')
+      +masterFullHist.map(h=>'<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">'+lvBadge(h.level)+'<span style="font-size:11px;color:var(--dim);">'+h.date+'</span></div>').join('')
       +'</div>':''  ;
 
   let modal=document.getElementById('promo-history-modal');
