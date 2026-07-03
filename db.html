@@ -1397,27 +1397,16 @@ function playerKey(r){return(r.first_name||'')+'|'+(r.last_name||'')+'|'+(r.birt
 // the rest of that day even if a coach unchecks a mistaken entry -- otherwise removing
 // the only check-in so far would reset everyone else back to the default too, which
 // looks like the whole thing "randomly resetting."
-const ATTEND_STARTED_KEY='jaguar_attend_started_v1';
-let attendStarted={}; // {sNum:{grp:{date:true}}}
-function loadAttendStarted(){try{const r=localStorage.getItem(ATTEND_STARTED_KEY);if(r)attendStarted=JSON.parse(r);}catch(e){}}
-function saveAttendStarted(){try{localStorage.setItem(ATTEND_STARTED_KEY,JSON.stringify(attendStarted));}catch(e){}}
-function hasCheckinsStartedToday(sNum,grp,dateStr){
-  return !!(attendStarted[sNum]&&attendStarted[sNum][grp]&&attendStarted[sNum][grp][dateStr]);
-}
-// Marks check-in as started for this date if it wasn't already. Returns true only the
-// FIRST time this fires for a given date, so callers can tell "just started" apart from
-// "already started" without re-triggering a full-table refresh on every later click.
-function markCheckinsStarted(sNum,grp,dateStr){
-  if(!attendStarted[sNum])attendStarted[sNum]={};
-  if(!attendStarted[sNum][grp])attendStarted[sNum][grp]={};
-  if(attendStarted[sNum][grp][dateStr])return false;
-  attendStarted[sNum][grp][dateStr]=true;
-  saveAttendStarted();
-  return true;
-}
-function getCountedAttendDates(sNum,grp,dates){
-  const today=new Date().toISOString().slice(0,10);
-  return dates.filter(d=>d<today||(d===today&&hasCheckinsStartedToday(sNum,grp,today)));
+// Attendance % is simply: how many of this session's dates has this kid been checked
+// in for, out of the total number of dates in the session. No date-gating, no "has
+// today started" logic -- just a straight count, same as the "2 of 6 filled = 33%"
+// you'd get from any checklist.
+function computeAttendStats(sNum,grp,pk,dates){
+  const pa=(attendData[sNum]&&attendData[sNum][grp]&&attendData[sNum][grp][pk])||{};
+  const attended=dates.filter(d=>pa[d]).length;
+  const total=dates.length;
+  const pct=total?Math.round(attended/total*100):0;
+  return{attended,total,pct};
 }
 
 // ── Primary: read from Data Center Program Summary (jaguar_plan_data) ──
@@ -1609,18 +1598,16 @@ function renderLevelAttendTab(sNum, grp, rows){
   const tbody=`<tbody>${rows.map(r=>{
     const pk=playerKey(r);
     const safeKey=pk.replace(/[^a-z0-9]/gi,'_');
-    const pa=attendData[sNum]?.[grp]?.[pk]||{};
-    const pastDates=getCountedAttendDates(sNum,grp,dates);
-    const attended=pastDates.filter(d=>pa[d]).length;
-    const pct=pastDates.length?Math.round(attended/pastDates.length*100):100;
+    const{attended,total,pct}=computeAttendStats(sNum,grp,pk,dates);
     const pctCls=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
+    const pa=attendData[sNum]?.[grp]?.[pk]||{};
     const cells=dates.map(d=>`<td><input type="checkbox" class="attend-cb" ${pa[d]?'checked':''} onchange="toggleAttend(${sNum},'${grp}','${pk}','${d}',this.checked)"></td>`).join('');
     return`<tr>
       <td class="name-cell">${r.first_name||''} ${r.last_name||''}</td>
       <td style="text-align:center;color:var(--dim);font-size:11px;">${r.birth_year||'—'}</td>
       <td>${lvBadge(r.level)}</td>
       ${cells}
-      <td><span class="pct-pill ${pctCls}" id="apct-${sNum}-${grp}-${safeKey}">${pct}%</span></td>
+      <td><span id="acnt-${sNum}-${grp}-${safeKey}" style="color:var(--dim);font-size:10px;margin-right:4px;">${attended}/${total}</span><span class="pct-pill ${pctCls}" id="apct-${sNum}-${grp}-${safeKey}">${pct}%</span></td>
     </tr>`;
   }).join('')}</tbody>`;
 
@@ -1642,26 +1629,15 @@ function toggleAttend(sNum,grp,pk,date,checked){
   if(!attendData[sNum])attendData[sNum]={};
   if(!attendData[sNum][grp])attendData[sNum][grp]={};
   if(!attendData[sNum][grp][pk])attendData[sNum][grp][pk]={};
-  const today=new Date().toISOString().slice(0,10);
   attendData[sNum][grp][pk][date]=checked;
   saveAttendData();
-  const justStarted=(date===today&&checked)?markCheckinsStarted(sNum,grp,today):false;
-  if(justStarted){
-    // First check-in recorded for today in this group -- today now counts toward
-    // EVERYONE's attendance %, not just the row that was clicked, so the whole table
-    // needs to refresh rather than patching a single cell.
-    renderAll();
-    if(activeTab==='attendance')renderAttendanceTab();
-    return;
-  }
   const dates=getSessionDates(sNum);
-  const pa=attendData[sNum][grp][pk];
-  const pastDates2=getCountedAttendDates(sNum,grp,dates);
-  const attended=pastDates2.filter(d=>pa[d]).length;
-  const pct=pastDates2.length?Math.round(attended/pastDates2.length*100):100;
+  const{attended,total,pct}=computeAttendStats(sNum,grp,pk,dates);
   const safeKey=pk.replace(/[^a-z0-9]/gi,'_');
   const el=document.getElementById('apct-'+sNum+'-'+grp+'-'+safeKey);
   if(el){el.textContent=pct+'%';el.className='pct-pill '+(pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo');}
+  const cntEl=document.getElementById('acnt-'+sNum+'-'+grp+'-'+safeKey);
+  if(cntEl){cntEl.textContent=attended+'/'+total;}
 }
 
 function renderAttendTab(sNum,grp){
@@ -1678,13 +1654,10 @@ function renderAttendSummary(sNum){
     anyData=true;
     html+=`<div style="margin-bottom:20px;"><div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:${grp.startsWith('lj')?'#5CCC88':'#F07050'};margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);">${grp.toUpperCase()}</div><div class="attend-summary-grid">`;
     rows.forEach(r=>{
-      const pk=playerKey(r);const pa=attendData[sNum]?.[grp]?.[pk]||{};
-      const _today3=new Date().toISOString().slice(0,10);
-      const pastDates3=dates.filter(d=>d<=_today3);
-      const attended=pastDates3.filter(d=>pa[d]).length;
-      const pct=pastDates3.length?Math.round(attended/pastDates3.length*100):0;
+      const pk=playerKey(r);
+      const{attended,total,pct}=computeAttendStats(sNum,grp,pk,dates);
       const fc=pct>=80?'#5CCC88':pct>=50?'var(--gold)':'#F07050';
-      html+=`<div class="asum-card"><div class="asum-name">${r.first_name||''} ${r.last_name||''}</div><div class="asum-level">${r.level||'—'} &middot; Born ${r.birth_year||'—'}</div><div class="asum-track"><div class="asum-fill" style="width:${pct}%;background:${fc};"></div></div><div class="asum-stats"><span>${attended} / ${dates.length} days</span><span style="color:${fc};font-weight:600;">${pct}%</span></div></div>`;
+      html+=`<div class="asum-card"><div class="asum-name">${r.first_name||''} ${r.last_name||''}</div><div class="asum-level">${r.level||'—'} &middot; Born ${r.birth_year||'—'}</div><div class="asum-track"><div class="asum-fill" style="width:${pct}%;background:${fc};"></div></div><div class="asum-stats"><span>${attended} / ${total} days</span><span style="color:${fc};font-weight:600;">${pct}%</span></div></div>`;
     });
     html+='</div></div>';
   });
@@ -1807,8 +1780,9 @@ function renderGroupTab(sNum,grp,rows){
     const fi=r._origIdx!==undefined?r._origIdx:DB[sk].indexOf(r);
     const pk=r.first_name+'|'+r.last_name+'|'+(r.birthdate||''),pt=pm[pk]||null;
     const sg=subLevel(r).toLowerCase()||grp+'1',pp=playerKey(r),sk2=pp.replace(/[^a-z0-9]/gi,'_');
-    const pa=attendData[sNum]?.[sg]?.[pp]||{};const pastD=getCountedAttendDates(sNum,sg,dates);const att=pastD.filter(d=>pa[d]).length;
-    const pct=pastD.length?Math.round(att/pastD.length*100):100,pcl=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
+    const{attended:att,total:attTotal,pct}=computeAttendStats(sNum,sg,pp,dates);
+    const pcl=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
+    const pa=attendData[sNum]?.[sg]?.[pp]||{};
     const cells=dates.map(d=>'<td><input type="checkbox" class="attend-cb" '+(pa[d]?'checked':'')+' onchange="toggleAttend('+sNum+',\''+sg+'\',\''+pp+'\',\''+d+'\',this.checked)"></td>').join('');
     const by=r.birth_year||(r.birthdate?r.birthdate.split('-')[0]:'--');
     return'<tr'+(pt?' style="background:rgba(255,200,50,.06);"':'')+'>'+
@@ -1819,7 +1793,7 @@ function renderGroupTab(sNum,grp,rows){
       (pt?'<td style="text-align:center;"><span title="Promoted to '+pt+'" style="color:var(--gold);font-size:14px;">&#9733;</span></td>':'<td></td>')+
       (pt?'<td style="padding:3px 4px;">'+lvBadge(pt)+'</td>':'<td></td>')+
       cells+
-      '<td style="padding:4px 3px;"><span class="pct-pill '+pcl+(dates.length>=3&&pct<60?' pct-warn':'')+'" id="apct-'+sNum+'-'+sg+'-'+sk2+'">'+pct+'%'+(dates.length>=3&&pct<60?' !':'')+' </span></td>'+
+      '<td style="padding:4px 3px;"><span id="acnt-'+sNum+'-'+sg+'-'+sk2+'" style="color:var(--dim);font-size:10px;margin-right:3px;">'+att+'/'+attTotal+'</span><span class="pct-pill '+pcl+'" id="apct-'+sNum+'-'+sg+'-'+sk2+'">'+pct+'%</span></td>'+
       '<td style="white-space:nowrap;"><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+fi+')">Del</button></td>'+
       '</tr>';
   }).join('')+'</tbody>';
@@ -2266,7 +2240,7 @@ function exportEmailList(){
 }
 
 // ── INIT ──
-loadDB();loadAttendData();loadAttendStarted();renderAll();updateStats();
+loadDB();loadAttendData();renderAll();updateStats();
 </script>
 
 <div id="gear-modal" style="display:none;">
