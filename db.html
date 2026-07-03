@@ -917,12 +917,14 @@ function renderPromoTab(sNum){
   const thead=`<thead><tr>${cols.map((k,ci)=>thSort(k,labels[ci],sort,null,tabKey)).join('')}</tr></thead>`;
   const tbody=`<tbody>${indexed.map(({r:p,i})=>{
     const promoOrigIdx=DB['promo'+sNum].indexOf(p);
+    const masterIdx=DB.master.findIndex(m=>masterKey(m)===masterKey(p));
+    const nameClick=masterIdx>=0?` onclick="openPlayerCard(${masterIdx})" title="View timeline / undo promotion" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;"`:'';
     const statusCell=p.promo_status==='Pending'
       ?`<span onclick="confirmPromoFromTab(${sNum},${promoOrigIdx})" title="Click to confirm this promotion" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:var(--gold);cursor:pointer;text-decoration:underline dotted;padding:2px 5px;border:1px solid var(--gold);border-radius:4px;">PENDING &#x2192;</span>`
       :`<span onclick="openPromoHistory(${sNum},${promoOrigIdx})" title="View promotion history" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">CONFIRMED &#x2139;</span>`;
     return `<tr>
-    <td style="font-size:12px;">${p.first_name||'—'}</td>
-    <td style="font-size:12px;">${p.last_name||'—'}</td>
+    <td style="font-size:12px;"${nameClick}>${p.first_name||'—'}</td>
+    <td style="font-size:12px;"${nameClick}>${p.last_name||'—'}</td>
     <td style="font-size:11px;color:var(--dim);">${p.birthdate||'—'}</td>
     <td>${lvBadge(p.from_level)}</td>
     <td>${lvBadge(p.to_level)}</td>
