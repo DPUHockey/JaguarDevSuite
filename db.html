@@ -1387,6 +1387,19 @@ function loadAttendData(){
 function saveAttendData(){try{localStorage.setItem(ATTEND_KEY,JSON.stringify(attendData));}catch(e){}}
 function saveManualDates(){try{localStorage.setItem(MANUAL_DATES_KEY,JSON.stringify(manualDates));}catch(e){}}
 function playerKey(r){return(r.first_name||'')+'|'+(r.last_name||'')+'|'+(r.birthdate||r.birth_year||'');}
+// Attendance % should only count a date once check-in has actually begun for it --
+// otherwise everyone shows as "missed" the instant the calendar flips to a class day,
+// even before anyone's had the chance to check in. We treat "started" as: at least one
+// athlete in this exact group has a real check-in recorded for that date.
+function hasCheckinsStartedToday(sNum,grp,dateStr){
+  const grpData=attendData[sNum]&&attendData[sNum][grp];
+  if(!grpData)return false;
+  return Object.values(grpData).some(rec=>rec&&rec[dateStr]);
+}
+function getCountedAttendDates(sNum,grp,dates){
+  const today=new Date().toISOString().slice(0,10);
+  return dates.filter(d=>d<today||(d===today&&hasCheckinsStartedToday(sNum,grp,today)));
+}
 
 // ── Primary: read from Data Center Program Summary (jaguar_plan_data) ──
 //
@@ -1578,10 +1591,9 @@ function renderLevelAttendTab(sNum, grp, rows){
     const pk=playerKey(r);
     const safeKey=pk.replace(/[^a-z0-9]/gi,'_');
     const pa=attendData[sNum]?.[grp]?.[pk]||{};
-    const _today=new Date().toISOString().slice(0,10);
-    const pastDates=dates.filter(d=>d<=_today);
+    const pastDates=getCountedAttendDates(sNum,grp,dates);
     const attended=pastDates.filter(d=>pa[d]).length;
-    const pct=pastDates.length?Math.round(attended/pastDates.length*100):0;
+    const pct=pastDates.length?Math.round(attended/pastDates.length*100):100;
     const pctCls=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
     const cells=dates.map(d=>`<td><input type="checkbox" class="attend-cb" ${pa[d]?'checked':''} onchange="toggleAttend(${sNum},'${grp}','${pk}','${d}',this.checked)"></td>`).join('');
     return`<tr>
@@ -1611,14 +1623,23 @@ function toggleAttend(sNum,grp,pk,date,checked){
   if(!attendData[sNum])attendData[sNum]={};
   if(!attendData[sNum][grp])attendData[sNum][grp]={};
   if(!attendData[sNum][grp][pk])attendData[sNum][grp][pk]={};
+  const today=new Date().toISOString().slice(0,10);
+  const startedBefore=date===today?hasCheckinsStartedToday(sNum,grp,today):true;
   attendData[sNum][grp][pk][date]=checked;
   saveAttendData();
+  const startedAfter=date===today?hasCheckinsStartedToday(sNum,grp,today):true;
+  if(date===today&&!startedBefore&&startedAfter){
+    // This was the FIRST check-in recorded for today in this group -- today now counts
+    // toward everyone's attendance %, not just the row that was just clicked, so the
+    // whole table needs to refresh rather than patching a single cell.
+    renderAttendanceTab();
+    return;
+  }
   const dates=getSessionDates(sNum);
   const pa=attendData[sNum][grp][pk];
-  const _today2=new Date().toISOString().slice(0,10);
-  const pastDates2=dates.filter(d=>d<=_today2);
+  const pastDates2=getCountedAttendDates(sNum,grp,dates);
   const attended=pastDates2.filter(d=>pa[d]).length;
-  const pct=pastDates2.length?Math.round(attended/pastDates2.length*100):0;
+  const pct=pastDates2.length?Math.round(attended/pastDates2.length*100):100;
   const safeKey=pk.replace(/[^a-z0-9]/gi,'_');
   const el=document.getElementById('apct-'+sNum+'-'+grp+'-'+safeKey);
   if(el){el.textContent=pct+'%';el.className='pct-pill '+(pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo');}
