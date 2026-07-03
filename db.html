@@ -216,6 +216,21 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .tbl-edit:hover{border-color:var(--gborder);color:var(--gold);}
 .tbl-del{font-size:11px;padding:2px 7px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--dim);cursor:pointer;font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;}
 .tbl-del:hover{border-color:var(--phborder);color:#F07050;}
+/* touch scrolling momentum on all scrollable panes */
+.table-outer,.attend-outer,.tab-bar,.sub-tab-bar{-webkit-overflow-scrolling:touch;}
+
+/* ============ TABLET (iPad portrait/landscape, ~600-1024px) ============ */
+@media(max-width:1024px){
+  .hero-strip,.upload-wrap,.tabs-wrap,.content-wrap,.alert-bar{padding-left:20px;padding-right:20px;}
+  .apps-panel{margin-left:20px;margin-right:20px;}
+  .form-grid-3,.form-grid-4{grid-template-columns:1fr 1fr;}
+  .add-modal{width:92vw;}
+  /* comfortable touch targets without overhauling desktop density */
+  .btn-sm,.btn-cancel,.btn-confirm,.tbl-edit,.tbl-del,.btn-promote{min-height:36px;}
+  .sess-opt{padding:16px 8px;}
+}
+
+/* ============ MOBILE (phones, <=600px) ============ */
 @media(max-width:600px){
   nav{padding:0 14px;}
   .hero-strip,.upload-wrap,.tabs-wrap,.content-wrap,.alert-bar{padding-left:14px;padding-right:14px;}
@@ -223,6 +238,50 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
   .nav-apps{display:none;}
   .form-grid,.form-grid-3,.form-grid-4{grid-template-columns:1fr;}
   .add-modal{padding:18px 16px;}
+
+  /* iOS zooms in on any input/select with font-size under 16px on focus -- keep all form
+     controls at 16px on phones so tapping into a field doesn't jolt the whole page */
+  .form-field input,.form-field select,.promo-select,select{font-size:16px!important;}
+  /* the day/promote selects set fixed pixel widths and small padding inline (desktop-sized);
+     override so the larger touch font above doesn't get clipped or too cramped to tap */
+  .attend-table select,.data-table select,.promo-select{
+    max-width:none!important;width:auto!important;min-width:56px;
+    padding:6px 6px!important;min-height:36px;
+  }
+
+  /* buttons need a real thumb target (Apple HIG minimum is 44px) */
+  .btn-sm,.btn-cancel,.btn-confirm,.tbl-edit,.tbl-del,.btn-promote,.data-btn{
+    min-height:44px;padding-top:0;padding-bottom:0;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .sess-opt{min-height:44px;display:flex;align-items:center;justify-content:center;}
+  .sess-chip{min-height:36px;display:inline-flex;align-items:center;}
+
+  /* modal buttons stack full-width so they're easy to hit and never crowd off-screen */
+  .modal-btns{flex-direction:column-reverse;}
+  .modal-btns button{width:100%;}
+  .modal{width:94vw;padding:22px 18px;}
+
+  /* toolbar wraps into full-width rows instead of squeezing */
+  .toolbar{flex-direction:column;align-items:stretch;}
+  .toolbar>div{width:100%;}
+
+  /* tables: shrink further and give the day/promote selects room to be tapped */
+  .attend-table,.data-table{font-size:11px;}
+  .attend-table thead th.name-col{min-width:110px;}
+  .attend-table tbody td.name-cell{max-width:80px;}
+  .table-outer,.attend-outer{max-height:calc(100vh - 220px);}
+  select{min-height:32px;}
+
+  /* stat pills and cards go full width for easier scanning */
+  .stat-pills{width:100%;}
+  .attend-summary-grid{grid-template-columns:1fr 1fr;}
+}
+
+/* ============ SMALL PHONE (<=380px) ============ */
+@media(max-width:380px){
+  .attend-summary-grid{grid-template-columns:1fr;}
+  .hero-title{font-size:26px;}
 }
 </style>
 </head>
