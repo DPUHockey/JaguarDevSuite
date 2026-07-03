@@ -2250,6 +2250,27 @@ function togglePlanEnd(sk,checked){
   if(!planData[sk])planData[sk]={checked:true,endSession:false};
   planData[sk].endSession=checked;
   savePlanData();
+  if(checked){
+    const stream=slotStreamKey(sk);
+    // ADM and InHouse each run across 3 days a week (practice days + a Sunday game),
+    // but are only tracked as 2 streams here (weekday vs Sunday). Ending the session
+    // on whichever day the user actually ends it on (usually the Sunday game) should
+    // also close out the OTHER stream's currently-open block, using that stream's own
+    // most recent date as its effective end -- since practices and games don't fall on
+    // the same calendar dates, "the same end date" isn't meaningful across streams.
+    if(stream&&(stream.startsWith('adm_')||stream.startsWith('ih_'))){
+      const code=stream.split('_')[0];
+      const otherStream=stream.endsWith('_sun')?code+'_wed':code+'_sun';
+      const dk=sk.split('__')[0];
+      const candidates=Object.keys(planData)
+        .filter(k=>k!==sk&&planData[k]&&planData[k].checked&&!planData[k].endSession&&slotStreamKey(k)===otherStream&&k.split('__')[0]<=dk)
+        .sort((a,b)=>a.split('__')[0]<b.split('__')[0]?1:-1); // most recent first
+      if(candidates.length){
+        planData[candidates[0]].endSession=true;
+        savePlanData();
+      }
+    }
+  }
   buildPlanMonthNav();
   buildPlanCalendar();
 }
