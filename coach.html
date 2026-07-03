@@ -393,7 +393,8 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <div><div class="section-title">Season Planning</div><div class="section-note">Build your program sessions. Check dates, mark session ends, view summary.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="openPlanningConfig()">⚙ Session Config</button>
-        <button class="btn btn-outline btn-sm" onclick="resetPlanningData()">Reset All</button>
+        <button class="btn btn-outline btn-sm" id="btn-reset-schedule" onclick="resetPlanningData(true)">Reset Schedule (keep blackouts)</button>
+        <button class="btn btn-outline btn-sm" id="btn-reset-all" onclick="resetPlanningData(false)">Reset All</button>
         <button class="btn btn-outline btn-sm" onclick="exportPlanDataDebug()">&#x2193; Export Plan Data</button>
       </div>
     </div>
@@ -1902,16 +1903,17 @@ function savePlanConfig(){
   buildPlanCalendar();
   toast('Session config saved');
 }
-function resetPlanningData(){
-  const btn=document.querySelector('[onclick="resetPlanningData()"]');
+function resetPlanningData(keepBlockouts){
+  const btn=document.getElementById(keepBlockouts?'btn-reset-schedule':'btn-reset-all');
+  const defaultLabel=keepBlockouts?'Reset Schedule (keep blackouts)':'Reset All';
   if(btn&&btn.dataset.confirming!=='1'){
     btn.dataset.confirming='1';
     btn.textContent='Confirm Reset?';
     btn.style.borderColor='var(--red)';btn.style.color='var(--red)';
-    setTimeout(()=>{btn.dataset.confirming='';btn.textContent='Reset All';btn.style.borderColor='';btn.style.color='';},3000);
+    setTimeout(()=>{btn.dataset.confirming='';btn.textContent=defaultLabel;btn.style.borderColor='';btn.style.color='';},3000);
     return;
   }
-  if(btn){btn.dataset.confirming='';btn.textContent='Reset All';btn.style.borderColor='';btn.style.color='';}
+  if(btn){btn.dataset.confirming='';btn.textContent=defaultLabel;btn.style.borderColor='';btn.style.color='';}
   try{
     const archive={app:'jaguar-coach-planning-archive',v:1,exported:new Date().toISOString(),
       planData:planData,blockedDates:Array.from(blockedDates),activeDates:Array.from(activeDates)};
@@ -1923,10 +1925,10 @@ function resetPlanningData(){
     setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
   }catch(e){}
   planData={};savePlanData();
-  blockedDates=new Set();saveBlockedDates();
+  if(!keepBlockouts){blockedDates=new Set();saveBlockedDates();}
   activeDates=new Set();saveActiveDates(activeDates);
   buildPlanCalendar();buildCalMonthNav();buildCalendar();
-  toast('Planning data reset \u2014 backup downloaded to your files');
+  toast(keepBlockouts?'Schedule reset \u2014 blackout dates kept. Backup downloaded to your files':'Planning data reset \u2014 backup downloaded to your files');
 }
 
 function switchPlanTab(n){
