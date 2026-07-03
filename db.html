@@ -384,6 +384,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
     <div class="add-modal">
       <h2 id="add-modal-title">Add Player</h2>
       <div class="modal-sub" id="add-modal-sub">New athlete record</div>
+      <div id="add-modal-promo-summary" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--surf2);border-radius:8px;font-size:12px;"></div>
 
       <div class="form-section">Athlete Info</div>
       <div class="form-grid">
@@ -1207,6 +1208,22 @@ function openAddModal(tabKey, idx){
     document.getElementById('add-modal-title').textContent = 'Edit Player';
     document.getElementById('add-modal-sub').textContent = row.first_name + ' ' + row.last_name;
     fillForm(row);
+    // Promotion status summary -- pulled from the matching Master File record (session
+    // rows themselves don't carry _promoHistory, so we look it up by identity)
+    const promoEl = document.getElementById('add-modal-promo-summary');
+    const masterRow = DB.master.find(m=>masterKey(m)===masterKey(row));
+    const hist = (masterRow&&masterRow._promoHistory)||[];
+    if(hist.length){
+      promoEl.style.display='block';
+      promoEl.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;">Promotion Status</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+        + hist.map(h=>lvBadge(h.level)+'<span style="color:var(--dim);font-size:10px;margin-right:8px;">'+(h.date||'')+'</span>').join('')
+        + '<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;color:#5CCC88;margin-left:auto;">CURRENT: '+(row.level||'--')+'</span>'
+        + '</div>';
+    } else {
+      promoEl.style.display='block';
+      promoEl.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);">No promotions yet \u2014 current level: '+(row.level||'--')+'</div>';
+    }
     // figure out which session this record is in
     for(let i=1;i<=6;i++){
       const sk='session'+i;
@@ -1220,6 +1237,8 @@ function openAddModal(tabKey, idx){
   } else {
     document.getElementById('add-modal-title').textContent = 'Add Player';
     document.getElementById('add-modal-sub').textContent = 'New athlete record';
+    const promoEl = document.getElementById('add-modal-promo-summary');
+    if(promoEl){promoEl.style.display='none';promoEl.innerHTML='';}
     const _fda=document.getElementById('f-date-added');if(_fda)_fda.value=new Date().toISOString().slice(0,10);
     // pre-select current tab if it's a session tab
     const m = activeTab.match(/^session(\d)$/);
@@ -1828,22 +1847,22 @@ function syncMasterFromSessions(){
   });}
 }
 const PROMO_TRACK=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','InHouse','Travel'];
-function renderMasterTab(){
-  const div=document.getElementById('panel-master');if(!div)return;
-  syncMasterFromSessions();
+function getMasterFilteredSorted(){
   const rows=DB.master,sk='master',sort=sortState[sk]||{col:'last_name',dir:'asc'};
   const mf=window._masterFilter||{q:'',status:'all'};
   let disp=rows;
   if(mf.q){const q=mf.q.toLowerCase();disp=disp.filter(r=>(r.first_name||'').toLowerCase().includes(q)||(r.last_name||'').toLowerCase().includes(q)||(r.level||'').toLowerCase().includes(q)||(r.parent1_name||'').toLowerCase().includes(q)||(r.notes||'').toLowerCase().includes(q));}
   if(mf.status!=='all')disp=disp.filter(r=>(r.status||'Active')===mf.status);
   const idx=applySortRows(disp,sort);
-  function th(c,l){return thSort(c,l,sort,null,sk);}
+  return{rows,disp,idx,sort};
+}
+function buildMasterTableInner(rows,disp,idx,sort){
+  function th(c,l){return thSort(c,l,sort,null,'master');}
   function age(b){if(!b)return'--';const d=new Date(b),n=new Date(),a=n.getFullYear()-d.getFullYear()-((n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))?1:0);return isNaN(a)?'--':a;}
   function yrs(da){if(!da)return'--';const y=(new Date()-new Date(da))/(1000*60*60*24*365.25);return y<1?'<1':Math.floor(y)+'';}
   function sBadge(s){const c=s==='Active'?'#5CCC88':s==='Lost'?'#F07050':'var(--dim)';return'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;padding:2px 6px;border-radius:10px;border:1px solid '+c+';color:'+c+';">'+(s||'Active')+'</span>';}
   function wBadge(w){if(!w)return'<span style="color:var(--dim);font-size:11px;">--</span>';const c=w==='Received'?'#5CCC88':'#F07050';return'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;padding:2px 6px;border-radius:10px;border:1px solid '+c+';color:'+c+';">'+w+'</span>';}
-  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{};window._masterFilter.q=this.value;renderMasterTab();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{};window._masterFilter.status=this.value;renderMasterTab();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div><div style="margin-top:6px;text-align:right;display:flex;gap:14px;justify-content:flex-end;"><span onclick="mergeDuplicateMasterEntries()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Merge Duplicate Athletes</span><span onclick="resetMasterFile()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Reset Master File (one-time full restart)</span></div>';
-  if(!rows.length){div.innerHTML=toolbar+'<div class="empty-state"><p>No players yet.</p></div>';return;}
+  if(!rows.length)return'<div class="empty-state"><p>No players yet.</p></div>';
   const thead='<thead><tr>'+th('first_name','First')+th('last_name','Last')+th('birthdate','Age')+th('date_added','Started')+'<th>Yrs</th>'+th('level','Level')+th('status','Status')+th('waiver','Waiver')+'<th>Sessions</th>'+PROMO_TRACK.map(l=>'<th style="min-width:68px;font-size:10px;letter-spacing:.5px;">'+l+'</th>').join('')+'<th style="min-width:52px;">Actions</th></tr></thead>';
   const tbody='<tbody>'+idx.map(({r})=>{
     const hm={};(r._promoHistory||[]).forEach(h=>{hm[h.level]=h.date;});
@@ -1858,7 +1877,26 @@ function renderMasterTab(){
     const oi=DB.master.indexOf(r),rd=(r.status==='Inactive'||r.status==='Lost')?' style="opacity:.55;"':'';
     return'<tr'+rd+'><td style="font-size:12px;cursor:pointer;color:var(--gold2);" onclick="openPlayerCard('+oi+')" title="View timeline">'+(r.first_name||'')+'</td><td style="font-size:12px;cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\'master\','+oi+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);text-align:center;">'+age(r.birthdate)+'</td><td style="font-size:11px;color:var(--dim);">'+(r.date_added||'')+'</td><td style="font-size:11px;color:var(--dim);text-align:center;">'+yrs(r.date_added)+'</td><td>'+lvBadge(r.level)+'</td><td>'+sBadge(r.status)+'</td><td>'+wBadge(r.waiver)+'</td><td style="font-size:11px;color:var(--dim);">'+((r._sessions||[]).join(', ')||'')+'</td>'+pc+'<td><button class="tbl-del" onclick="deletePlayer(\'master\','+oi+')">Del</button></td></tr>';
   }).join('')+'</tbody>';
-  div.innerHTML=toolbar+'<div class="table-outer"><table class="data-table">'+thead+tbody+'</table></div>';
+  return'<div class="table-outer"><table class="data-table">'+thead+tbody+'</table></div>';
+}
+// Lightweight update used by the search box and status filter -- only touches the
+// count label and table body, never the toolbar itself, so the search input's focus
+// and cursor position survive every keystroke instead of the field being destroyed
+// and recreated (which was forcing users to re-click after every letter typed).
+function updateMasterTable(){
+  const{rows,disp,idx,sort}=getMasterFilteredSorted();
+  const countEl=document.getElementById('master-count-label');
+  if(countEl)countEl.textContent='Master File \u2014 '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'');
+  const areaEl=document.getElementById('master-table-area');
+  if(areaEl)areaEl.innerHTML=buildMasterTableInner(rows,disp,idx,sort);
+}
+function renderMasterTab(){
+  const div=document.getElementById('panel-master');if(!div)return;
+  syncMasterFromSessions();
+  const mf=window._masterFilter||{q:'',status:'all'};
+  const{rows,disp,idx,sort}=getMasterFilteredSorted();
+  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left" id="master-count-label">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{};window._masterFilter.q=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{};window._masterFilter.status=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div><div style="margin-top:6px;text-align:right;display:flex;gap:14px;justify-content:flex-end;"><span onclick="mergeDuplicateMasterEntries()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Merge Duplicate Athletes</span><span onclick="resetMasterFile()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Reset Master File (one-time full restart)</span></div>';
+  div.innerHTML=toolbar+'<div id="master-table-area">'+buildMasterTableInner(rows,disp,idx,sort)+'</div>';
 }
 function exportMasterCSV(){
   const rows=DB.master;if(!rows.length){showAlert('No data','err');return;}
