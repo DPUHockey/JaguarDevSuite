@@ -394,6 +394,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="openPlanningConfig()">⚙ Session Config</button>
         <button class="btn btn-outline btn-sm" onclick="resetPlanningData()">Reset All</button>
+        <button class="btn btn-outline btn-sm" onclick="exportPlanDataDebug()">&#x2193; Export Plan Data</button>
       </div>
     </div>
     <!-- Inner tabs -->
@@ -2149,6 +2150,21 @@ function slotStreamKey(sk){
 }
 const STREAM_LABELS={lj_wed:'LJ/PH (Wednesday)',lj_sun:'LJ/PH (Sunday)',adm_wed:'ADM Practice',adm_sun:'ADM Game',ih_wed:'InHouse Practice',ih_sun:'InHouse Game'};
 let _pendingSessionPick=null; // {sk, checked}
+function exportPlanDataDebug(){
+  const checkedOnly={};
+  Object.keys(planData).forEach(k=>{if(planData[k]&&planData[k].checked)checkedOnly[k]=planData[k];});
+  const sortedKeys=Object.keys(checkedOnly).sort();
+  const readable=sortedKeys.map(k=>{
+    const v=checkedOnly[k];
+    return k+' -> checked:'+v.checked+', endSession:'+(v.endSession||false)+', sessionNum:'+(v.sessionNum||'(none)');
+  }).join('\n');
+  const blob=new Blob([readable],{type:'text/plain'});
+  const a=document.createElement('a'),d=new Date();
+  a.href=URL.createObjectURL(blob);
+  a.download='jaguar-plan-data-debug-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.txt';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+}
 function togglePlanSlot(sk,checked){
   // Extract dateKey from slotKey (format: dateKey__dayName__si)
   const dk=sk.split('__')[0];
@@ -2174,7 +2190,8 @@ function togglePlanSlot(sk,checked){
     } else {
       // suggest the next session number after whatever's already used in this stream
       const used=Object.keys(planData).filter(k=>planData[k]&&planData[k].checked&&slotStreamKey(k)===stream).map(k=>planData[k].sessionNum||0);
-      const suggested=used.length?Math.min(6,Math.max(...used)+(mostRecent&&mostRecent.endSession?1:0)||Math.max(...used)):1;
+      const maxUsed=used.length?Math.max(...used):0;
+      const suggested=maxUsed>0?Math.min(6,maxUsed+((mostRecent&&mostRecent.endSession)?1:0)):1;
       _pendingSessionPick={sk,checked};
       document.getElementById('sessionPickStreamLabel').textContent=STREAM_LABELS[stream]||stream;
       document.getElementById('sessionPickSelect').value=String(Math.min(6,Math.max(1,suggested||1)));
