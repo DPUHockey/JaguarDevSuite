@@ -856,7 +856,10 @@ function renderSessionPanel(sNum){
   ];
 
   const cur=activeSubTab[sk]||'all';
-  const barHtml=`<div class="sub-tab-bar" style="justify-content:space-between;align-items:center;">${subTabs.map(t=>`<button class="sub-tab-btn ${t.cls}${cur===t.key?' active':''}" onclick="switchSubTab('${sk}','${t.key}')">${t.label}${t.cnt!==null?` <span class="cnt-badge">${t.cnt}</span>`:''}</button>`).join('')}<span onclick="clearSessionData(${sNum})" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;margin-left:auto;padding-left:12px;white-space:nowrap;">Clear Session ${sNum}</span></div>`;
+  const barHtml=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;">
+    <div class="sub-tab-bar" style="flex:1;min-width:0;margin-bottom:0;">${subTabs.map(t=>`<button class="sub-tab-btn ${t.cls}${cur===t.key?' active':''}" onclick="switchSubTab('${sk}','${t.key}')">${t.label}${t.cnt!==null?` <span class="cnt-badge">${t.cnt}</span>`:''}</button>`).join('')}</div>
+    <span onclick="clearSessionData(${sNum})" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;flex-shrink:0;white-space:nowrap;">Clear Session ${sNum}</span>
+  </div>`;
 
   let content='';
   if(cur==='promo'){content=renderPromoTab(sNum);}
