@@ -1391,10 +1391,29 @@ function playerKey(r){return(r.first_name||'')+'|'+(r.last_name||'')+'|'+(r.birt
 // otherwise everyone shows as "missed" the instant the calendar flips to a class day,
 // even before anyone's had the chance to check in. We treat "started" as: at least one
 // athlete in this exact group has a real check-in recorded for that date.
+// Attendance % should only count a date once check-in has actually begun for it --
+// otherwise everyone shows as "missed" the instant the calendar flips to a class day,
+// even before anyone's had the chance to check in. Once started, it STAYS started for
+// the rest of that day even if a coach unchecks a mistaken entry -- otherwise removing
+// the only check-in so far would reset everyone else back to the default too, which
+// looks like the whole thing "randomly resetting."
+const ATTEND_STARTED_KEY='jaguar_attend_started_v1';
+let attendStarted={}; // {sNum:{grp:{date:true}}}
+function loadAttendStarted(){try{const r=localStorage.getItem(ATTEND_STARTED_KEY);if(r)attendStarted=JSON.parse(r);}catch(e){}}
+function saveAttendStarted(){try{localStorage.setItem(ATTEND_STARTED_KEY,JSON.stringify(attendStarted));}catch(e){}}
 function hasCheckinsStartedToday(sNum,grp,dateStr){
-  const grpData=attendData[sNum]&&attendData[sNum][grp];
-  if(!grpData)return false;
-  return Object.values(grpData).some(rec=>rec&&rec[dateStr]);
+  return !!(attendStarted[sNum]&&attendStarted[sNum][grp]&&attendStarted[sNum][grp][dateStr]);
+}
+// Marks check-in as started for this date if it wasn't already. Returns true only the
+// FIRST time this fires for a given date, so callers can tell "just started" apart from
+// "already started" without re-triggering a full-table refresh on every later click.
+function markCheckinsStarted(sNum,grp,dateStr){
+  if(!attendStarted[sNum])attendStarted[sNum]={};
+  if(!attendStarted[sNum][grp])attendStarted[sNum][grp]={};
+  if(attendStarted[sNum][grp][dateStr])return false;
+  attendStarted[sNum][grp][dateStr]=true;
+  saveAttendStarted();
+  return true;
 }
 function getCountedAttendDates(sNum,grp,dates){
   const today=new Date().toISOString().slice(0,10);
@@ -1624,14 +1643,13 @@ function toggleAttend(sNum,grp,pk,date,checked){
   if(!attendData[sNum][grp])attendData[sNum][grp]={};
   if(!attendData[sNum][grp][pk])attendData[sNum][grp][pk]={};
   const today=new Date().toISOString().slice(0,10);
-  const startedBefore=date===today?hasCheckinsStartedToday(sNum,grp,today):true;
   attendData[sNum][grp][pk][date]=checked;
   saveAttendData();
-  const startedAfter=date===today?hasCheckinsStartedToday(sNum,grp,today):true;
-  if(date===today&&startedBefore!==startedAfter){
-    // Today's check-in status just flipped (either the first check-in of the day just
-    // happened, or the last remaining one was just undone) -- either way, that changes
-    // what "today" means for EVERYONE's attendance %, not just the row that was clicked.
+  const justStarted=(date===today&&checked)?markCheckinsStarted(sNum,grp,today):false;
+  if(justStarted){
+    // First check-in recorded for today in this group -- today now counts toward
+    // EVERYONE's attendance %, not just the row that was clicked, so the whole table
+    // needs to refresh rather than patching a single cell.
     renderAll();
     if(activeTab==='attendance')renderAttendanceTab();
     return;
@@ -2248,7 +2266,7 @@ function exportEmailList(){
 }
 
 // ── INIT ──
-loadDB();loadAttendData();renderAll();updateStats();
+loadDB();loadAttendData();loadAttendStarted();renderAll();updateStats();
 </script>
 
 <div id="gear-modal" style="display:none;">
