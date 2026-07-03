@@ -1628,11 +1628,12 @@ function toggleAttend(sNum,grp,pk,date,checked){
   attendData[sNum][grp][pk][date]=checked;
   saveAttendData();
   const startedAfter=date===today?hasCheckinsStartedToday(sNum,grp,today):true;
-  if(date===today&&!startedBefore&&startedAfter){
-    // This was the FIRST check-in recorded for today in this group -- today now counts
-    // toward everyone's attendance %, not just the row that was just clicked, so the
-    // whole table needs to refresh rather than patching a single cell.
-    renderAttendanceTab();
+  if(date===today&&startedBefore!==startedAfter){
+    // Today's check-in status just flipped (either the first check-in of the day just
+    // happened, or the last remaining one was just undone) -- either way, that changes
+    // what "today" means for EVERYONE's attendance %, not just the row that was clicked.
+    renderAll();
+    if(activeTab==='attendance')renderAttendanceTab();
     return;
   }
   const dates=getSessionDates(sNum);
@@ -1788,8 +1789,8 @@ function renderGroupTab(sNum,grp,rows){
     const fi=r._origIdx!==undefined?r._origIdx:DB[sk].indexOf(r);
     const pk=r.first_name+'|'+r.last_name+'|'+(r.birthdate||''),pt=pm[pk]||null;
     const sg=subLevel(r).toLowerCase()||grp+'1',pp=playerKey(r),sk2=pp.replace(/[^a-z0-9]/gi,'_');
-    const pa=attendData[sNum]?.[sg]?.[pp]||{};const _td=new Date().toISOString().slice(0,10);const pastD=dates.filter(d=>d<=_td);const att=pastD.filter(d=>pa[d]).length;
-    const pct=pastD.length?Math.round(att/pastD.length*100):0,pcl=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
+    const pa=attendData[sNum]?.[sg]?.[pp]||{};const pastD=getCountedAttendDates(sNum,sg,dates);const att=pastD.filter(d=>pa[d]).length;
+    const pct=pastD.length?Math.round(att/pastD.length*100):100,pcl=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
     const cells=dates.map(d=>'<td><input type="checkbox" class="attend-cb" '+(pa[d]?'checked':'')+' onchange="toggleAttend('+sNum+',\''+sg+'\',\''+pp+'\',\''+d+'\',this.checked)"></td>').join('');
     const by=r.birth_year||(r.birthdate?r.birthdate.split('-')[0]:'--');
     return'<tr'+(pt?' style="background:rgba(255,200,50,.06);"':'')+'>'+
