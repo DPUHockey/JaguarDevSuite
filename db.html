@@ -487,18 +487,60 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 
 <script>
 // ── DATA STORE ──
-const STORE_KEY = 'jaguar_athlete_db_v1';
+// Split into two keys so a season reset can wipe check-in/session data without
+// touching Master File (career-spanning) history:
+//   MASTER_KEY  -- persists forever, never cleared by Start New Season
+//   SEASON_KEY  -- this year's sessions/promotions, safe to wipe each fall
+const MASTER_KEY = 'jaguar_master_v1';
+const SEASON_KEY = 'jaguar_season_v1';
+const LEGACY_STORE_KEY = 'jaguar_athlete_db_v1'; // old combined key -- read once for migration, then unused
+const SEASON_FIELDS = ['session1','session2','session3','session4','session5','session6','lj1','lj2','lj3','ph1','ph2','ph3','lj','ph','promo1','promo2','promo3','promo4','promo5','promo6'];
 const DB = {session1:[],session2:[],session3:[],session4:[],session5:[],session6:[],master:[],lj1:[],lj2:[],lj3:[],ph1:[],ph2:[],ph3:[],lj:[],ph:[],promo1:[],promo2:[],promo3:[],promo4:[],promo5:[],promo6:[]};
 let pending = null, pendingName = '', selSess = null;
 
-function saveDB(){try{localStorage.setItem(STORE_KEY,JSON.stringify(DB));}catch(e){}}
+function saveDB(){
+  try{
+    localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
+    const season={};SEASON_FIELDS.forEach(k=>season[k]=DB[k]);
+    localStorage.setItem(SEASON_KEY,JSON.stringify(season));
+  }catch(e){}
+}
 function loadDB(){
   try{
-    const raw=localStorage.getItem(STORE_KEY);
-    if(!raw)return;
-    const saved=JSON.parse(raw);
-    Object.keys(DB).forEach(k=>{if(saved[k])DB[k]=saved[k];});
+    const mRaw=localStorage.getItem(MASTER_KEY),sRaw=localStorage.getItem(SEASON_KEY);
+    if(mRaw||sRaw){
+      if(mRaw){const m=JSON.parse(mRaw);if(m.master)DB.master=m.master;}
+      if(sRaw){const s=JSON.parse(sRaw);SEASON_FIELDS.forEach(k=>{if(s[k])DB[k]=s[k];});}
+      return;
+    }
+    // one-time migration: old single-key format found, split it into the new keys
+    const legacy=localStorage.getItem(LEGACY_STORE_KEY);
+    if(legacy){
+      const saved=JSON.parse(legacy);
+      Object.keys(DB).forEach(k=>{if(saved[k])DB[k]=saved[k];});
+      saveDB();
+    }
   }catch(e){}
+}
+function startNewSeason(){
+  jagConfirm('Start a new season? This downloads a backup of everything first, then clears all session rosters, check-ins, and promotions for a fresh start. Master File (every athlete\'s career history) is never touched.',function(){
+    try{
+      const archive={app:'jaguar-db-season-archive',v:1,exported:new Date().toISOString(),master:DB.master,season:{}};
+      SEASON_FIELDS.forEach(k=>archive.season[k]=DB[k]);
+      const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
+      const a=document.createElement('a'),d=new Date();
+      a.href=URL.createObjectURL(blob);
+      a.download='jaguar-season-archive-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+      document.body.appendChild(a);a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+    }catch(e){}
+    SEASON_FIELDS.forEach(k=>DB[k]=[]);
+    pending=null;pendingName='';selSess=null;
+    saveDB();
+    switchMainTab('master');
+    updateStats();
+    showAlert('New season started \u2014 Master File preserved ('+DB.master.length+' athletes). Session data cleared and archived to your downloads.','ok');
+  });
 }
 
 // ── CSV PARSER ──
@@ -1695,7 +1737,7 @@ function renderMasterTab(){
   function yrs(da){if(!da)return'--';const y=(new Date()-new Date(da))/(1000*60*60*24*365.25);return y<1?'<1':Math.floor(y)+'';}
   function sBadge(s){const c=s==='Active'?'#5CCC88':s==='Lost'?'#F07050':'var(--dim)';return'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;padding:2px 6px;border-radius:10px;border:1px solid '+c+';color:'+c+';">'+(s||'Active')+'</span>';}
   function wBadge(w){if(!w)return'<span style="color:var(--dim);font-size:11px;">--</span>';const c=w==='Received'?'#5CCC88':'#F07050';return'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;padding:2px 6px;border-radius:10px;border:1px solid '+c+';color:'+c+';">'+w+'</span>';}
-  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{};window._masterFilter.q=this.value;renderMasterTab();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{};window._masterFilter.status=this.value;renderMasterTab();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button></div></div>';
+  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{};window._masterFilter.q=this.value;renderMasterTab();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{};window._masterFilter.status=this.value;renderMasterTab();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div>';
   if(!rows.length){div.innerHTML=toolbar+'<div class="empty-state"><p>No players yet.</p></div>';return;}
   const thead='<thead><tr>'+th('first_name','First')+th('last_name','Last')+th('birthdate','Age')+th('date_added','Started')+'<th>Yrs</th>'+th('level','Level')+th('status','Status')+th('waiver','Waiver')+'<th>Sessions</th>'+PROMO_TRACK.map(l=>'<th style="min-width:68px;font-size:10px;letter-spacing:.5px;">'+l+'</th>').join('')+'<th style="min-width:52px;">Actions</th></tr></thead>';
   const tbody='<tbody>'+idx.map(({r})=>{
