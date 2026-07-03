@@ -939,14 +939,16 @@ function renderPromoTab(sNum){
 }
 
 // ── PROMO MODAL ──
-function openPromoModal(sNum, rowIdx){
+function openPromoModal(sNum, rowIdx, overrideToLevel){
   const sk='session'+sNum;
   const row=DB[sk][rowIdx];
   if(!row)return;
   const lvl=(row.level||'').toUpperCase().replace(/\s/g,'');
-  // Read the dropdown value if user changed it
+  // Read the dropdown value if user changed it -- unless we're re-opening this modal
+  // to confirm an existing pending promotion, in which case use the level that was
+  // already decided on rather than recomputing a fresh suggestion.
   const selectEl=document.getElementById('nl-'+sk+'-'+rowIdx);
-  const nl=selectEl?selectEl.value:nextLevel(lvl);
+  const nl=overrideToLevel||(selectEl?selectEl.value:nextLevel(lvl));
   pendingPromo={sNum,rowIdx,fromLevel:lvl,toLevel:nl,row};
   // Build modal content
   const m=document.getElementById('promo-modal-inner');
@@ -965,13 +967,6 @@ function openPromoModal(sNum, rowIdx){
         <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">Override Promoted-To Level</label>
         <select id="promo-override" class="promo-select" style="width:100%;padding:7px 10px;font-size:13px;">
           ${LEVEL_ORDER.map(l=>`<option value="${l}"${l===nl?' selected':''}>${l}</option>`).join('')}
-        </select>
-      </div>
-      <div style="margin-top:8px;">
-        <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">Status</label>
-        <select id="promo-status" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--wht);font-family:'Barlow Condensed',sans-serif;font-size:12px;outline:none;">
-          <option value="Pending" selected>Pending (nominated)</option>
-          <option value="Confirmed">Confirmed</option>
         </select>
       </div>
       <div style="margin-top:8px;">
@@ -999,7 +994,7 @@ function confirmPromo(){
   const{sNum,rowIdx,fromLevel,row}=pendingPromo;
   const toLevel=document.getElementById('promo-override').value||pendingPromo.toLevel;
   if(!toLevel){showAlert('Please select a promoted-to level','err');return;}
-  const promoNotes=v('promo-notes');const promoSt=document.getElementById('promo-status')?document.getElementById('promo-status').value:'Confirmed';
+  const promoNotes=v('promo-notes');const promoSt='Confirmed';
   const promoRecord={first_name:row.first_name,last_name:row.last_name,birthdate:row.birthdate,from_level:fromLevel,to_level:toLevel,promoted_on:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),promo_status:promoSt,notes:promoNotes,parent1_name:row.parent1_name,parent1_email:row.parent1_email,parent1_phone:row.parent1_phone,parent2_name:row.parent2_name,parent2_email:row.parent2_email,parent2_phone:row.parent2_phone};
   if(!DB['promo'+sNum])DB['promo'+sNum]=[];
   const _ei=DB['promo'+sNum].findIndex(p=>p.first_name===promoRecord.first_name&&p.last_name===promoRecord.last_name&&p.birthdate===promoRecord.birthdate);
