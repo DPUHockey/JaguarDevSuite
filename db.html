@@ -1429,8 +1429,14 @@ function getSessionDatesFromPlanData(){
     // each with their own endSession markers.
     // Key format: "2026-09-14__Wednesday__0"
     // We split each day-of-week stream separately then merge by session index.
+    //
+    // Each entry can carry an explicit sessionNum (set via the Season Planning "Which
+    // Session?" picker) -- that's the source of truth when present, since it lets a
+    // block of dates be tagged as e.g. Session 6 even if nothing earlier in the current
+    // calendar range was marked Sessions 1-5. Older entries saved before that picker
+    // existed won't have sessionNum, so those still fall back to positional counting.
 
-    const streams={}; // dayName -> [{dp, endSession}]
+    const streams={}; // dayName -> [{dp, endSession, sessionNum}]
     entries.forEach(([k,v])=>{
       if(!v||!v.checked) return;
       const dp=parsePlanKey(k);
@@ -1440,24 +1446,21 @@ function getSessionDatesFromPlanData(){
       if(!streams[dayName]) streams[dayName]=[];
       // Avoid duplicate dates within a stream
       if(!streams[dayName].find(e=>e.dp===dp))
-        streams[dayName].push({dp, endSession:!!(v.endSession)});
+        streams[dayName].push({dp, endSession:!!(v.endSession), sessionNum:v.sessionNum||null});
     });
 
     if(!Object.keys(streams).length) return null;
 
-    // For each stream, assign session numbers using endSession markers
-    // streams are independent — Wednesday Session 1 ends when Wed endSession fires
-    // Sunday Session 1 ends when Sun endSession fires
-    // Both contribute their dates to the same session bucket
     const bySession={1:[],2:[],3:[],4:[],5:[],6:[]};
     let totalDates=0;
 
     Object.values(streams).forEach(stream=>{
       stream.sort((a,b)=>a.dp.localeCompare(b.dp));
-      let sn=1;
-      stream.forEach(({dp,endSession})=>{
-        if(sn<=6&&!bySession[sn].includes(dp)){
-          bySession[sn].push(dp);
+      let sn=1; // positional fallback counter, used only when a date has no explicit sessionNum
+      stream.forEach(({dp,endSession,sessionNum})=>{
+        const targetSn=sessionNum||sn;
+        if(targetSn>=1&&targetSn<=6&&!bySession[targetSn].includes(dp)){
+          bySession[targetSn].push(dp);
           totalDates++;
         }
         if(endSession) sn++;

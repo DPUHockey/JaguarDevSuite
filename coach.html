@@ -526,6 +526,19 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </div>
 
 <!-- SEASON PLANNING CONFIG MODAL -->
+<div id="modalSessionPick" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:340px">
+    <div class="modal-header"><div class="modal-title">Which Session?</div><button class="modal-close" onclick="cancelSessionPick()">✕</button></div>
+    <p style="color:var(--white-dim);font-size:13px;line-height:1.6;margin-bottom:12px;">This is the start of a new block of dates for <span id="sessionPickStreamLabel" style="color:var(--gold-light);"></span>. Every date you check from here will belong to this session until you mark &#127937; End Session.</p>
+    <div class="form-group"><label class="form-label">Session Number</label>
+      <select class="form-select" id="sessionPickSelect">
+        <option value="1">Session 1</option><option value="2">Session 2</option><option value="3">Session 3</option>
+        <option value="4">Session 4</option><option value="5">Session 5</option><option value="6">Session 6</option>
+      </select>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="cancelSessionPick()">Cancel</button><button class="btn btn-gold" onclick="confirmSessionPick()">Use This Session</button></div>
+  </div>
+</div>
 <div id="modalPlanConfig" class="modal-backdrop hidden">
   <div class="modal" style="max-width:480px">
     <div class="modal-header"><div class="modal-title">Session Configuration</div><button class="modal-close" onclick="closeModal('modalPlanConfig')">✕</button></div>
@@ -1984,7 +1997,7 @@ function computeSessionLabels(){
         const sk=slotKey(dk,dayDef,si);
         const entry=planData[sk];
         if(!entry?.checked)return;
-        const item={sk,dk,dt:new Date(dt),dayDef,si,slot:s,endSession:!!entry.endSession};
+        const item={sk,dk,dt:new Date(dt),dayDef,si,slot:s,endSession:!!entry.endSession,sessionNum:entry.sessionNum};
         if(s.code==='lj'&&!isSunday) ljWedEntries.push(item);
         else if(s.code==='lj'&&isSunday) ljSunEntries.push(item);
         else if(s.code==='adm'&&!isSunday) admPracEntries.push(item);
@@ -1997,21 +2010,27 @@ function computeSessionLabels(){
 
   // Assign session/class labels
   function assignLabels(entries,sessionNames){
-    let sessIdx=0,classNum=1;
+    let sessIdx=0,classNum=1,lastNum=null;
     entries.forEach(e=>{
-      e.sessionName=sessionNames?sessionNames[Math.min(sessIdx,sessionNames.length-1)]:`Session ${sessIdx+1}`;
+      const num=e.sessionNum||(sessIdx+1); // explicit tag wins; falls back to positional count for legacy data
+      if(lastNum!==null&&num!==lastNum)classNum=1;
+      e.sessionName=sessionNames?sessionNames[Math.min(num-1,sessionNames.length-1)]:`Session ${num}`;
       e.classNum=classNum;
       e.label=`${e.sessionName} · Class ${classNum}`;
+      lastNum=num;
       if(e.endSession){sessIdx++;classNum=1;}
       else classNum++;
     });
   }
   function assignGameLabels(entries,sessionNames){
-    let sessIdx=0,gameNum=1;
+    let sessIdx=0,gameNum=1,lastNum=null;
     entries.forEach(e=>{
-      e.sessionName=sessionNames?sessionNames[Math.min(sessIdx,sessionNames.length-1)]:`Session ${sessIdx+1}`;
+      const num=e.sessionNum||(sessIdx+1);
+      if(lastNum!==null&&num!==lastNum)gameNum=1;
+      e.sessionName=sessionNames?sessionNames[Math.min(num-1,sessionNames.length-1)]:`Session ${num}`;
       e.gameNum=gameNum;
       e.label=`${e.sessionName} · Game ${gameNum}`;
+      lastNum=num;
       if(e.endSession){sessIdx++;gameNum=1;}
       else gameNum++;
     });
@@ -2115,6 +2134,21 @@ function buildPlanCalendar(){
   grid.innerHTML=html;
 }
 
+// A "stream" is one of the 6 independent recurring lines that get their own session
+// numbering: LJ/PH-Wed, LJ/PH-Sun, ADM-practice, ADM-game, InHouse-practice, InHouse-game.
+// (Sunday carries the "game" slot for adm/ih; every other practice day is "practice".)
+function slotStreamKey(sk){
+  const parts=sk.split('__');
+  const dayName=parts[1],si=+parts[2];
+  const dayDef=SCHEDULE.find(s=>s.day===dayName);
+  if(!dayDef)return null;
+  const slot=dayDef.slots[si];
+  if(!slot)return null;
+  const isSunday=dayName==='Sunday';
+  return slot.code+'_'+(isSunday?'sun':'wed');
+}
+const STREAM_LABELS={lj_wed:'LJ/PH (Wednesday)',lj_sun:'LJ/PH (Sunday)',adm_wed:'ADM Practice',adm_sun:'ADM Game',ih_wed:'InHouse Practice',ih_sun:'InHouse Game'};
+let _pendingSessionPick=null; // {sk, checked}
 function togglePlanSlot(sk,checked){
   // Extract dateKey from slotKey (format: dateKey__dayName__si)
   const dk=sk.split('__')[0];
@@ -2125,14 +2159,42 @@ function togglePlanSlot(sk,checked){
     toast('This date is blocked out','terror');
     return;
   }
+  if(checked){
+    // Determine whether this continues an existing session block or starts a new one.
+    // Look at the most recently checked date in the same stream, chronologically before
+    // this one. If it exists and hasn't been marked "End Session", inherit its number
+    // automatically. Otherwise this is the start of a new block — ask which session.
+    const stream=slotStreamKey(sk);
+    const priorDates=Object.keys(planData)
+      .filter(k=>planData[k]&&planData[k].checked&&k!==sk&&slotStreamKey(k)===stream&&k.split('__')[0]<dk)
+      .sort((a,b)=>a.split('__')[0]<b.split('__')[0]?-1:1);
+    const mostRecent=priorDates.length?planData[priorDates[priorDates.length-1]]:null;
+    if(mostRecent&&!mostRecent.endSession&&mostRecent.sessionNum){
+      applyPlanCheck(sk,mostRecent.sessionNum);
+    } else {
+      // suggest the next session number after whatever's already used in this stream
+      const used=Object.keys(planData).filter(k=>planData[k]&&planData[k].checked&&slotStreamKey(k)===stream).map(k=>planData[k].sessionNum||0);
+      const suggested=used.length?Math.min(6,Math.max(...used)+(mostRecent&&mostRecent.endSession?1:0)||Math.max(...used)):1;
+      _pendingSessionPick={sk,checked};
+      document.getElementById('sessionPickStreamLabel').textContent=STREAM_LABELS[stream]||stream;
+      document.getElementById('sessionPickSelect').value=String(Math.min(6,Math.max(1,suggested||1)));
+      document.getElementById('modalSessionPick').classList.remove('hidden');
+    }
+  } else {
+    applyPlanCheck(sk,null,false);
+  }
+}
+function applyPlanCheck(sk,sessionNum,checked=true){
   if(!planData[sk])planData[sk]={checked:false,endSession:false};
   planData[sk].checked=checked;
   if(!checked){
     planData[sk].endSession=false;
+    planData[sk].sessionNum=undefined;
     // Uncheck on schedule too if it was only there because of planning
     activeDates.delete(sk);
     saveActiveDates(activeDates);
   } else {
+    planData[sk].sessionNum=sessionNum;
     // Auto-check on schedule page
     activeDates.add(sk);
     saveActiveDates(activeDates);
@@ -2140,6 +2202,18 @@ function togglePlanSlot(sk,checked){
   savePlanData();
   buildPlanMonthNav();
   buildPlanCalendar();
+}
+function confirmSessionPick(){
+  if(!_pendingSessionPick)return;
+  const n=+document.getElementById('sessionPickSelect').value;
+  applyPlanCheck(_pendingSessionPick.sk,n);
+  _pendingSessionPick=null;
+  closeModal('modalSessionPick');
+}
+function cancelSessionPick(){
+  _pendingSessionPick=null;
+  closeModal('modalSessionPick');
+  buildPlanCalendar(); // snap the checkbox back since the pick was cancelled
 }
 function togglePlanEnd(sk,checked){
   if(!planData[sk])planData[sk]={checked:true,endSession:false};
