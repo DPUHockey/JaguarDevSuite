@@ -291,7 +291,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V1</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V2</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -659,6 +659,19 @@ let currentUser=null;
 const JAG_SELF_KEY='coach';
 window.__jagApp=JAG_SELF_KEY; // self-marker: survives navigation because this page sets it on every load
 window.name='jag_'+JAG_SELF_KEY;
+// Called by the homepage's Scheduler shortcut when this tab is already open. If
+// already logged in, jump straight there; if still sitting on the login screen,
+// stash the request so startApp() can honor it right after login completes.
+window.jumpToPlanningCalendar=function(){
+  if(currentUser){
+    if(currentUser.role==='accountant'){try{window.focus();}catch(e){}return;} // no Season Planning tab for this role
+    switchTab('planning');
+    switchPlanTab('calendar');
+    try{window.focus();}catch(e){}
+  } else {
+    window.__pendingDeepLink='planning-calendar';
+  }
+};
 const JAG_URLS={home:'index.html',db:'db.html',coach:'coach.html',adm:'adm.html',ih:'ih.html',drills:'drills.html',schedule:'schedule.html',stats:'stats.html',notes:'notes.html'};
 // Hosted on GitHub Pages: apps live as sibling URLs, so cross-app jumps are simple
 // same-origin navigations of a named tab. We still open('',name) FIRST to check if
@@ -997,6 +1010,18 @@ function startApp(){
   if(calActs)calActs.classList.toggle('hidden',!canEdit);
   buildTabBar();
   buildSchedule();
+
+  // Deep link support: the homepage's "Scheduler" shortcut opens this app with
+  // ?view=planning-calendar so it lands directly on Season Planning's Calendar view
+  // instead of making people navigate here manually every time.
+  const deepView=window.__pendingDeepLink||new URLSearchParams(location.search).get('view');
+  window.__pendingDeepLink=null;
+  const tabExists=id=>!!document.querySelector(`.tab[data-tab="${id}"]`);
+  if(deepView==='planning-calendar'&&tabExists('planning')){
+    switchTab('planning');
+    switchPlanTab('calendar');
+    return;
+  }
 
   // Default first tab
   const role=currentUser.role;
