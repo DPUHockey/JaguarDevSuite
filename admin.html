@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Center — Jaguar Dev Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#0a0a0a;--gold:#C9A84C;--gold-light:#E8C97A;--gold-dark:#8B6914;
+  --gray-dark:#1e1e1e;--gray-mid:#2e2e2e;--gray-light:#4a4a4a;--gray-border:#333;
+  --white:#f5f5f0;--white-dim:#bbb;--red:#e74c3c;--green:#2ecc71;--blue:#3498db;
+}
+*{box-sizing:border-box;}
+body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;font-size:14px;min-height:100vh;margin:0;}
+h1,h2,h3,h4{font-family:'Bebas Neue',sans-serif;letter-spacing:1px;margin:0;}
+input,select,button{font-family:'Barlow',sans-serif;}
+::-webkit-scrollbar{width:10px;height:12px;}
+::-webkit-scrollbar-track{background:var(--gray-mid);border-radius:4px;}
+::-webkit-scrollbar-thumb{background:var(--gold-dark);border-radius:4px;border:2px solid var(--gray-mid);}
+::-webkit-scrollbar-thumb:hover{background:var(--gold);}
+.hidden{display:none!important;}
+.btn{padding:8px 16px;border:none;border-radius:5px;cursor:pointer;font-family:'Barlow Condensed';font-size:13px;letter-spacing:1px;text-transform:uppercase;transition:all .18s;display:inline-flex;align-items:center;gap:6px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-gold{background:var(--gold);color:var(--black);font-weight:700;}
+.btn-gold:hover:not(:disabled){background:var(--gold-light);}
+.btn-outline{background:transparent;border:1px solid var(--gold-dark);color:var(--gold-light);}
+.btn-outline:hover:not(:disabled){background:rgba(201,168,76,.1);}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}
+.btn-danger:hover:not(:disabled){background:rgba(231,76,60,.1);}
+.btn-sm{padding:5px 10px;font-size:11px;}
+
+/* nav */
+nav{display:flex;align-items:center;gap:18px;padding:12px 24px;background:var(--gray-dark);border-bottom:1px solid var(--gray-border);flex-wrap:wrap;}
+.nav-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold);white-space:nowrap;}
+.nav-links{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;}
+.nav-btn{background:transparent;border:1px solid var(--gray-border);color:var(--white-dim);padding:7px 13px;border-radius:5px;cursor:pointer;font-family:'Barlow Condensed';font-size:12px;letter-spacing:.5px;transition:all .15s;}
+.nav-btn:hover{border-color:var(--gold-dark);color:var(--gold-light);}
+
+/* login (matches Coach Data Center / Budget) */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{width:100%;max-width:400px;}
+.login-logo{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.logo-circle{width:56px;height:56px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--black);border:2px solid var(--gold-light);flex-shrink:0;}
+.login-logo h1{font-size:26px;color:var(--gold);line-height:1.1;font-family:'Bebas Neue',sans-serif;}
+.login-logo .subtitle{font-family:'Barlow Condensed';font-size:12px;color:var(--white-dim);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.login-card{background:var(--gray-dark);border:1px solid var(--gold-dark);border-radius:10px;padding:28px;}
+.login-note{font-size:12px;color:var(--white-dim);margin-bottom:18px;line-height:1.5;}
+.fg{margin-bottom:12px;}
+.fl{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);margin-bottom:5px;}
+.fi{width:100%;background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:5px;padding:8px 10px;color:var(--white);font-size:13.5px;}
+.fi:focus{outline:none;border-color:var(--gold-dark);}
+
+.wrap{max-width:1100px;margin:0 auto;padding:32px 24px 80px;}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;color:var(--white);}
+.section-note{font-size:12px;color:var(--white-dim);letter-spacing:.5px;margin-top:2px;}
+.section-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+
+.warn-banner{background:rgba(231,76,60,.08);border:1px solid rgba(231,76,60,.35);border-radius:8px;padding:12px 16px;font-size:12.5px;color:#ff9a90;margin-bottom:22px;line-height:1.6;}
+
+table.users{width:100%;border-collapse:collapse;font-size:13px;}
+table.users thead th{text-align:left;font-family:'Barlow Condensed';font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);padding:8px 10px;border-bottom:1px solid var(--gray-border);}
+table.users tbody td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+table.users tbody tr:hover{background:rgba(255,255,255,.02);}
+table.users input[type="text"],table.users input[type="password"]{background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:4px;padding:6px 8px;color:var(--white);font-size:12.5px;width:100%;}
+table.users select{background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:4px;padding:6px 8px;color:var(--white);font-size:12.5px;}
+.pw-cell{display:flex;align-items:center;gap:6px;}
+.pw-toggle{background:none;border:none;color:var(--white-dim);cursor:pointer;font-size:14px;padding:2px 4px;}
+.pw-toggle:hover{color:var(--gold-light);}
+.role-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-family:'Barlow Condensed';font-size:10.5px;letter-spacing:.5px;font-weight:600;}
+.role-admin{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3);}
+.role-editor{background:rgba(201,168,76,.15);color:var(--gold-light);border:1px solid var(--gold-dark);}
+.role-viewer{background:rgba(52,152,219,.15);color:#7ec8ff;border:1px solid rgba(52,152,219,.3);}
+.role-accountant{background:rgba(46,204,113,.15);color:#2ecc71;border:1px solid rgba(46,204,113,.3);}
+.active-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+.active-dot.on{background:var(--green);}
+.active-dot.off{background:var(--gray-light);}
+
+.save-note{font-size:12px;color:var(--green);}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+
+#app-ver-badge{position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="app-ver-badge">V1</div>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-circle">JAG</div>
+      <div><h1>Admin Center</h1><div class="subtitle">Sign In Required</div></div>
+    </div>
+    <div class="login-card">
+      <div class="login-note">Manages login accounts and passwords shared across the Jaguar Dev Suite. Admin role required.</div>
+      <div class="fg"><span class="fl">Username</span><input class="fi" id="loginUser" type="text" placeholder="Enter username" autocomplete="username"/></div>
+      <div class="fg" style="margin-bottom:20px;"><span class="fl">Password</span><input class="fi" id="loginPass" type="password" placeholder="Enter password"/></div>
+      <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="doLogin()">Sign In</button>
+      <div id="loginError" class="hidden" style="margin-top:10px;padding:8px 12px;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:5px;color:#e74c3c;font-size:13px;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="appShell" class="hidden">
+<nav>
+  <div class="nav-title">Admin Center</div>
+  <div class="nav-links">
+    <button class="nav-btn" onclick="jagLaunch('db')">Dev Check In</button>
+    <button class="nav-btn" onclick="jagLaunch('adm')">ADM Center</button>
+    <button class="nav-btn" onclick="jagLaunch('ih')">InHouse Center</button>
+    <button class="nav-btn" onclick="jagLaunch('coach')">Coach Data Center</button>
+    <button class="nav-btn" onclick="jagLaunch('notes')">Budget</button>
+    <button class="nav-btn" onclick="jagHome()">&#8962; Home</button>
+    <button class="nav-btn" onclick="doLogout()" style="border-color:#e74c3c;color:#e74c3c;">Sign Out</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="section-hdr">
+    <div>
+      <div class="section-title">Suite Users</div>
+      <div class="section-note">One shared account list used by Coach Data Center, Budget, and this Admin Center. Changes here take effect everywhere immediately.</div>
+    </div>
+  </div>
+
+  <div class="warn-banner">
+    Passwords are shown here in plain text and stored as plain text in the browser. This is basic access-gating for an internal club tool, not real security — anyone with access to a device's browser storage could read them. Don't reuse a password here that's used anywhere sensitive.
+  </div>
+
+  <div class="toolbar">
+    <span class="save-note" id="save-note"></span>
+    <button class="btn btn-gold btn-sm" onclick="addUser()">+ Add User</button>
+  </div>
+
+  <table class="users" id="users-table"></table>
+</div>
+</div>
+
+<script>
+// ── QUICK LAUNCH (jump between Jaguar Suite tabs opened via Jaguar Master) ──
+const JAG_SELF_KEY='admin';
+window.__jagApp=JAG_SELF_KEY;
+window.name='jag_'+JAG_SELF_KEY;
+const JAG_URLS={home:'index.html',db:'db.html',coach:'coach.html',adm:'adm.html',ih:'ih.html',drills:'drills.html',schedule:'schedule.html',stats:'stats.html',notes:'notes.html',admin:'admin.html'};
+function jagLaunch(key){
+  if(key===JAG_SELF_KEY)return;
+  const url=JAG_URLS[key];
+  if(!url)return;
+  const w=window.open('','jag_'+key);
+  if(!w){alert('Popup blocked! Allow popups then try again.');return;}
+  if(w.__jagApp===key){try{w.focus();}catch(e){}return;}
+  w.location.href=url;
+  try{w.focus();}catch(e){}
+}
+function jagHome(){
+  const w=window.open('','jag_home');
+  if(!w){alert('Popup blocked! Allow popups then try again.');return;}
+  if(w.__jagApp!=='home')w.location.href=JAG_URLS.home;
+  try{w.focus();}catch(e){}
+}
+
+// ── SHARED USER LIST (same 'jag_users' key as Coach Data Center and Budget) ──
+const ROLES=['admin','editor','accountant','viewer'];
+function defaultUsers(){
+  return[
+    {id:'u1',name:'Admin User',username:'admin',password:'admin123',role:'admin',active:true},
+    {id:'u2',name:'Coach Editor',username:'editor',password:'edit123',role:'editor',active:true},
+    {id:'u3',name:'Head Accountant',username:'accountant',password:'acct123',role:'accountant',active:true},
+    {id:'u4',name:'View Only',username:'viewer',password:'view123',role:'viewer',active:true}
+  ];
+}
+function loadUsers(){
+  try{
+    const s=localStorage.getItem('jag_users');
+    if(s){const p=JSON.parse(s);if(Array.isArray(p)&&p.length)return p;}
+  }catch(e){}
+  return defaultUsers();
+}
+function saveUsersData(){ localStorage.setItem('jag_users', JSON.stringify(users)); }
+let users=loadUsers();
+
+// ── AUTH (admin role only) ──
+let currentUser=null;
+function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  const found=users.find(x=>x.username===u&&x.password===p&&x.active);
+  const el=document.getElementById('loginError');
+  if(!found){el.textContent='Invalid username or password.';el.classList.remove('hidden');return;}
+  if(found.role!=='admin'){el.textContent='Admin role required to access Admin Center.';el.classList.remove('hidden');return;}
+  currentUser=found;
+  startApp();
+}
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function doLogout(){
+  currentUser=null;
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').classList.add('hidden');
+}
+function startApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  users=loadUsers(); // re-read in case another tab changed it since page load
+  renderUsers();
+}
+
+// ── USER MANAGEMENT ──
+function newUserId(){ return 'u'+Date.now()+Math.random().toString(36).slice(2,6); }
+function activeAdminCount(){ return users.filter(u=>u.role==='admin'&&u.active).length; }
+function flashSaved(){
+  const el=document.getElementById('save-note');
+  el.textContent='✓ Saved';
+  setTimeout(()=>{ if(el.textContent==='✓ Saved') el.textContent=''; },2000);
+}
+function commit(){ saveUsersData(); flashSaved(); renderUsers(); }
+
+function addUser(){
+  users.push({id:newUserId(),name:'New User',username:'user'+(users.length+1),password:'changeme',role:'viewer',active:true});
+  commit();
+}
+function updateField(id,field,value){
+  const u=users.find(x=>x.id===id);
+  if(!u)return;
+  if(field==='role'&&u.role==='admin'&&value!=='admin'&&activeAdminCount()<=1){
+    alert('At least one active Admin account must remain. Promote another user to Admin before changing this one.');
+    renderUsers();
+    return;
+  }
+  u[field]=value;
+  saveUsersData();
+  flashSaved();
+}
+function toggleActive(id){
+  const u=users.find(x=>x.id===id);
+  if(!u)return;
+  if(u.role==='admin'&&u.active&&activeAdminCount()<=1){
+    alert('At least one active Admin account must remain. Activate another Admin before deactivating this one.');
+    return;
+  }
+  u.active=!u.active;
+  commit();
+}
+function deleteUser(id){
+  const u=users.find(x=>x.id===id);
+  if(!u)return;
+  if(u.role==='admin'&&activeAdminCount()<=1){
+    alert('At least one active Admin account must remain. You cannot delete the last Admin.');
+    return;
+  }
+  if(!confirm('Delete user "'+u.name+'" ('+u.username+')? This cannot be undone.'))return;
+  users=users.filter(x=>x.id!==id);
+  commit();
+}
+function togglePwVisible(id){
+  const inp=document.getElementById('pw-'+id);
+  if(!inp)return;
+  inp.type=inp.type==='password'?'text':'password';
+}
+
+function renderUsers(){
+  const table=document.getElementById('users-table');
+  table.innerHTML=`
+    <thead><tr><th>Name</th><th>Username</th><th>Password</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
+    <tbody>
+      ${users.map(u=>`
+        <tr>
+          <td><input type="text" value="${u.name}" data-id="${u.id}" data-f="name"/></td>
+          <td><input type="text" value="${u.username}" data-id="${u.id}" data-f="username"/></td>
+          <td>
+            <div class="pw-cell">
+              <input type="password" id="pw-${u.id}" value="${u.password}" data-id="${u.id}" data-f="password" style="flex:1;"/>
+              <button class="pw-toggle" onclick="togglePwVisible('${u.id}')" title="Show/hide password">&#128065;</button>
+            </div>
+          </td>
+          <td>
+            <select data-id="${u.id}" data-f="role">
+              ${ROLES.map(r=>`<option value="${r}"${u.role===r?' selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}
+            </select>
+          </td>
+          <td style="text-align:center;">
+            <span class="active-dot ${u.active?'on':'off'}" style="cursor:pointer;" onclick="toggleActive('${u.id}')" title="Click to toggle"></span>
+          </td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+  table.querySelectorAll('input[data-f], select[data-f]').forEach(el=>{
+    el.addEventListener('change', ()=>{ updateField(el.dataset.id, el.dataset.f, el.value); });
+  });
+}
+</script>
+</body>
+</html>
