@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V7</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
 
 <nav>
   <div class="nav-left">
@@ -590,6 +590,41 @@ function resetMasterFile(){
     switchMainTab('master');
     updateStats();
     showAlert('Master File cleared \u2014 '+wasCount+' athletes archived to your downloads. Ready for a fresh start.','ok');
+  });
+}
+// A true clean-slate reset -- unlike Reset Master File (which only clears the Master
+// File array) or Start New Season (which explicitly preserves Master File), this wipes
+// every piece of roster/athlete data this app owns: Master File, all 6 session
+// rosters, all promotion records, the derived LJ/PH lists, and attendance check-ins.
+// This is what's needed before re-importing a fresh CSV against the current code --
+// otherwise leftover session rows would immediately re-create Master File entries via
+// syncMasterFromSessions the moment the new data loaded. Deliberately leaves Coach
+// Hours / Season Planning data untouched since that's shared with a separate app.
+function fullDataReset(){
+  jagConfirm('FULL RESET \u2014 this wipes everything: Master File, all 6 session rosters, all promotions, and attendance check-ins. Nothing roster-related will be left. A complete backup downloads first. Coach Hours / Season Planning data (shared with the Coach Data Center app) is not touched. This cannot be undone except by re-importing the backup. Are you sure?',function(){
+    try{
+      const archive={app:'jaguar-db-full-archive',v:1,exported:new Date().toISOString(),
+        master:DB.master,attendance:attendData,manualDates:manualDates,sessions:{},promos:{}};
+      for(let s=1;s<=6;s++){archive.sessions['session'+s]=DB['session'+s]||[];archive.promos['promo'+s]=DB['promo'+s]||[];}
+      const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
+      const a=document.createElement('a'),d=new Date();
+      a.href=URL.createObjectURL(blob);
+      a.download='jaguar-FULL-backup-before-reset-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+      document.body.appendChild(a);a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+    }catch(e){}
+    DB.master=[];
+    for(let s=1;s<=6;s++){DB['session'+s]=[];DB['promo'+s]=[];}
+    DB.lj=[];DB.ph=[];DB.lj1=[];DB.lj2=[];DB.lj3=[];DB.ph1=[];DB.ph2=[];DB.ph3=[];
+    attendData={};
+    manualDates={};
+    saveDB();
+    saveAttendData();
+    saveManualDates();
+    renderAll();
+    switchMainTab('master');
+    updateStats();
+    showAlert('Full reset complete \u2014 everything backed up to your downloads. Clean slate, ready for a fresh CSV import.','ok');
   });
 }
 
@@ -2173,7 +2208,7 @@ function renderMasterTab(){
   syncMasterFromSessions();
   const mf=window._masterFilter||{q:'',status:'all'};
   const{rows,disp,idx,sort}=getMasterFilteredSorted();
-  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left" id="master-count-label">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.q=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.status=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div><div style="margin-top:6px;text-align:right;display:flex;gap:14px;justify-content:flex-end;"><span onclick="mergeDuplicateMasterEntries()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Merge Duplicate Athletes</span><span onclick="cleanupDuplicateSessionRows()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Clean Up Duplicate Session Entries</span><span onclick="resetMasterFile()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Reset Master File (one-time full restart)</span></div>';
+  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left" id="master-count-label">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.q=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.status=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div><div style="margin-top:6px;text-align:right;display:flex;gap:14px;justify-content:flex-end;"><span onclick="mergeDuplicateMasterEntries()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Merge Duplicate Athletes</span><span onclick="cleanupDuplicateSessionRows()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Clean Up Duplicate Session Entries</span><span onclick="resetMasterFile()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Reset Master File (one-time full restart)</span><span onclick="fullDataReset()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#F07050;text-decoration:underline dotted;cursor:pointer;font-weight:600;">FULL RESET \u2014 wipe everything</span></div>';
   div.innerHTML=toolbar+'<div id="master-table-area">'+buildMasterTableInner(rows,disp,idx,sort)+'</div>';
 }
 function exportMasterCSV(){
