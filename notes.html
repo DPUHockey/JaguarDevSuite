@@ -66,6 +66,35 @@ table.data tfoot td.num{text-align:right;color:var(--gold-light);}
 .divider{margin:36px 0 28px;border-top:2px solid var(--gray-border);position:relative;}
 .divider-label{position:absolute;top:-13px;left:0;background:var(--black);padding-right:14px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;color:var(--white-dim);}
 
+.mega-divider{margin:0 0 22px;border-top:3px solid var(--gold-dark);position:relative;}
+.mega-divider-label{position:absolute;top:-15px;left:0;background:var(--black);padding-right:16px;font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:3px;color:var(--gold);}
+.mega-divider.second{margin-top:48px;}
+
+/* ===== PROJECTED BUDGET ===== */
+.proj-note{font-size:12px;color:var(--white-dim);line-height:1.6;margin-bottom:20px;padding:12px 14px;background:rgba(201,168,76,.06);border:1px solid var(--gold-dark);border-radius:6px;}
+.proj-program{margin-bottom:28px;}
+.proj-program-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.proj-program-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold-light);}
+table.proj-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;}
+table.proj-table th{text-align:center;font-family:'Barlow Condensed';font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--white-dim);padding:6px 4px;border-bottom:1px solid var(--gray-border);white-space:nowrap;}
+table.proj-table th:first-child{text-align:left;}
+table.proj-table td{padding:5px 4px;text-align:center;}
+table.proj-table td:first-child{text-align:left;font-weight:600;color:var(--gold-light);white-space:nowrap;}
+table.proj-table input{width:100%;min-width:52px;text-align:center;background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:4px;padding:5px 2px;color:var(--white);font-size:12px;}
+table.proj-table td.calc{color:var(--white-dim);font-variant-numeric:tabular-nums;}
+table.proj-table td.calc.income{color:var(--green);}
+table.proj-table td.calc.expense{color:var(--red);}
+table.proj-table tfoot td{padding:7px 4px;font-weight:700;border-top:1px solid var(--gray-border);}
+
+.cost-list{margin-top:6px;}
+.cost-list-row{display:grid;grid-template-columns:1fr 140px 32px;gap:8px;margin-bottom:6px;align-items:center;}
+.cost-list-row input[type="text"]{background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:4px;padding:6px 8px;color:var(--white);font-size:12.5px;}
+.cost-list-row input[type="number"]{background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:4px;padding:6px 8px;color:var(--white);font-size:12.5px;text-align:right;}
+.cost-list-remove{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:4px;cursor:pointer;font-size:14px;line-height:1;padding:5px 0;}
+.cost-list-remove:hover{background:rgba(231,76,60,.15);}
+.cost-list-add{margin-top:4px;font-size:11px;}
+.proj-summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:26px;}
+
 /* ===== BOTTOM HALF: WORKSHEET ===== */
 .ws-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:20px;}
 @media(max-width:980px){.ws-grid{grid-template-columns:1fr;}}
@@ -97,7 +126,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V1</div>
+<div id="app-ver-badge">V2</div>
 
 <nav>
   <div class="nav-title">Jaguar Budget</div>
@@ -111,6 +140,8 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </nav>
 
 <div class="wrap">
+
+  <div class="mega-divider"><span class="mega-divider-label">Actual Budget</span></div>
 
   <div class="section-hdr">
     <div>
@@ -201,6 +232,85 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
   <div class="save-bar">
     <span class="save-note" id="save-note"></span>
     <button class="btn btn-gold" onclick="saveBudget()">Save Budget</button>
+  </div>
+
+  <div class="mega-divider second"><span class="mega-divider-label">Projected Budget</span></div>
+
+  <div class="proj-note">
+    <strong>First pass — flag anything that doesn't match what you meant.</strong> For each row below: <em>Expense = Hours × (Ice $/hr + Coach@15 hrs×$15 + Coach@25 hrs×$25)</em>, and <em>Income = Hours × Players × Price/hr</em> (Dev sessions add LJ and PH as two separate player groups within the same session). Program Costs (jerseys, sticks, etc.) add to that program's expenses. Overall Costs (overhead, pucks, etc.) add to the grand total only, not to any one program.
+  </div>
+
+  <div class="proj-summary-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Projected Income</div>
+      <div class="stat-value income" id="proj-total-income">$0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Projected Expenses</div>
+      <div class="stat-value expense" id="proj-total-expense">$0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Net</div>
+      <div class="stat-value" id="proj-net">$0</div>
+      <div class="stat-sub" id="proj-net-sub"></div>
+    </div>
+  </div>
+
+  <!-- ADM -->
+  <div class="proj-program">
+    <div class="proj-program-hdr">
+      <div class="proj-program-title">ADM</div>
+      <div class="section-note">Income <span id="proj-adm-sub-income">$0</span> &middot; Expense <span id="proj-adm-sub-expense">$0</span> &middot; Net <span id="proj-adm-sub-net">$0</span></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="proj-table" id="proj-adm-table"></table>
+    </div>
+    <div class="panel">
+      <div class="panel-title" style="font-size:14px;">ADM Program Costs <span style="color:var(--white-dim);font-weight:400;">(jerseys, equipment, etc.)</span></div>
+      <div class="cost-list" id="proj-adm-costs"></div>
+    </div>
+  </div>
+
+  <!-- InHouse -->
+  <div class="proj-program">
+    <div class="proj-program-hdr">
+      <div class="proj-program-title">InHouse</div>
+      <div class="section-note">Income <span id="proj-ih-sub-income">$0</span> &middot; Expense <span id="proj-ih-sub-expense">$0</span> &middot; Net <span id="proj-ih-sub-net">$0</span></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="proj-table" id="proj-ih-table"></table>
+    </div>
+    <div class="panel">
+      <div class="panel-title" style="font-size:14px;">InHouse Program Costs <span style="color:var(--white-dim);font-weight:400;">(jerseys, equipment, etc.)</span></div>
+      <div class="cost-list" id="proj-ih-costs"></div>
+    </div>
+  </div>
+
+  <!-- Dev (LJ/PH) -->
+  <div class="proj-program">
+    <div class="proj-program-hdr">
+      <div class="proj-program-title">Dev (LJ / PH)</div>
+      <div class="section-note">Income <span id="proj-dev-sub-income">$0</span> &middot; Expense <span id="proj-dev-sub-expense">$0</span> &middot; Net <span id="proj-dev-sub-net">$0</span></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="proj-table" id="proj-dev-table"></table>
+    </div>
+    <div class="panel">
+      <div class="panel-title" style="font-size:14px;">Dev Program Costs <span style="color:var(--white-dim);font-weight:400;">(sticks, LJ/PH jerseys, etc.)</span></div>
+      <div class="cost-list" id="proj-dev-costs"></div>
+    </div>
+  </div>
+
+  <!-- Overall Costs -->
+  <div class="panel" style="margin-bottom:20px;">
+    <div class="panel-title">Overall Costs</div>
+    <div class="section-note" style="margin-bottom:6px;">Costs that apply to the whole program, not any one of ADM/InHouse/Dev — overhead, pucks, insurance, etc. Name each one and enter a total amount.</div>
+    <div class="cost-list" id="proj-overall-costs"></div>
+  </div>
+
+  <div class="save-bar">
+    <span class="save-note" id="proj-save-note"></span>
+    <button class="btn btn-gold" onclick="saveProjected()">Save Projected Budget</button>
   </div>
 
 </div>
@@ -418,11 +528,247 @@ function render(){
   renderExpenseTable(exp);
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// PROJECTED BUDGET
+// A separate, independent worksheet from the Actual Budget above -- own data,
+// own localStorage key, own Save button. Coach rates are fixed at $15/hr and
+// $25/hr to match the two paid designations already used in Coach Data Center
+// (Credit/Pro and Pro 2). Rendering is split into two layers on purpose:
+// buildX() functions create the actual <input> elements (called once, or
+// whenever rows are structurally added/removed) and updateProjectedCalcs()
+// only touches the read-only calculated cells on every keystroke -- so typing
+// in one field never rebuilds the DOM and kicks focus out of the input.
+// ══════════════════════════════════════════════════════════════════════════
+const PROJ_KEY='jag_budget_projected';
+const ADM_IH_SEASONS=['fall','winter','spring','summer'];
+const ADM_IH_SEASON_LABELS={fall:'Fall',winter:'Winter',spring:'Spring',summer:'Summer'};
+const DEV_SESSIONS=[1,2,3,4,5,6];
+
+function defaultSeasonRow(){ return {hours:0,iceRate:0,coach15:0,coach25:0,players:0,priceHr:0}; }
+function defaultDevRow(){ return {hours:0,iceRate:0,coach15:0,coach25:0,ljPlayers:0,ljPriceHr:0,phPlayers:0,phPriceHr:0}; }
+function costRow(name){ return {name:name||'',amount:0}; }
+function defaultProjected(){
+  const adm={}; ADM_IH_SEASONS.forEach(s=>adm[s]=defaultSeasonRow());
+  const ih={}; ADM_IH_SEASONS.forEach(s=>ih[s]=defaultSeasonRow());
+  const dev={}; DEV_SESSIONS.forEach(s=>dev[s]=defaultDevRow());
+  return {
+    adm:{seasons:adm, costs:[costRow('ADM Jerseys')]},
+    ih:{seasons:ih, costs:[costRow('InHouse Jerseys')]},
+    dev:{sessions:dev, costs:[costRow('Dev Sticks'), costRow('Dev LJ/PH Jerseys')]},
+    overallCosts:[costRow('Monthly Overhead'), costRow('Pucks'), costRow(''), costRow(''), costRow(''), costRow(''), costRow('')]
+  };
+}
+function loadProjected(){
+  try{
+    const s=localStorage.getItem(PROJ_KEY);
+    if(s){
+      const p=JSON.parse(s);
+      const d=defaultProjected();
+      ['adm','ih'].forEach(k=>{
+        if(p[k]&&p[k].seasons) ADM_IH_SEASONS.forEach(sk=>Object.assign(d[k].seasons[sk], p[k].seasons[sk]||{}));
+        if(p[k]&&Array.isArray(p[k].costs)&&p[k].costs.length) d[k].costs=p[k].costs;
+      });
+      if(p.dev&&p.dev.sessions) DEV_SESSIONS.forEach(sk=>Object.assign(d.dev.sessions[sk], p.dev.sessions[sk]||{}));
+      if(p.dev&&Array.isArray(p.dev.costs)&&p.dev.costs.length) d.dev.costs=p.dev.costs;
+      if(Array.isArray(p.overallCosts)&&p.overallCosts.length) d.overallCosts=p.overallCosts;
+      return d;
+    }
+  }catch(e){}
+  return defaultProjected();
+}
+function saveProjectedData(p){ localStorage.setItem(PROJ_KEY, JSON.stringify(p)); }
+let projected=loadProjected();
+
+function calcSeasonRow(programKey,seasonKey){
+  const r=projected[programKey].seasons[seasonKey];
+  const expense=(r.hours||0)*((r.iceRate||0)+(r.coach15||0)*15+(r.coach25||0)*25);
+  const income=(r.hours||0)*(r.players||0)*(r.priceHr||0);
+  return {expense,income,net:income-expense};
+}
+function calcDevRow(sessionKey){
+  const r=projected.dev.sessions[sessionKey];
+  const expense=(r.hours||0)*((r.iceRate||0)+(r.coach15||0)*15+(r.coach25||0)*25);
+  const income=(r.hours||0)*((r.ljPlayers||0)*(r.ljPriceHr||0)+(r.phPlayers||0)*(r.phPriceHr||0));
+  return {expense,income,net:income-expense};
+}
+function costListTotal(arr){ return arr.reduce((a,c)=>a+(+c.amount||0),0); }
+function computeProgramTotals(programKey){
+  let income=0,expense=0;
+  if(programKey==='dev'){
+    DEV_SESSIONS.forEach(s=>{ const c=calcDevRow(s); income+=c.income; expense+=c.expense; });
+    expense+=costListTotal(projected.dev.costs);
+  }else{
+    ADM_IH_SEASONS.forEach(s=>{ const c=calcSeasonRow(programKey,s); income+=c.income; expense+=c.expense; });
+    expense+=costListTotal(projected[programKey].costs);
+  }
+  return {income,expense,net:income-expense};
+}
+function computeProjectedTotals(){
+  const adm=computeProgramTotals('adm'), ih=computeProgramTotals('ih'), dev=computeProgramTotals('dev');
+  const overallCostTotal=costListTotal(projected.overallCosts);
+  const income=adm.income+ih.income+dev.income;
+  const expense=adm.expense+ih.expense+dev.expense+overallCostTotal;
+  return {adm,ih,dev,overallCostTotal,income,expense,net:income-expense};
+}
+
+function buildSeasonTable(programKey){
+  const table=document.getElementById('proj-'+programKey+'-table');
+  table.innerHTML=`
+    <thead><tr>
+      <th>Season</th><th>Hours</th><th>Ice $/hr</th><th>Coach<br>@$15/hr</th><th>Coach<br>@$25/hr</th><th>Players</th><th>Price/hr</th>
+      <th>Expense</th><th>Income</th><th>Net</th>
+    </tr></thead>
+    <tbody>
+      ${ADM_IH_SEASONS.map(s=>{
+        const r=projected[programKey].seasons[s];
+        return `<tr>
+          <td>${ADM_IH_SEASON_LABELS[s]}</td>
+          <td><input type="number" min="0" step="0.5" value="${r.hours}" data-p="${programKey}" data-s="${s}" data-f="hours"/></td>
+          <td><input type="number" min="0" step="0.01" value="${r.iceRate}" data-p="${programKey}" data-s="${s}" data-f="iceRate"/></td>
+          <td><input type="number" min="0" step="1" value="${r.coach15}" data-p="${programKey}" data-s="${s}" data-f="coach15"/></td>
+          <td><input type="number" min="0" step="1" value="${r.coach25}" data-p="${programKey}" data-s="${s}" data-f="coach25"/></td>
+          <td><input type="number" min="0" step="1" value="${r.players}" data-p="${programKey}" data-s="${s}" data-f="players"/></td>
+          <td><input type="number" min="0" step="0.01" value="${r.priceHr}" data-p="${programKey}" data-s="${s}" data-f="priceHr"/></td>
+          <td class="calc expense" id="proj-${programKey}-${s}-expense">$0</td>
+          <td class="calc income" id="proj-${programKey}-${s}-income">$0</td>
+          <td class="calc" id="proj-${programKey}-${s}-net">$0</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  `;
+  table.querySelectorAll('input[data-f]').forEach(inp=>{
+    inp.oninput=()=>{
+      const {p,s,f}=inp.dataset;
+      projected[p].seasons[s][f]=+inp.value||0;
+      document.getElementById('proj-save-note').textContent='';
+      updateProjectedCalcs();
+    };
+  });
+}
+function buildDevTable(){
+  const table=document.getElementById('proj-dev-table');
+  table.innerHTML=`
+    <thead><tr>
+      <th>Session</th><th>Hours</th><th>Ice $/hr</th><th>Coach<br>@$15/hr</th><th>Coach<br>@$25/hr</th>
+      <th>LJ Players</th><th>LJ $/hr</th><th>PH Players</th><th>PH $/hr</th>
+      <th>Expense</th><th>Income</th><th>Net</th>
+    </tr></thead>
+    <tbody>
+      ${DEV_SESSIONS.map(s=>{
+        const r=projected.dev.sessions[s];
+        return `<tr>
+          <td>Session ${s}</td>
+          <td><input type="number" min="0" step="0.5" value="${r.hours}" data-s="${s}" data-f="hours"/></td>
+          <td><input type="number" min="0" step="0.01" value="${r.iceRate}" data-s="${s}" data-f="iceRate"/></td>
+          <td><input type="number" min="0" step="1" value="${r.coach15}" data-s="${s}" data-f="coach15"/></td>
+          <td><input type="number" min="0" step="1" value="${r.coach25}" data-s="${s}" data-f="coach25"/></td>
+          <td><input type="number" min="0" step="1" value="${r.ljPlayers}" data-s="${s}" data-f="ljPlayers"/></td>
+          <td><input type="number" min="0" step="0.01" value="${r.ljPriceHr}" data-s="${s}" data-f="ljPriceHr"/></td>
+          <td><input type="number" min="0" step="1" value="${r.phPlayers}" data-s="${s}" data-f="phPlayers"/></td>
+          <td><input type="number" min="0" step="0.01" value="${r.phPriceHr}" data-s="${s}" data-f="phPriceHr"/></td>
+          <td class="calc expense" id="proj-dev-${s}-expense">$0</td>
+          <td class="calc income" id="proj-dev-${s}-income">$0</td>
+          <td class="calc" id="proj-dev-${s}-net">$0</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  `;
+  table.querySelectorAll('input[data-f]').forEach(inp=>{
+    inp.oninput=()=>{
+      const {s,f}=inp.dataset;
+      projected.dev.sessions[s][f]=+inp.value||0;
+      document.getElementById('proj-save-note').textContent='';
+      updateProjectedCalcs();
+    };
+  });
+}
+function buildCostList(listKey){
+  const arr = listKey==='overall' ? projected.overallCosts : projected[listKey].costs;
+  const container=document.getElementById('proj-'+listKey+'-costs');
+  container.innerHTML = arr.map((c,i)=>`
+    <div class="cost-list-row">
+      <input type="text" placeholder="Cost name" value="${c.name||''}" data-list="${listKey}" data-idx="${i}" data-f="name"/>
+      <input type="number" min="0" step="1" placeholder="Amount" value="${c.amount||0}" data-list="${listKey}" data-idx="${i}" data-f="amount"/>
+      <button class="cost-list-remove" onclick="removeCostRow('${listKey}',${i})" title="Remove">&times;</button>
+    </div>
+  `).join('') + `<button class="btn btn-outline cost-list-add" onclick="addCostRow('${listKey}')">+ Add Cost</button>`;
+  container.querySelectorAll('input[data-list]').forEach(inp=>{
+    inp.oninput=()=>{
+      const {list,idx,f}=inp.dataset;
+      const arr2 = list==='overall' ? projected.overallCosts : projected[list].costs;
+      arr2[+idx][f] = f==='amount' ? (+inp.value||0) : inp.value;
+      document.getElementById('proj-save-note').textContent='';
+      updateProjectedCalcs();
+    };
+  });
+}
+function addCostRow(listKey){
+  const arr = listKey==='overall' ? projected.overallCosts : projected[listKey].costs;
+  arr.push(costRow(''));
+  buildCostList(listKey);
+  updateProjectedCalcs();
+}
+function removeCostRow(listKey,idx){
+  const arr = listKey==='overall' ? projected.overallCosts : projected[listKey].costs;
+  arr.splice(idx,1);
+  buildCostList(listKey);
+  updateProjectedCalcs();
+}
+
+function updateProjectedCalcs(){
+  ['adm','ih'].forEach(programKey=>{
+    ADM_IH_SEASONS.forEach(s=>{
+      const c=calcSeasonRow(programKey,s);
+      document.getElementById(`proj-${programKey}-${s}-expense`).textContent=money(c.expense);
+      document.getElementById(`proj-${programKey}-${s}-income`).textContent=money(c.income);
+      document.getElementById(`proj-${programKey}-${s}-net`).textContent=money(c.net);
+    });
+  });
+  DEV_SESSIONS.forEach(s=>{
+    const c=calcDevRow(s);
+    document.getElementById(`proj-dev-${s}-expense`).textContent=money(c.expense);
+    document.getElementById(`proj-dev-${s}-income`).textContent=money(c.income);
+    document.getElementById(`proj-dev-${s}-net`).textContent=money(c.net);
+  });
+  const t=computeProjectedTotals();
+  document.getElementById('proj-adm-sub-income').textContent=money(t.adm.income);
+  document.getElementById('proj-adm-sub-expense').textContent=money(t.adm.expense);
+  document.getElementById('proj-adm-sub-net').textContent=money(t.adm.net);
+  document.getElementById('proj-ih-sub-income').textContent=money(t.ih.income);
+  document.getElementById('proj-ih-sub-expense').textContent=money(t.ih.expense);
+  document.getElementById('proj-ih-sub-net').textContent=money(t.ih.net);
+  document.getElementById('proj-dev-sub-income').textContent=money(t.dev.income);
+  document.getElementById('proj-dev-sub-expense').textContent=money(t.dev.expense);
+  document.getElementById('proj-dev-sub-net').textContent=money(t.dev.net);
+
+  document.getElementById('proj-total-income').textContent=money(t.income);
+  document.getElementById('proj-total-expense').textContent=money(t.expense);
+  const netEl=document.getElementById('proj-net');
+  netEl.textContent=(t.net<0?'-':'')+money(Math.abs(t.net));
+  netEl.className='stat-value '+(t.net>=0?'net-pos':'net-neg');
+  document.getElementById('proj-net-sub').textContent=t.net>=0?'Projected surplus':'Projected shortfall';
+}
+function renderProjectedAll(){
+  buildSeasonTable('adm');
+  buildSeasonTable('ih');
+  buildDevTable();
+  buildCostList('adm');
+  buildCostList('ih');
+  buildCostList('dev');
+  buildCostList('overall');
+  updateProjectedCalcs();
+}
+function saveProjected(){
+  saveProjectedData(projected);
+  document.getElementById('proj-save-note').textContent='✓ Saved';
+}
+
 // ── INIT ──
 fillForm();
 coaches = loadCoaches();
 refreshCoachData();
 render();
+renderProjectedAll();
 </script>
 </body>
 </html>
