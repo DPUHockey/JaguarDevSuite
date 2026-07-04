@@ -393,6 +393,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <div><div class="section-title">Season Planning</div><div class="section-note">Build your program sessions. Check dates, mark session ends, view summary.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="openPlanningConfig()">⚙ Session Config</button>
+        <button class="btn btn-outline btn-sm" onclick="repairPlanCodes()" title="Locks in each checked date's program (LJ/PH, ADM, InHouse) using today's schedule, so future schedule edits can't reclassify it">🔒 Lock In Program Assignments</button>
         <button class="btn btn-outline btn-sm" id="btn-reset-schedule" onclick="resetPlanningData(true)">Reset Schedule (keep blackouts)</button>
         <button class="btn btn-outline btn-sm" id="btn-reset-all" onclick="resetPlanningData(false)">Reset All</button>
         <button class="btn btn-outline btn-sm" onclick="exportPlanDataDebug()">&#x2193; Export Plan Data</button>
@@ -2007,13 +2008,19 @@ function computeSessionLabels(){
         const sk=slotKey(dk,dayDef,si);
         const entry=planData[sk];
         if(!entry?.checked)return;
-        const item={sk,dk,dt:new Date(dt),dayDef,si,slot:s,endSession:!!entry.endSession,sessionNum:entry.sessionNum};
-        if(s.code==='lj'&&!isSunday) ljWedEntries.push(item);
-        else if(s.code==='lj'&&isSunday) ljSunEntries.push(item);
-        else if(s.code==='adm'&&!isSunday) admPracEntries.push(item);
-        else if(s.code==='adm'&&isSunday) admGameEntries.push(item);
-        else if(s.code==='ih'&&!isSunday) ihPracEntries.push(item);
-        else if(s.code==='ih'&&isSunday) ihGameEntries.push(item);
+        // Prefer the code permanently stamped at check-time (see applyPlanCheck) over
+        // this slot's current position in SCHEDULE -- otherwise editing the schedule's
+        // slots later (reordering, adding, removing) silently reclassifies every
+        // already-checked date on that day, which is what caused ADM dates to show up
+        // under the LJ/PH schedule.
+        const code=entry.code||s.code;
+        const item={sk,dk,dt:new Date(dt),dayDef,si,slot:s,code,endSession:!!entry.endSession,sessionNum:entry.sessionNum};
+        if(code==='lj'&&!isSunday) ljWedEntries.push(item);
+        else if(code==='lj'&&isSunday) ljSunEntries.push(item);
+        else if(code==='adm'&&!isSunday) admPracEntries.push(item);
+        else if(code==='adm'&&isSunday) admGameEntries.push(item);
+        else if(code==='ih'&&!isSunday) ihPracEntries.push(item);
+        else if(code==='ih'&&isSunday) ihGameEntries.push(item);
       });
     }
   });
@@ -2113,11 +2120,15 @@ function buildPlanCalendar(){
       dayDef.slots.forEach((s,si)=>{
         const sk=slotKey(dk,dayDef,si);
         const entry=planData[sk]||{checked:false,endSession:false};
-        const isGame=s.code==='ih'&&isSunday||s.code==='adm'&&isSunday;
-        const colorKey=s.code==='lj'?'lj':s.code==='adm'?'adm':isSunday?'ih_game':'ih_prac';
+        // Same "stamped code wins" rule as computeSessionLabels -- otherwise this
+        // calendar view would show a previously-checked date under whichever program
+        // now happens to occupy that slot position, even after the fix there.
+        const code=entry.code||s.code;
+        const isGame=code==='ih'&&isSunday||code==='adm'&&isSunday;
+        const colorKey=code==='lj'?'lj':code==='adm'?'adm':isSunday?'ih_game':'ih_prac';
         const pc=PLAN_COLORS[colorKey];
         const lbl=labels[sk];
-        const typeLabel=s.code==='lj'?'LJ/PH':s.code==='adm'?(isSunday?'ADM Game':'ADM Prac'):(isSunday?'IH Game':'IH Prac');
+        const typeLabel=code==='lj'?'LJ/PH':code==='adm'?(isSunday?'ADM Game':'ADM Prac'):(isSunday?'IH Game':'IH Prac');
 
         html+=`<div class="plan-slot" style="background:${entry.checked?pc.bg:'transparent'};border:1px solid ${entry.checked?pc.border:'transparent'};margin-top:3px;border-radius:3px;padding:2px 3px">
           <div class="plan-slot-inner">
@@ -2148,13 +2159,20 @@ function buildPlanCalendar(){
 // numbering: LJ/PH-Wed, LJ/PH-Sun, ADM-practice, ADM-game, InHouse-practice, InHouse-game.
 // (Sunday carries the "game" slot for adm/ih; every other practice day is "practice".)
 function slotStreamKey(sk){
+  // A previously-checked date may have its true program permanently stamped in
+  // planData (see applyPlanCheck) -- that's authoritative and immune to later
+  // SCHEDULE edits. Only fall back to resolving position-in-SCHEDULE for dates that
+  // predate this fix and never got stamped.
+  const stored=planData[sk]&&planData[sk].code;
   const parts=sk.split('__');
-  const dayName=parts[1],si=+parts[2];
+  const dayName=parts[1];
+  const isSunday=dayName==='Sunday';
+  if(stored)return stored+'_'+(isSunday?'sun':'wed');
+  const si=+parts[2];
   const dayDef=SCHEDULE.find(s=>s.day===dayName);
   if(!dayDef)return null;
   const slot=dayDef.slots[si];
   if(!slot)return null;
-  const isSunday=dayName==='Sunday';
   return slot.code+'_'+(isSunday?'sun':'wed');
 }
 const STREAM_LABELS={lj_wed:'LJ/PH (Wednesday)',lj_sun:'LJ/PH (Sunday)',adm_wed:'ADM Practice',adm_sun:'ADM Game',ih_wed:'InHouse Practice',ih_sun:'InHouse Game'};
@@ -2228,6 +2246,16 @@ function applyPlanCheck(sk,sessionNum,checked=true){
     saveActiveDates(activeDates);
   } else {
     planData[sk].sessionNum=sessionNum;
+    // Permanently record which program (lj/adm/ih) this date belongs to, resolved from
+    // the CURRENT schedule at the moment it's checked. Without this, a date's program
+    // is re-derived every time from its slot's array position in SCHEDULE -- so if the
+    // schedule's slots for that day are ever reordered or edited later, every
+    // previously-checked date on that day silently gets reclassified under whatever
+    // program now happens to sit at that same index (e.g. an old LJ/PH date showing up
+    // as ADM). Stamping the code here means a date's program can never drift out from
+    // under it after the fact.
+    const stream=slotStreamKey(sk);
+    if(stream)planData[sk].code=stream.split('_')[0];
     // Auto-check on schedule page
     activeDates.add(sk);
     saveActiveDates(activeDates);
@@ -2277,6 +2305,29 @@ function togglePlanEnd(sk,checked){
   buildPlanCalendar();
 }
 
+// One-time repair for dates checked before program codes were permanently stamped.
+// Freezes each existing checked date's program using TODAY's schedule (assumed
+// correct) so it can't be silently reclassified by any future schedule edit.
+function repairPlanCodes(){
+  let fixed=0;
+  Object.keys(planData).forEach(sk=>{
+    const entry=planData[sk];
+    if(!entry||!entry.checked||entry.code)return;
+    const parts=sk.split('__');
+    const dayName=parts[1],si=+parts[2];
+    const dayDef=SCHEDULE.find(s=>s.day===dayName);
+    const slot=dayDef&&dayDef.slots[si];
+    if(!slot)return;
+    entry.code=slot.code;
+    fixed++;
+  });
+  if(fixed){
+    savePlanData();
+    buildPlanMonthNav();
+    buildPlanCalendar();
+  }
+  toast(fixed?('Repaired '+fixed+' date'+(fixed!==1?'s':'')+' \u2014 program assignments now locked in.'):'Nothing to repair \u2014 all dates already locked in.');
+}
 function buildPlanSummary(){
   const labels=computeSessionLabels();
   const content=document.getElementById('planSummaryContent');
@@ -2284,12 +2335,12 @@ function buildPlanSummary(){
 
   // Group by program type → session → entries
   const programs=[
-    {key:'lj_wed',title:'Little Jaguars / Pre-Hockey — Wednesday',color:'#ffb6c1',filter:e=>e.slot.code==='lj'&&e.dt.getDay()!==0},
-    {key:'lj_sun',title:'Little Jaguars / Pre-Hockey — Sunday',color:'#ffc8d8',filter:e=>e.slot.code==='lj'&&e.dt.getDay()===0},
-    {key:'adm_prac',title:'ADM — Practices',color:'#90ee90',filter:e=>e.slot.code==='adm'&&e.dt.getDay()!==0},
-    {key:'adm_game',title:'ADM — Games (Sunday)',color:'#a0e88f',filter:e=>e.slot.code==='adm'&&e.dt.getDay()===0},
-    {key:'ih_prac',title:'InHouse — Practices',color:'#ffa500',filter:e=>e.slot.code==='ih'&&e.dt.getDay()!==0},
-    {key:'ih_game',title:'InHouse — Games (Sunday)',color:'#7ec8ff',filter:e=>e.slot.code==='ih'&&e.dt.getDay()===0},
+    {key:'lj_wed',title:'Little Jaguars / Pre-Hockey — Wednesday',color:'#ffb6c1',filter:e=>e.code==='lj'&&e.dt.getDay()!==0},
+    {key:'lj_sun',title:'Little Jaguars / Pre-Hockey — Sunday',color:'#ffc8d8',filter:e=>e.code==='lj'&&e.dt.getDay()===0},
+    {key:'adm_prac',title:'ADM — Practices',color:'#90ee90',filter:e=>e.code==='adm'&&e.dt.getDay()!==0},
+    {key:'adm_game',title:'ADM — Games (Sunday)',color:'#a0e88f',filter:e=>e.code==='adm'&&e.dt.getDay()===0},
+    {key:'ih_prac',title:'InHouse — Practices',color:'#ffa500',filter:e=>e.code==='ih'&&e.dt.getDay()!==0},
+    {key:'ih_game',title:'InHouse — Games (Sunday)',color:'#7ec8ff',filter:e=>e.code==='ih'&&e.dt.getDay()===0},
   ];
 
   const allEntries=Object.values(labels);
