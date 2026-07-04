@@ -291,7 +291,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V2</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V3</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -465,7 +465,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 
   <!-- USERS PANEL -->
   <div id="panel-users" class="panel">
-    <div class="section-header"><div><div class="section-title">User Management</div><div class="section-note">Manage accounts and access levels</div></div><button class="btn btn-gold btn-sm" onclick="openAddUserModal()">+ Add User</button></div>
+    <div class="section-header"><div><div class="section-title">User Management</div><div class="section-note">Manage accounts and access levels</div></div><button class="btn btn-gold btn-sm" onclick="jagLaunch('admin')">Open Admin Center</button></div>
     <div style="overflow-x:auto"><table class="data-table" id="userTable"></table></div>
     <div class="card" style="max-width:520px;margin-top:16px">
       <h4 style="color:var(--gold);margin-bottom:12px;font-size:16px">Access Level Guide</h4>
@@ -672,7 +672,7 @@ window.jumpToPlanningCalendar=function(){
     window.__pendingDeepLink='planning-calendar';
   }
 };
-const JAG_URLS={home:'index.html',db:'db.html',coach:'coach.html',adm:'adm.html',ih:'ih.html',drills:'drills.html',schedule:'schedule.html',stats:'stats.html',notes:'notes.html'};
+const JAG_URLS={home:'index.html',db:'db.html',coach:'coach.html',adm:'adm.html',ih:'ih.html',drills:'drills.html',schedule:'schedule.html',stats:'stats.html',notes:'notes.html',admin:'admin.html'};
 // Hosted on GitHub Pages: apps live as sibling URLs, so cross-app jumps are simple
 // same-origin navigations of a named tab. We still open('',name) FIRST to check if
 // that app is already running — navigating a live tab would reload it and wipe state.
@@ -3108,23 +3108,12 @@ function saveCoachModal(){
 /* ---------------------------------------------------
    USER MANAGEMENT
 --------------------------------------------------- */
+// User management has moved to the dedicated Admin Center app (admin.html), which
+// shares the same 'jag_users' data this panel used to manage directly -- so this is
+// just a pointer now, not a second copy of the same feature.
 function buildUserTable(){
   const tbl=document.getElementById('userTable');
-  let h=`<thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
-  users.forEach((u,i)=>{
-    h+=`<tr>
-      <td>${u.name}</td>
-      <td style="font-family:'Barlow Condensed';color:var(--white-dim)">${u.username}</td>
-      <td>${roleBadge(u.role)}</td>
-      <td><span class="status-dot ${u.active?'dot-active':'dot-inactive'}"></span>${u.active?'Active':'Inactive'}</td>
-      <td><div class="action-btns">
-        <button class="btn btn-outline btn-xs" onclick="openEditUserModal(${i})">Edit</button>
-        <button class="btn btn-blue btn-xs" onclick="toggleUserActive(${i})">${u.active?'Deactivate':'Activate'}</button>
-        ${u.username!==currentUser.username?`<button class="btn btn-danger btn-xs" onclick="removeUser(${i})">Delete</button>`:''}
-      </div></td>
-    </tr>`;
-  });
-  tbl.innerHTML=h+'</tbody>';
+  tbl.innerHTML=`<tr><td style="padding:24px 8px;color:var(--white-dim);">User accounts (including passwords) are now managed in the <strong style="color:var(--gold-light);">Admin Center</strong> app, shared across the whole suite. <button class="btn btn-gold btn-sm" style="margin-left:10px;" onclick="jagLaunch('admin')">Open Admin Center</button></td></tr>`;
 }
 function openAddUserModal(){
   editingUserIdx=null;
