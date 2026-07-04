@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V6</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V7</div>
 
 <nav>
   <div class="nav-left">
@@ -1919,6 +1919,19 @@ function getFullPromoHistory(m){
   }
   return hist;
 }
+// The single source of truth for "what level is this player actually at right now".
+// A player's raw `level` field has repeatedly proven unreliable -- it can be reverted
+// by a stale duplicate row, or arbitrarily inherited from whichever record a merge
+// happens to pick as its base. _promoHistory only ever gets appended to, never
+// overwritten, so the highest-ranked entry on it is always correct. Every tool that
+// needs to know or repair a player's current level should go through this, rather
+// than reading/copying the `level` field directly.
+function trueLevelFromHistory(m){
+  const hist=getFullPromoHistory(m);
+  const ranked=hist.map(h=>LEVEL_ORDER.indexOf(h.level)).filter(i=>i>=0);
+  if(!ranked.length)return null;
+  return LEVEL_ORDER[Math.max(...ranked)];
+}
 function upsertMaster(row,sn){
   const mk=masterKey(row);if(mk.startsWith('||'))return;
   const ei=DB.master.findIndex(m=>masterKey(m)===mk);
@@ -1954,8 +1967,22 @@ function mergeDuplicateMasterEntries(){
       const sessions=new Set();list.forEach(e=>(e._sessions||[]).forEach(s=>sessions.add(s)));
       out._sessions=Array.from(sessions);
       const promoMap=new Map();
-      list.forEach(e=>(e._promoHistory||[]).forEach(p=>{if(!promoMap.has(p.level)||p.date>promoMap.get(p.level).date)promoMap.set(p.level,p);}));
-      out._promoHistory=Array.from(promoMap.values());
+      list.forEach(e=>(e._promoHistory||[]).forEach(p=>{
+        const existing=promoMap.get(p.level);
+        if(!existing){promoMap.set(p.level,p);return;}
+        // Compare via ISO conversion when possible -- one duplicate's history can have
+        // dates in a different raw format than the other's, and plain string
+        // comparison across mismatched formats picks the wrong one more often than not.
+        const pIso=toISODate(p.date)||p.date||'',eIso=toISODate(existing.date)||existing.date||'';
+        if(pIso>eIso)promoMap.set(p.level,p);
+      }));
+      out._promoHistory=Array.from(promoMap.values()).sort((a,b)=>LEVEL_ORDER.indexOf(a.level)-LEVEL_ORDER.indexOf(b.level));
+      // Recompute current level from the just-combined history rather than trusting
+      // whichever duplicate got picked as "base" -- that field is exactly what's been
+      // unreliable across every one of these duplicate scenarios, while the merged
+      // history itself is complete and correct at this point.
+      const trueLevel=trueLevelFromHistory(out);
+      if(trueLevel)out.level=trueLevel;
       COLS.forEach(c=>{if(!out[c]){const src=list.find(e=>e[c]);if(src)out[c]=src[c];}});
       const dates=list.map(e=>e.date_added).filter(Boolean).sort();
       if(dates.length)out.date_added=dates[0];
@@ -1996,11 +2023,7 @@ function cleanupDuplicateSessionRows(){
     // real current level even if the level field drifted away from it.
     let masterLevelFixCount=0;
     DB.master.forEach(m=>{
-      const hist=getFullPromoHistory(m);
-      if(!hist.length)return;
-      const ranked=hist.map(h=>LEVEL_ORDER.indexOf(h.level)).filter(i=>i>=0);
-      if(!ranked.length)return;
-      const trueLevel=LEVEL_ORDER[Math.max(...ranked)];
+      const trueLevel=trueLevelFromHistory(m);
       if(trueLevel && m.level!==trueLevel){m.level=trueLevel;masterLevelFixCount++;}
     });
     let dupCount=0,levelFixCount=0;
