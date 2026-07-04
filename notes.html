@@ -24,6 +24,7 @@ input,select,button{font-family:'Barlow',sans-serif;}
 .btn-gold:hover{background:var(--gold-light);}
 .btn-outline{background:transparent;border:1px solid var(--gold-dark);color:var(--gold-light);}
 .btn-outline:hover{background:rgba(201,168,76,.1);}
+.hidden{display:none!important;}
 
 nav{display:flex;align-items:center;gap:18px;padding:12px 24px;background:var(--gray-dark);border-bottom:1px solid var(--gray-border);flex-wrap:wrap;}
 .nav-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold);white-space:nowrap;}
@@ -94,6 +95,7 @@ table.proj-table tfoot td{padding:7px 4px;font-weight:700;border-top:1px solid v
 .cost-list-remove:hover{background:rgba(231,76,60,.15);}
 .cost-list-add{margin-top:4px;font-size:11px;}
 .proj-summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:26px;}
+.scenario-bar{display:flex;align-items:flex-end;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
 
 /* ===== BOTTOM HALF: WORKSHEET ===== */
 .ws-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:20px;}
@@ -123,11 +125,39 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 .save-note{font-size:12px;color:var(--green);align-self:center;margin-right:auto;}
 
 #app-ver-badge{position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;}
+
+/* ===== LOGIN (matches Coach Data Center) ===== */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.login-box{width:100%;max-width:400px;}
+.login-logo{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.logo-circle{width:56px;height:56px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--black);border:2px solid var(--gold-light);flex-shrink:0;}
+.login-logo h1{font-size:26px;color:var(--gold);line-height:1.1;font-family:'Bebas Neue',sans-serif;}
+.login-logo .subtitle{font-family:'Barlow Condensed';font-size:12px;color:var(--white-dim);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.login-card{background:var(--gray-dark);border:1px solid var(--gold-dark);border-radius:10px;padding:28px;}
+.login-note{font-size:12px;color:var(--white-dim);margin-bottom:18px;line-height:1.5;}
+#logoutBtn{margin-left:auto;}
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V2</div>
+<div id="app-ver-badge">V3</div>
 
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-circle">JAG</div>
+      <div><h1>Jaguar Budget</h1><div class="subtitle">Sign In Required</div></div>
+    </div>
+    <div class="login-card">
+      <div class="login-note">Budget contains coach pay rate and payroll data. Access is limited to Admin and Accountant accounts.</div>
+      <div class="fg"><span class="fl">Username</span><input class="fi" id="loginUser" type="text" placeholder="Enter username" autocomplete="username"/></div>
+      <div class="fg" style="margin-bottom:20px;"><span class="fl">Password</span><input class="fi" id="loginPass" type="password" placeholder="Enter password"/></div>
+      <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="doLogin()">Sign In</button>
+      <div id="loginError" class="hidden" style="margin-top:10px;padding:8px 12px;background:rgba(231,76,60,.1);border:1px solid rgba(231,76,60,.3);border-radius:5px;color:#e74c3c;font-size:13px;text-align:center;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="appShell" class="hidden">
 <nav>
   <div class="nav-title">Jaguar Budget</div>
   <div class="nav-links">
@@ -136,6 +166,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
     <button class="nav-btn jag-btn" onclick="jagLaunch('ih')">InHouse Center</button>
     <button class="nav-btn jag-btn" onclick="jagLaunch('coach')">Coach Data Center</button>
     <button class="nav-btn jag-btn" onclick="jagHome()">&#8962; Home</button>
+    <button class="nav-btn" id="logoutBtn" onclick="doLogout()" style="border-color:#e74c3c;color:#e74c3c;">Sign Out</button>
   </div>
 </nav>
 
@@ -236,6 +267,17 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 
   <div class="mega-divider second"><span class="mega-divider-label">Projected Budget</span></div>
 
+  <div class="scenario-bar">
+    <div class="fg" style="margin-bottom:0;flex:1;max-width:320px;">
+      <span class="fl">Scenario</span>
+      <select class="fi" id="scenario-select" onchange="switchScenario(this.value)"></select>
+    </div>
+    <button class="btn btn-outline" onclick="newScenario()">+ New</button>
+    <button class="btn btn-outline" onclick="duplicateScenario()">Duplicate</button>
+    <button class="btn btn-outline" onclick="renameScenario()">Rename</button>
+    <button class="btn btn-outline" id="deleteScenarioBtn" onclick="deleteScenario()" style="border-color:#e74c3c;color:#e74c3c;">Delete</button>
+  </div>
+
   <div class="proj-note">
     <strong>First pass — flag anything that doesn't match what you meant.</strong> For each row below: <em>Expense = Hours × (Ice $/hr + Coach@15 hrs×$15 + Coach@25 hrs×$25)</em>, and <em>Income = Hours × Players × Price/hr</em> (Dev sessions add LJ and PH as two separate player groups within the same session). Program Costs (jerseys, sticks, etc.) add to that program's expenses. Overall Costs (overhead, pucks, etc.) add to the grand total only, not to any one program.
   </div>
@@ -313,6 +355,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
     <button class="btn btn-gold" onclick="saveProjected()">Save Projected Budget</button>
   </div>
 
+</div>
 </div>
 
 <script>
@@ -539,7 +582,8 @@ function render(){
 // only touches the read-only calculated cells on every keystroke -- so typing
 // in one field never rebuilds the DOM and kicks focus out of the input.
 // ══════════════════════════════════════════════════════════════════════════
-const PROJ_KEY='jag_budget_projected';
+const SCENARIOS_KEY='jag_budget_scenarios';
+const LEGACY_PROJ_KEY='jag_budget_projected'; // old single-scenario key, migrated once below
 const ADM_IH_SEASONS=['fall','winter','spring','summer'];
 const ADM_IH_SEASON_LABELS={fall:'Fall',winter:'Winter',spring:'Spring',summer:'Summer'};
 const DEV_SESSIONS=[1,2,3,4,5,6];
@@ -558,26 +602,101 @@ function defaultProjected(){
     overallCosts:[costRow('Monthly Overhead'), costRow('Pucks'), costRow(''), costRow(''), costRow(''), costRow(''), costRow('')]
   };
 }
-function loadProjected(){
+// Normalizes a possibly-partial/older-shaped data object onto the current default
+// shape, so scenarios saved by an earlier version of this app still load correctly.
+function normalizeProjectedData(p){
+  const d=defaultProjected();
+  p=p||{};
+  ['adm','ih'].forEach(k=>{
+    if(p[k]&&p[k].seasons) ADM_IH_SEASONS.forEach(sk=>Object.assign(d[k].seasons[sk], p[k].seasons[sk]||{}));
+    if(p[k]&&Array.isArray(p[k].costs)&&p[k].costs.length) d[k].costs=p[k].costs;
+  });
+  if(p.dev&&p.dev.sessions) DEV_SESSIONS.forEach(sk=>Object.assign(d.dev.sessions[sk], p.dev.sessions[sk]||{}));
+  if(p.dev&&Array.isArray(p.dev.costs)&&p.dev.costs.length) d.dev.costs=p.dev.costs;
+  if(Array.isArray(p.overallCosts)&&p.overallCosts.length) d.overallCosts=p.overallCosts;
+  return d;
+}
+function newScenarioId(){ return 's'+Date.now()+Math.random().toString(36).slice(2,6); }
+function loadScenariosState(){
   try{
-    const s=localStorage.getItem(PROJ_KEY);
+    const s=localStorage.getItem(SCENARIOS_KEY);
     if(s){
       const p=JSON.parse(s);
-      const d=defaultProjected();
-      ['adm','ih'].forEach(k=>{
-        if(p[k]&&p[k].seasons) ADM_IH_SEASONS.forEach(sk=>Object.assign(d[k].seasons[sk], p[k].seasons[sk]||{}));
-        if(p[k]&&Array.isArray(p[k].costs)&&p[k].costs.length) d[k].costs=p[k].costs;
-      });
-      if(p.dev&&p.dev.sessions) DEV_SESSIONS.forEach(sk=>Object.assign(d.dev.sessions[sk], p.dev.sessions[sk]||{}));
-      if(p.dev&&Array.isArray(p.dev.costs)&&p.dev.costs.length) d.dev.costs=p.dev.costs;
-      if(Array.isArray(p.overallCosts)&&p.overallCosts.length) d.overallCosts=p.overallCosts;
-      return d;
+      if(p&&Array.isArray(p.scenarios)&&p.scenarios.length){
+        p.scenarios.forEach(sc=>{sc.data=normalizeProjectedData(sc.data);});
+        if(!p.scenarios.find(sc=>sc.id===p.activeId)) p.activeId=p.scenarios[0].id;
+        return p;
+      }
     }
   }catch(e){}
-  return defaultProjected();
+  // One-time migration from the old single-scenario key, if present
+  let legacyData=null;
+  try{
+    const old=localStorage.getItem(LEGACY_PROJ_KEY);
+    if(old) legacyData=JSON.parse(old);
+  }catch(e){}
+  const id=newScenarioId();
+  return { scenarios:[{id, name:'Scenario 1', data:normalizeProjectedData(legacyData)}], activeId:id };
 }
-function saveProjectedData(p){ localStorage.setItem(PROJ_KEY, JSON.stringify(p)); }
-let projected=loadProjected();
+function saveScenariosState(){ localStorage.setItem(SCENARIOS_KEY, JSON.stringify(scenariosState)); }
+let scenariosState=loadScenariosState();
+function activeScenario(){ return scenariosState.scenarios.find(s=>s.id===scenariosState.activeId)||scenariosState.scenarios[0]; }
+let projected=activeScenario().data;
+
+function renderScenarioSelect(){
+  const sel=document.getElementById('scenario-select');
+  sel.innerHTML=scenariosState.scenarios.map(s=>`<option value="${s.id}"${s.id===scenariosState.activeId?' selected':''}>${s.name}</option>`).join('');
+  document.getElementById('deleteScenarioBtn').disabled=scenariosState.scenarios.length<=1;
+}
+function switchScenario(id){
+  scenariosState.activeId=id;
+  saveScenariosState();
+  projected=activeScenario().data;
+  renderProjectedAll();
+  renderScenarioSelect();
+}
+function newScenario(){
+  const name=prompt('Name for the new scenario:','New Scenario');
+  if(!name)return;
+  const id=newScenarioId();
+  scenariosState.scenarios.push({id,name:name.trim()||'New Scenario',data:defaultProjected()});
+  scenariosState.activeId=id;
+  saveScenariosState();
+  projected=activeScenario().data;
+  renderProjectedAll();
+  renderScenarioSelect();
+}
+function duplicateScenario(){
+  const cur=activeScenario();
+  const name=prompt('Name for the duplicate:',cur.name+' copy');
+  if(!name)return;
+  const id=newScenarioId();
+  scenariosState.scenarios.push({id,name:name.trim()||(cur.name+' copy'),data:JSON.parse(JSON.stringify(cur.data))});
+  scenariosState.activeId=id;
+  saveScenariosState();
+  projected=activeScenario().data;
+  renderProjectedAll();
+  renderScenarioSelect();
+}
+function renameScenario(){
+  const cur=activeScenario();
+  const name=prompt('Rename scenario:',cur.name);
+  if(!name)return;
+  cur.name=name.trim()||cur.name;
+  saveScenariosState();
+  renderScenarioSelect();
+}
+function deleteScenario(){
+  if(scenariosState.scenarios.length<=1){alert('At least one scenario must remain.');return;}
+  const cur=activeScenario();
+  if(!confirm('Delete scenario "'+cur.name+'"? This cannot be undone.'))return;
+  scenariosState.scenarios=scenariosState.scenarios.filter(s=>s.id!==cur.id);
+  scenariosState.activeId=scenariosState.scenarios[0].id;
+  saveScenariosState();
+  projected=activeScenario().data;
+  renderProjectedAll();
+  renderScenarioSelect();
+}
 
 function calcSeasonRow(programKey,seasonKey){
   const r=projected[programKey].seasons[seasonKey];
@@ -749,6 +868,7 @@ function updateProjectedCalcs(){
   document.getElementById('proj-net-sub').textContent=t.net>=0?'Projected surplus':'Projected shortfall';
 }
 function renderProjectedAll(){
+  renderScenarioSelect();
   buildSeasonTable('adm');
   buildSeasonTable('ih');
   buildDevTable();
@@ -759,16 +879,59 @@ function renderProjectedAll(){
   updateProjectedCalcs();
 }
 function saveProjected(){
-  saveProjectedData(projected);
-  document.getElementById('proj-save-note').textContent='✓ Saved';
+  saveScenariosState();
+  document.getElementById('proj-save-note').textContent='✓ Saved "'+activeScenario().name+'"';
 }
 
-// ── INIT ──
-fillForm();
-coaches = loadCoaches();
-refreshCoachData();
-render();
-renderProjectedAll();
+// ══════════════════════════════════════════════════════════════════════════
+// AUTH — uses the SAME shared user list as Coach Data Center (localStorage
+// key 'jag_users'), so any existing Coach Data Center account works here
+// too, with no separate signup. Only admin and accountant roles may enter,
+// since this page surfaces coach pay rates and payroll totals. Manage users
+// (including creating new ones) from the Admin Center app.
+// ══════════════════════════════════════════════════════════════════════════
+function loadUsers(){
+  try{
+    const s=localStorage.getItem('jag_users');
+    if(s){const p=JSON.parse(s);if(Array.isArray(p)&&p.length)return p;}
+  }catch(e){}
+  return[
+    {id:'u1',name:'Admin User',username:'admin',password:'admin123',role:'admin',active:true},
+    {id:'u2',name:'Coach Editor',username:'editor',password:'edit123',role:'editor',active:true},
+    {id:'u3',name:'Head Accountant',username:'accountant',password:'acct123',role:'accountant',active:true},
+    {id:'u4',name:'View Only',username:'viewer',password:'view123',role:'viewer',active:true}
+  ];
+}
+let currentUser=null;
+function doLogin(){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  const users=loadUsers();
+  const found=users.find(x=>x.username===u&&x.password===p&&x.active);
+  const el=document.getElementById('loginError');
+  if(!found){el.textContent='Invalid username or password.';el.classList.remove('hidden');return;}
+  if(found.role!=='admin'&&found.role!=='accountant'){el.textContent='This account does not have access to Budget (Admin or Accountant role required).';el.classList.remove('hidden');return;}
+  currentUser=found;
+  startApp();
+}
+document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function doLogout(){
+  currentUser=null;
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginError').classList.add('hidden');
+}
+function startApp(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  fillForm();
+  coaches = loadCoaches();
+  refreshCoachData();
+  render();
+  renderProjectedAll();
+}
 </script>
 </body>
 </html>
