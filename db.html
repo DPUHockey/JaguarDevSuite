@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V10</div>
 
 <nav>
   <div class="nav-left">
@@ -700,6 +700,17 @@ function toISODate(s){
   }
   return'';
 }
+// The one correct way to get "today" as YYYY-MM-DD. new Date().toISOString() always
+// reports UTC, which silently rolls over to the next calendar day in the evening for
+// anyone west of Greenwich -- that's what was causing "Started" dates to show
+// tomorrow's date. This uses local date components instead, and every place in the
+// app that needs "today" (date_added defaults, promotion dates, gear return dates)
+// should go through this rather than rolling its own, so every date recorded anywhere
+// is both correct AND in the same consistent format as everything else.
+function todayISO(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 // Some registration exports only have a "Class" column (e.g. "LJ 2", "PH 1") and no
 // separate Level field. If Level comes in blank, derive it from Class using the same
 // normalization rules as getLevel() below, so promotions/next-level logic still works.
@@ -1091,7 +1102,7 @@ function confirmPromo(){
   const toLevel=document.getElementById('promo-override').value||pendingPromo.toLevel;
   if(!toLevel){showAlert('Please select a promoted-to level','err');return;}
   const promoNotes=v('promo-notes');const promoSt='Confirmed';
-  const promoRecord={first_name:row.first_name,last_name:row.last_name,birthdate:row.birthdate,from_level:fromLevel,to_level:toLevel,promoted_on:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),promo_status:promoSt,notes:promoNotes,parent1_name:row.parent1_name,parent1_email:row.parent1_email,parent1_phone:row.parent1_phone,parent2_name:row.parent2_name,parent2_email:row.parent2_email,parent2_phone:row.parent2_phone};
+  const promoRecord={first_name:row.first_name,last_name:row.last_name,birthdate:row.birthdate,from_level:fromLevel,to_level:toLevel,promoted_on:todayISO(),promo_status:promoSt,notes:promoNotes,parent1_name:row.parent1_name,parent1_email:row.parent1_email,parent1_phone:row.parent1_phone,parent2_name:row.parent2_name,parent2_email:row.parent2_email,parent2_phone:row.parent2_phone};
   if(!DB['promo'+sNum])DB['promo'+sNum]=[];
   // Match on the exact transition (name+birthdate+from+to), not just name+birthdate --
   // otherwise a second promotion later in the same session (e.g. LJ2->LJ3 after an
@@ -1340,7 +1351,7 @@ function openAddModal(tabKey, idx){
     document.getElementById('add-modal-sub').textContent = 'New athlete record';
     const promoEl = document.getElementById('add-modal-promo-summary');
     if(promoEl){promoEl.style.display='none';promoEl.innerHTML='';}
-    const _fda=document.getElementById('f-date-added');if(_fda)_fda.value=new Date().toISOString().slice(0,10);
+    const _fda=document.getElementById('f-date-added');if(_fda)_fda.value=todayISO();
     // pre-select current tab if it's a session tab
     const m = activeTab.match(/^session(\d)$/);
     if(m){ pickAddSession(parseInt(m[1])); }
@@ -1925,7 +1936,7 @@ function renderGroupTab(sNum,grp,rows){
       '</tr>';
   }).join('')+'</tbody>';
   const sgs2=isLJ?['lj1','lj2','lj3']:['ph1','ph2','ph3'];
-  const _tfToday=new Date().toISOString().slice(0,10);
+  const _tfToday=todayISO();
   const tf='<tfoot><tr style="background:var(--surf2);"><td colspan="6" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Present</td>'+dates.map(d=>{if(d>_tfToday)return'<td style="text-align:center;font-size:11px;color:var(--dim);opacity:.3;">—</td>';let cnt=0;sgs2.forEach(sg=>{if(attendData[sNum]?.[sg])cnt+=Object.values(attendData[sNum][sg]).filter(pa=>pa[d]).length;});const p2=rows.length?Math.round(cnt/rows.length*100):0;return'<td style="text-align:center;font-size:11px;color:var(--dim);">'+cnt+'<br><span style="font-size:10px;opacity:.6;">'+p2+'%</span></td>';}).join('')+'<td colspan="2"></td></tr></tfoot>';
   return toolbar+strip+'<div class="attend-outer"><table class="attend-table">'+hd+bd+tf+'</table></div>';
 }
@@ -1938,19 +1949,19 @@ function masterKey(r){return(r.first_name||'').toLowerCase().trim()+'|'+(r.last_
 // entry level the moment they get promoted past it, since it was never on record --
 // this reconstructs it from the earliest promotion we do have, using their original
 // entry date as the best available date for it.
+// Every real promotion now explicitly records both the "from" and "to" level (see
+// recordMasterPromo), and every fresh import explicitly records its own true starting
+// level (see upsertMaster) -- so _promoHistory is always a complete, honest record on
+// its own. This used to also guess at an implied predecessor level whenever the lowest
+// recorded level wasn't LJ1, as a safety net for legacy data from before promotions
+// recorded their "from" level. But that guess can't tell "this kid really was promoted
+// once, from a level we lost" apart from "this kid was simply imported directly at
+// LJ2 and has never been promoted" -- and defaulting to the former was inventing fake
+// promotion history for every freshly-imported player who didn't start at LJ1.
 function getFullPromoHistory(m){
   const hist=(m._promoHistory||[]).slice();
-  if(!hist.length){
-    if(m.level)hist.push({level:(m.level||'').toUpperCase().replace(/\s/g,''),date:m.date_added||''});
-    return hist;
-  }
-  const idxs=hist.map(h=>LEVEL_ORDER.indexOf(h.level)).filter(i=>i>=0);
-  if(idxs.length){
-    const minIdx=Math.min(...idxs);
-    if(minIdx>0){
-      const impliedStart=LEVEL_ORDER[minIdx-1];
-      if(!hist.some(h=>h.level===impliedStart))hist.unshift({level:impliedStart,date:m.date_added||''});
-    }
+  if(!hist.length&&m.level){
+    hist.push({level:(m.level||'').toUpperCase().replace(/\s/g,''),date:m.date_added||''});
   }
   return hist;
 }
@@ -1971,7 +1982,7 @@ function upsertMaster(row,sn){
   const mk=masterKey(row);if(mk.startsWith('||'))return;
   const ei=DB.master.findIndex(m=>masterKey(m)===mk);
   if(ei>=0){const m=DB.master[ei];if(!m._sessions)m._sessions=[];const sess='Session '+sn;if(sn&&!m._sessions.includes(sess))m._sessions.push(sess);if(row.level)m.level=row.level;return;}
-  const dateAdded=row.date_added||new Date().toISOString().slice(0,10);
+  const dateAdded=row.date_added||todayISO();
   // The player's very first level is a real milestone on their roadmap, not just a
   // starting point that gets overwritten -- record it with the date they entered the
   // program so the full history (entry level -> every promotion since) stays intact.
@@ -2384,7 +2395,7 @@ function gearReturnOpen(cb, sk, idx){
     }
     const status=document.getElementById('gear-return-select').value;
     const notes=document.getElementById('gear-return-notes').value.trim();
-    const dateStr=isEdit?r.gear_returned.split(' — ')[0]:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+    const dateStr=isEdit?r.gear_returned.split(' — ')[0]:todayISO();
     const label=dateStr+(notes?' — '+notes:'');
     DB[sk][idx].gear_returned=label;
     DB[sk][idx].gear_return_status=status;
@@ -2405,7 +2416,7 @@ function stayPendingPromo(){
   const promoNotes=v('promo-notes');
   const promoRecord={first_name:row.first_name,last_name:row.last_name,birthdate:row.birthdate,
     from_level:fromLevel,to_level:toLevel,
-    promoted_on:new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),
+    promoted_on:todayISO(),
     promo_status:'Pending',notes:promoNotes,
     parent1_name:row.parent1_name,parent1_email:row.parent1_email,parent1_phone:row.parent1_phone,
     parent2_name:row.parent2_name,parent2_email:row.parent2_email,parent2_phone:row.parent2_phone};
