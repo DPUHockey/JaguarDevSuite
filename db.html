@@ -1911,8 +1911,22 @@ function migrateAttendOnPromo(sNum,pk,fromLevel,toLevel){
 function recordMasterPromo(row,from,to,date){
   const m=DB.master.find(e=>masterKey(e)===masterKey(row));if(!m)return;
   if(!m._promoHistory)m._promoHistory=[];
-  const ei=m._promoHistory.findIndex(h=>h.level===to);
-  if(ei>=0)m._promoHistory[ei].date=date;else m._promoHistory.push({level:to,date});
+  // Permanently record the level the player was AT before this promotion, not just
+  // the level they're moving to. Previously only "to" was ever written to real
+  // storage -- the original/entry level was only ever reconstructed on the fly for
+  // display, which meant it could silently fail to show up depending on how the
+  // record was later touched (edits, CSV re-imports, merges). Writing it here means
+  // it's on record permanently, the same as every other rung on the ladder.
+  const fromNorm=(from||'').toUpperCase().replace(/\s/g,'');
+  if(fromNorm && !m._promoHistory.some(h=>h.level===fromNorm)){
+    m._promoHistory.push({level:fromNorm,date:m.date_added||''});
+  }
+  const toNorm=(to||'').toUpperCase().replace(/\s/g,'');
+  const ei=m._promoHistory.findIndex(h=>h.level===toNorm);
+  if(ei>=0)m._promoHistory[ei].date=date;else m._promoHistory.push({level:toNorm,date});
+  // Keep the roadmap in ladder order (LJ1->LJ2->LJ3->...) rather than insertion
+  // order, since "from" can end up pushed after entries that already exist.
+  m._promoHistory.sort((a,b)=>LEVEL_ORDER.indexOf(a.level)-LEVEL_ORDER.indexOf(b.level));
   m.level=to;
 }
 function syncMasterFromSessions(){
