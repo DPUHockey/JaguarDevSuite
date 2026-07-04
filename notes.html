@@ -1,1 +1,428 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500&display=swap" rel="stylesheet"></head><body style="background:#0a0a0a;color:#F5F3EE;font-family:Barlow,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:14px;text-align:center;padding:40px"><svg width="52" height="52" fill="none" viewBox="0 0 24 24" stroke="#C9A84C" stroke-width="1"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><div style="font-family:Bebas Neue,sans-serif;font-size:30px;letter-spacing:4px;color:#C9A84C">Session Notes</div><div style="font-size:13px;color:rgba(245,243,238,0.45);max-width:320px;line-height:1.7">Coming soon.</div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Budget — Jaguar Dev Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --black:#0a0a0a;--gold:#C9A84C;--gold-light:#E8C97A;--gold-dark:#8B6914;
+  --gray-dark:#1e1e1e;--gray-mid:#2e2e2e;--gray-light:#4a4a4a;--gray-border:#333;
+  --white:#f5f5f0;--white-dim:#bbb;--red:#e74c3c;--green:#2ecc71;--blue:#3498db;
+}
+*{box-sizing:border-box;}
+body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;font-size:14px;min-height:100vh;margin:0;}
+h1,h2,h3,h4{font-family:'Bebas Neue',sans-serif;letter-spacing:1px;margin:0;}
+input,select,button{font-family:'Barlow',sans-serif;}
+::-webkit-scrollbar{width:10px;height:12px;}
+::-webkit-scrollbar-track{background:var(--gray-mid);border-radius:4px;}
+::-webkit-scrollbar-thumb{background:var(--gold-dark);border-radius:4px;border:2px solid var(--gray-mid);}
+::-webkit-scrollbar-thumb:hover{background:var(--gold);}
+.btn{padding:8px 16px;border:none;border-radius:5px;cursor:pointer;font-family:'Barlow Condensed';font-size:13px;letter-spacing:1px;text-transform:uppercase;transition:all .18s;display:inline-flex;align-items:center;gap:6px;}
+.btn-gold{background:var(--gold);color:var(--black);font-weight:700;}
+.btn-gold:hover{background:var(--gold-light);}
+.btn-outline{background:transparent;border:1px solid var(--gold-dark);color:var(--gold-light);}
+.btn-outline:hover{background:rgba(201,168,76,.1);}
+
+nav{display:flex;align-items:center;gap:18px;padding:12px 24px;background:var(--gray-dark);border-bottom:1px solid var(--gray-border);flex-wrap:wrap;}
+.nav-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold);white-space:nowrap;}
+.nav-links{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;}
+.nav-btn{background:transparent;border:1px solid var(--gray-border);color:var(--white-dim);padding:7px 13px;border-radius:5px;cursor:pointer;font-family:'Barlow Condensed';font-size:12px;letter-spacing:.5px;transition:all .15s;}
+.nav-btn:hover{border-color:var(--gold-dark);color:var(--gold-light);}
+.nav-btn.jag-btn{color:var(--white-dim);}
+
+.wrap{max-width:1400px;margin:0 auto;padding:32px 24px 80px;}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;color:var(--white);}
+.section-note{font-size:12px;color:var(--white-dim);letter-spacing:.5px;margin-top:2px;}
+.section-hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+
+/* ===== TOP HALF: OUTPUT ===== */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;}
+.stat-card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:8px;padding:20px 22px;}
+.stat-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--white-dim);margin-bottom:8px;}
+.stat-value{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:1px;}
+.stat-value.income{color:var(--green);}
+.stat-value.expense{color:var(--red);}
+.stat-value.net-pos{color:var(--gold-light);}
+.stat-value.net-neg{color:var(--red);}
+.stat-sub{font-size:11px;color:var(--white-dim);margin-top:4px;}
+
+.out-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;margin-bottom:8px;}
+@media(max-width:980px){.out-grid{grid-template-columns:1fr;}}
+
+.panel{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:8px;padding:18px 20px;}
+.panel-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1.5px;color:var(--gold-light);margin-bottom:12px;}
+
+table.data{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.data thead th{text-align:left;font-family:'Barlow Condensed';font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);padding:6px 8px;border-bottom:1px solid var(--gray-border);}
+table.data thead th.num{text-align:right;}
+table.data tbody td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);}
+table.data tbody td.num{text-align:right;font-variant-numeric:tabular-nums;}
+table.data tfoot td{padding:8px;font-weight:700;border-top:1px solid var(--gray-border);}
+table.data tfoot td.num{text-align:right;color:var(--gold-light);}
+
+/* ===== DIVIDER ===== */
+.divider{margin:36px 0 28px;border-top:2px solid var(--gray-border);position:relative;}
+.divider-label{position:absolute;top:-13px;left:0;background:var(--black);padding-right:14px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;color:var(--white-dim);}
+
+/* ===== BOTTOM HALF: WORKSHEET ===== */
+.ws-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-bottom:20px;}
+@media(max-width:980px){.ws-grid{grid-template-columns:1fr;}}
+
+.fg{margin-bottom:12px;}
+.fl{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);margin-bottom:5px;}
+.fi{width:100%;background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:5px;padding:8px 10px;color:var(--white);font-size:13.5px;}
+.fi:focus{outline:none;border-color:var(--gold-dark);}
+
+.cost-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.sess-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+
+table.grid-enroll{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+table.grid-enroll th{text-align:center;font-family:'Barlow Condensed';font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);padding:6px 4px;border-bottom:1px solid var(--gray-border);}
+table.grid-enroll th:first-child{text-align:left;}
+table.grid-enroll td{padding:5px 4px;text-align:center;}
+table.grid-enroll td:first-child{text-align:left;font-weight:600;color:var(--gold-light);}
+table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:4px;padding:5px 2px;color:var(--white);font-size:12.5px;}
+
+.coach-sync-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.coach-sync-status{font-size:11px;color:var(--white-dim);}
+.coach-sync-status.ok{color:var(--green);}
+.coach-sync-status.warn{color:#f39c12;}
+
+.save-bar{position:sticky;bottom:0;background:linear-gradient(0deg,var(--black) 60%,transparent);padding:20px 0 8px;display:flex;justify-content:flex-end;gap:10px;}
+.save-note{font-size:12px;color:var(--green);align-self:center;margin-right:auto;}
+
+#app-ver-badge{position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="app-ver-badge">V1</div>
+
+<nav>
+  <div class="nav-title">Jaguar Budget</div>
+  <div class="nav-links">
+    <button class="nav-btn jag-btn" onclick="jagLaunch('db')">Dev Check In</button>
+    <button class="nav-btn jag-btn" onclick="jagLaunch('adm')">ADM Center</button>
+    <button class="nav-btn jag-btn" onclick="jagLaunch('ih')">InHouse Center</button>
+    <button class="nav-btn jag-btn" onclick="jagLaunch('coach')">Coach Data Center</button>
+    <button class="nav-btn jag-btn" onclick="jagHome()">&#8962; Home</button>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <div class="section-hdr">
+    <div>
+      <div class="section-title">Season Budget Summary</div>
+      <div class="section-note">Income by program &amp; session, expenses from coach payroll + fixed overhead.</div>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Season Income</div>
+      <div class="stat-value income" id="out-total-income">$0</div>
+      <div class="stat-sub">Enrollment &times; classes &times; class cost, all sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Season Expenses</div>
+      <div class="stat-value expense" id="out-total-expense">$0</div>
+      <div class="stat-sub">Coach payroll + monthly overhead, all months</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Net</div>
+      <div class="stat-value" id="out-net">$0</div>
+      <div class="stat-sub" id="out-net-sub"></div>
+    </div>
+  </div>
+
+  <div class="out-grid">
+    <div class="panel">
+      <div class="panel-title">Income by Session &amp; Program</div>
+      <table class="data" id="income-table"></table>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Expenses by Month</div>
+      <table class="data" id="expense-table"></table>
+    </div>
+  </div>
+
+  <div class="divider"><span class="divider-label">Worksheet</span></div>
+
+  <div class="section-hdr">
+    <div>
+      <div class="section-title">Pricing &amp; Formulas</div>
+      <div class="section-note">Everything above is calculated from what you set here. Nothing takes effect until you click Save.</div>
+    </div>
+  </div>
+
+  <div class="ws-grid">
+    <div class="panel">
+      <div class="panel-title">Class Cost per Program</div>
+      <div class="section-note" style="margin-bottom:10px;">Price per athlete, per class. Same rate all season for each program.</div>
+      <div class="cost-row">
+        <div class="fg"><span class="fl">LJ</span><input class="fi" type="number" min="0" step="0.01" id="cc-lj"/></div>
+        <div class="fg"><span class="fl">PH</span><input class="fi" type="number" min="0" step="0.01" id="cc-ph"/></div>
+        <div class="fg"><span class="fl">ADM</span><input class="fi" type="number" min="0" step="0.01" id="cc-adm"/></div>
+        <div class="fg"><span class="fl">IH</span><input class="fi" type="number" min="0" step="0.01" id="cc-ih"/></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Classes per Session</div>
+      <div class="section-note" style="margin-bottom:10px;">How many classes each session runs — this is what makes some sessions cost more than others.</div>
+      <div class="sess-row" id="session-classes-row"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:20px;">
+    <div class="panel-title">Enrollment per Session</div>
+    <div class="section-note" style="margin-bottom:6px;">Number of athletes enrolled in each program, per session. Enter manually for now — this can be wired up to auto-pull from the actual rosters later if you want.</div>
+    <table class="grid-enroll" id="enroll-grid"></table>
+  </div>
+
+  <div class="ws-grid">
+    <div class="panel">
+      <div class="panel-title">Monthly Overhead</div>
+      <div class="section-note" style="margin-bottom:10px;">Flat cost added to every month's expenses, on top of coach payroll.</div>
+      <div class="fg" style="max-width:180px;"><span class="fl">Per Month</span><input class="fi" type="number" min="0" step="1" id="overhead"/></div>
+    </div>
+
+    <div class="panel">
+      <div class="coach-sync-row">
+        <div class="panel-title" style="margin-bottom:0;">Coach Payroll (from Coach Data Center)</div>
+        <button class="btn btn-outline" style="padding:5px 10px;font-size:11px;" onclick="refreshCoachData()">&#8635; Refresh</button>
+      </div>
+      <div class="coach-sync-status" id="coach-sync-status"></div>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <span class="save-note" id="save-note"></span>
+    <button class="btn btn-gold" onclick="saveBudget()">Save Budget</button>
+  </div>
+
+</div>
+
+<script>
+// ── QUICK LAUNCH (jump between Jaguar Suite tabs opened via Jaguar Master) ──
+const JAG_SELF_KEY='notes';
+window.__jagApp=JAG_SELF_KEY;
+window.name='jag_'+JAG_SELF_KEY;
+const JAG_URLS={home:'index.html',db:'db.html',coach:'coach.html',adm:'adm.html',ih:'ih.html',drills:'drills.html',schedule:'schedule.html',stats:'stats.html',notes:'notes.html'};
+function jagLaunch(key){
+  if(key===JAG_SELF_KEY)return;
+  const url=JAG_URLS[key];
+  if(!url)return;
+  const w=window.open('','jag_'+key);
+  if(!w){alert('Popup blocked! Allow popups then try again.');return;}
+  if(w.__jagApp===key){try{w.focus();}catch(e){}return;}
+  w.location.href=url;
+  try{w.focus();}catch(e){}
+}
+function jagHome(){
+  const w=window.open('','jag_home');
+  if(!w){alert('Popup blocked! Allow popups then try again.');return;}
+  if(w.__jagApp!=='home')w.location.href=JAG_URLS.home;
+  try{w.focus();}catch(e){}
+}
+
+// ── PROGRAM / SESSION CONSTANTS ──
+const PROGRAMS=[{id:'lj',label:'LJ'},{id:'ph',label:'PH'},{id:'adm',label:'ADM'},{id:'ih',label:'IH'}];
+const SESSIONS=[1,2,3,4,5,6];
+
+// ── COACH PAYROLL: mirrors Coach Data Center's own calculation exactly (same
+// DESIG rates, same SEASON_MONTHS, same probation rule) so the numbers here always
+// match what Coach Data Center itself would report. Reads directly from the same
+// shared localStorage key ('jag_coaches') since both apps are same-origin. ──
+const DESIG={
+  volunteer:{label:'Volunteer',rate:0},
+  probation:{label:'Probation',rate:0},
+  credit:{label:'Credit',rate:15},
+  pro:{label:'Pro',rate:15},
+  pro2:{label:'Pro 2',rate:25},
+  staff:{label:'Staff',rate:0}
+};
+const SEASON_MONTHS=[
+  {key:'2026-07',label:'Jul 2026'},{key:'2026-08',label:'Aug 2026'},
+  {key:'2026-09',label:'Sep 2026'},{key:'2026-10',label:'Oct 2026'},
+  {key:'2026-11',label:'Nov 2026'},{key:'2026-12',label:'Dec 2026'},
+  {key:'2027-01',label:'Jan 2027'},{key:'2027-02',label:'Feb 2027'},
+  {key:'2027-03',label:'Mar 2027'},{key:'2027-04',label:'Apr 2027'},
+  {key:'2027-05',label:'May 2027'},{key:'2027-06',label:'Jun 2027'},
+  {key:'2027-07',label:'Jul 2027'},{key:'2027-08',label:'Aug 2027'}
+];
+function rate(desig){ return (DESIG[desig]||DESIG.volunteer).rate; }
+function loadCoaches(){
+  try{
+    const s=localStorage.getItem('jag_coaches');
+    if(s){ const p=JSON.parse(s); if(Array.isArray(p)) return p; }
+  }catch(e){}
+  return [];
+}
+function coachMonthHrs(coach,monthKey){
+  return Object.entries(coach.hours||{})
+    .filter(([k])=>k.startsWith(monthKey+'_'))
+    .reduce((a,[,v])=>a+(v||0),0);
+}
+function coachMonthPay(coach,monthKey){
+  if(coach.desig==='probation') return 0;
+  return coachMonthHrs(coach,monthKey)*rate(coach.desig);
+}
+let coaches=[];
+function refreshCoachData(){
+  coaches=loadCoaches();
+  const el=document.getElementById('coach-sync-status');
+  if(!coaches.length){
+    el.textContent='No coach data found yet in Coach Data Center.';
+    el.className='coach-sync-status warn';
+  }else{
+    const totalHrs=coaches.reduce((a,c)=>a+Object.values(c.hours||{}).reduce((x,y)=>x+(y||0),0),0);
+    el.textContent='Synced '+coaches.length+' coach'+(coaches.length!==1?'es':'')+', '+totalHrs+' total logged hours.';
+    el.className='coach-sync-status ok';
+  }
+  render();
+}
+
+// ── BUDGET DATA (this app's own settings, separate from coach/roster data) ──
+const BUDGET_KEY='jag_budget_data';
+function defaultBudget(){
+  const classCosts={}; PROGRAMS.forEach(p=>classCosts[p.id]=0);
+  const sessionClasses={}; SESSIONS.forEach(s=>sessionClasses[s]=4);
+  const enrollment={}; SESSIONS.forEach(s=>{ enrollment[s]={}; PROGRAMS.forEach(p=>enrollment[s][p.id]=0); });
+  return { classCosts, sessionClasses, enrollment, overhead:4600 };
+}
+function loadBudget(){
+  try{
+    const s=localStorage.getItem(BUDGET_KEY);
+    if(s){
+      const p=JSON.parse(s);
+      const d=defaultBudget();
+      return {
+        classCosts:Object.assign(d.classCosts,p.classCosts),
+        sessionClasses:Object.assign(d.sessionClasses,p.sessionClasses),
+        enrollment:Object.assign(d.enrollment,p.enrollment),
+        overhead: typeof p.overhead==='number'?p.overhead:d.overhead
+      };
+    }
+  }catch(e){}
+  return defaultBudget();
+}
+function saveBudgetData(b){ localStorage.setItem(BUDGET_KEY, JSON.stringify(b)); }
+let budget=loadBudget();
+
+// ── FORM <-> DATA ──
+function fillForm(){
+  PROGRAMS.forEach(p=>{ document.getElementById('cc-'+p.id).value = budget.classCosts[p.id]; });
+  document.getElementById('overhead').value = budget.overhead;
+
+  const scRow=document.getElementById('session-classes-row');
+  scRow.innerHTML = SESSIONS.map(s=>`
+    <div class="fg"><span class="fl">Session ${s}</span><input class="fi" type="number" min="0" step="1" id="sc-${s}" value="${budget.sessionClasses[s]}"/></div>
+  `).join('');
+
+  const grid=document.getElementById('enroll-grid');
+  grid.innerHTML = `
+    <thead><tr><th>Session</th>${PROGRAMS.map(p=>`<th>${p.label}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${SESSIONS.map(s=>`
+        <tr><td>Session ${s}</td>${PROGRAMS.map(p=>`<td><input type="number" min="0" step="1" id="en-${s}-${p.id}" value="${budget.enrollment[s][p.id]}"/></td>`).join('')}</tr>
+      `).join('')}
+    </tbody>
+  `;
+
+  document.querySelectorAll('.fi, .grid-enroll input').forEach(el=>{ el.oninput = onInputChange; });
+}
+function readForm(){
+  const classCosts={}; PROGRAMS.forEach(p=>classCosts[p.id]=+document.getElementById('cc-'+p.id).value||0);
+  const sessionClasses={}; SESSIONS.forEach(s=>sessionClasses[s]=+document.getElementById('sc-'+s).value||0);
+  const enrollment={}; SESSIONS.forEach(s=>{ enrollment[s]={}; PROGRAMS.forEach(p=>enrollment[s][p.id]=+document.getElementById('en-'+s+'-'+p.id).value||0); });
+  const overhead=+document.getElementById('overhead').value||0;
+  return { classCosts, sessionClasses, enrollment, overhead };
+}
+function onInputChange(){
+  budget = readForm();
+  document.getElementById('save-note').textContent='';
+  render();
+}
+function saveBudget(){
+  budget = readForm();
+  saveBudgetData(budget);
+  document.getElementById('save-note').textContent='✓ Saved';
+}
+
+// ── CALCULATIONS ──
+function computeIncome(){
+  const rows = SESSIONS.map(s=>{
+    const perProgram={};
+    let rowTotal=0;
+    PROGRAMS.forEach(p=>{
+      const rev = (budget.enrollment[s][p.id]||0) * (budget.sessionClasses[s]||0) * (budget.classCosts[p.id]||0);
+      perProgram[p.id]=rev;
+      rowTotal+=rev;
+    });
+    return { session:s, perProgram, rowTotal };
+  });
+  const totals={}; PROGRAMS.forEach(p=>totals[p.id]=rows.reduce((a,r)=>a+r.perProgram[p.id],0));
+  const grandTotal = rows.reduce((a,r)=>a+r.rowTotal,0);
+  return { rows, totals, grandTotal };
+}
+function computeExpenses(){
+  const rows = SEASON_MONTHS.map(m=>{
+    const payroll = coaches.reduce((a,c)=>a+coachMonthPay(c,m.key),0);
+    const total = payroll + (budget.overhead||0);
+    return { month:m, payroll, overhead:budget.overhead||0, total };
+  });
+  const totalPayroll = rows.reduce((a,r)=>a+r.payroll,0);
+  const totalOverhead = rows.reduce((a,r)=>a+r.overhead,0);
+  const grandTotal = rows.reduce((a,r)=>a+r.total,0);
+  return { rows, totalPayroll, totalOverhead, grandTotal };
+}
+function money(n){ return '$'+Math.round(n).toLocaleString('en-US'); }
+
+// ── RENDER OUTPUT ──
+function renderIncomeTable(inc){
+  const t=document.getElementById('income-table');
+  t.innerHTML = `
+    <thead><tr><th>Session</th>${PROGRAMS.map(p=>`<th class="num">${p.label}</th>`).join('')}<th class="num">Total</th></tr></thead>
+    <tbody>
+      ${inc.rows.map(r=>`<tr><td>Session ${r.session}</td>${PROGRAMS.map(p=>`<td class="num">${money(r.perProgram[p.id])}</td>`).join('')}<td class="num">${money(r.rowTotal)}</td></tr>`).join('')}
+    </tbody>
+    <tfoot><tr><td>Total</td>${PROGRAMS.map(p=>`<td class="num">${money(inc.totals[p.id])}</td>`).join('')}<td class="num">${money(inc.grandTotal)}</td></tr></tfoot>
+  `;
+}
+function renderExpenseTable(exp){
+  const t=document.getElementById('expense-table');
+  t.innerHTML = `
+    <thead><tr><th>Month</th><th class="num">Coach Payroll</th><th class="num">Overhead</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      ${exp.rows.map(r=>`<tr><td>${r.month.label}</td><td class="num">${money(r.payroll)}</td><td class="num">${money(r.overhead)}</td><td class="num">${money(r.total)}</td></tr>`).join('')}
+    </tbody>
+    <tfoot><tr><td>Total</td><td class="num">${money(exp.totalPayroll)}</td><td class="num">${money(exp.totalOverhead)}</td><td class="num">${money(exp.grandTotal)}</td></tr></tfoot>
+  `;
+}
+function render(){
+  const inc = computeIncome();
+  const exp = computeExpenses();
+  const net = inc.grandTotal - exp.grandTotal;
+
+  document.getElementById('out-total-income').textContent = money(inc.grandTotal);
+  document.getElementById('out-total-expense').textContent = money(exp.grandTotal);
+  const netEl = document.getElementById('out-net');
+  netEl.textContent = (net<0?'-':'')+money(Math.abs(net));
+  netEl.className = 'stat-value '+(net>=0?'net-pos':'net-neg');
+  document.getElementById('out-net-sub').textContent = net>=0 ? 'Projected surplus' : 'Projected shortfall';
+
+  renderIncomeTable(inc);
+  renderExpenseTable(exp);
+}
+
+// ── INIT ──
+fillForm();
+coaches = loadCoaches();
+refreshCoachData();
+render();
+</script>
+</body>
+</html>
