@@ -139,7 +139,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V3</div>
+<div id="app-ver-badge">V4</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -735,7 +735,7 @@ function buildSeasonTable(programKey){
   table.innerHTML=`
     <thead><tr>
       <th>Season</th><th>Hours</th><th>Ice $/hr</th><th>Coach<br>@$15/hr</th><th>Coach<br>@$25/hr</th><th>Players</th><th>Price/hr</th>
-      <th>Expense</th><th>Income</th><th>Net</th>
+      <th>Expense</th><th>Income</th><th>Net</th><th>Proposed<br>Player Cost</th>
     </tr></thead>
     <tbody>
       ${ADM_IH_SEASONS.map(s=>{
@@ -751,6 +751,7 @@ function buildSeasonTable(programKey){
           <td class="calc expense" id="proj-${programKey}-${s}-expense">$0</td>
           <td class="calc income" id="proj-${programKey}-${s}-income">$0</td>
           <td class="calc" id="proj-${programKey}-${s}-net">$0</td>
+          <td class="calc" id="proj-${programKey}-${s}-playercost">$0</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -770,7 +771,7 @@ function buildDevTable(){
     <thead><tr>
       <th>Session</th><th>Hours</th><th>Ice $/hr</th><th>Coach<br>@$15/hr</th><th>Coach<br>@$25/hr</th>
       <th>LJ Players</th><th>LJ $/hr</th><th>PH Players</th><th>PH $/hr</th>
-      <th>Expense</th><th>Income</th><th>Net</th>
+      <th>Expense</th><th>Income</th><th>Net</th><th>Proposed<br>LJ Player Cost</th><th>Proposed<br>PH Player Cost</th>
     </tr></thead>
     <tbody>
       ${DEV_SESSIONS.map(s=>{
@@ -788,6 +789,8 @@ function buildDevTable(){
           <td class="calc expense" id="proj-dev-${s}-expense">$0</td>
           <td class="calc income" id="proj-dev-${s}-income">$0</td>
           <td class="calc" id="proj-dev-${s}-net">$0</td>
+          <td class="calc" id="proj-dev-${s}-ljcost">$0</td>
+          <td class="calc" id="proj-dev-${s}-phcost">$0</td>
         </tr>`;
       }).join('')}
     </tbody>
@@ -838,16 +841,21 @@ function updateProjectedCalcs(){
   ['adm','ih'].forEach(programKey=>{
     ADM_IH_SEASONS.forEach(s=>{
       const c=calcSeasonRow(programKey,s);
+      const r=projected[programKey].seasons[s];
       document.getElementById(`proj-${programKey}-${s}-expense`).textContent=money(c.expense);
       document.getElementById(`proj-${programKey}-${s}-income`).textContent=money(c.income);
       document.getElementById(`proj-${programKey}-${s}-net`).textContent=money(c.net);
+      document.getElementById(`proj-${programKey}-${s}-playercost`).textContent=money((r.hours||0)*(r.priceHr||0));
     });
   });
   DEV_SESSIONS.forEach(s=>{
     const c=calcDevRow(s);
+    const r=projected.dev.sessions[s];
     document.getElementById(`proj-dev-${s}-expense`).textContent=money(c.expense);
     document.getElementById(`proj-dev-${s}-income`).textContent=money(c.income);
     document.getElementById(`proj-dev-${s}-net`).textContent=money(c.net);
+    document.getElementById(`proj-dev-${s}-ljcost`).textContent=money((r.hours||0)*(r.ljPriceHr||0));
+    document.getElementById(`proj-dev-${s}-phcost`).textContent=money((r.hours||0)*(r.phPriceHr||0));
   });
   const t=computeProjectedTotals();
   document.getElementById('proj-adm-sub-income').textContent=money(t.adm.income);
