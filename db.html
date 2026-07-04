@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V3</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V4</div>
 
 <nav>
   <div class="nav-left">
@@ -1369,7 +1369,21 @@ function savePlayer(force){
     showAlert('Please select a session','err');return;
   }
   const sk='session'+addSelSess;
-  if(editKey)deleteFromAllTables(DB[editKey.tabKey][editKey.idx]);
+  if(editKey){
+    // Editing from the Master File tab hands us the MASTER copy of this player, which
+    // is a different object than their row in the session array (upsertMaster makes a
+    // separate copy). Removing "by reference" silently fails in that case and leaves
+    // a stale duplicate row behind in the session -- which is exactly what was causing
+    // some kids to intermittently show an old, already-promoted-past level as current.
+    // Removing by identity (name+birthdate) instead works no matter which tab the edit
+    // was opened from.
+    const oldMk=masterKey(DB[editKey.tabKey][editKey.idx]);
+    for(let s=1;s<=6;s++){
+      const arr=DB['session'+s];if(!arr)continue;
+      for(let i=arr.length-1;i>=0;i--){if(masterKey(arr[i])===oldMk)arr.splice(i,1);}
+    }
+    rebuildDerived();
+  }
   DB[sk].push(row);
   upsertMaster(row,addSelSess);
   const mini={first_name:row.first_name,last_name:row.last_name,birth_year:birthYear(row),level:row.level,session:'Session '+addSelSess};
@@ -1935,6 +1949,52 @@ function mergeDuplicateMasterEntries(){
     showAlert(dupCount?('Merged '+dupCount+' duplicate record'+(dupCount!==1?'s':'')+' \u2014 Master File now has '+DB.master.length+' unique athletes.'):'No duplicates found.','ok');
   });
 }
+// Repairs damage from a bug where editing a player from the Master File tab could
+// leave a stale duplicate copy of them behind in their session (their old row never
+// got removed, only a new one got added). Those stale duplicates could sit at an old,
+// already-promoted-past level and silently overwrite the real current level again
+// later -- this is why some kids showed their correct promoted level and others
+// mysteriously reverted to an older one. Keeps one row per athlete per session,
+// merging in any non-blank fields from the duplicates, and syncs level to the Master
+// File record (the authoritative source of truth after a promotion).
+function cleanupDuplicateSessionRows(){
+  jagConfirm('Scan all sessions for duplicate/stale athlete rows (left over from an editing bug) and clean them up? A backup downloads first.',function(){
+    try{
+      const archive={app:'jaguar-db-sessions-archive',v:1,exported:new Date().toISOString(),sessions:{}};
+      for(let s=1;s<=6;s++)archive.sessions['session'+s]=DB['session'+s]||[];
+      const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
+      const a=document.createElement('a'),d=new Date();
+      a.href=URL.createObjectURL(blob);
+      a.download='jaguar-sessions-before-cleanup-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+      document.body.appendChild(a);a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+    }catch(e){}
+    let dupCount=0,levelFixCount=0;
+    for(let s=1;s<=6;s++){
+      const arr=DB['session'+s];if(!arr||!arr.length)continue;
+      const groups=new Map();
+      arr.forEach(r=>{const mk=masterKey(r);if(!groups.has(mk))groups.set(mk,[]);groups.get(mk).push(r);});
+      const rebuilt=[];
+      groups.forEach((list,mk)=>{
+        if(list.length===1){rebuilt.push(list[0]);return;}
+        dupCount+=list.length-1;
+        let base=list[0];
+        list.forEach(e=>{if(COLS.filter(c=>e[c]).length>COLS.filter(c=>base[c]).length)base=e;});
+        const out=Object.assign({},base);
+        COLS.forEach(c=>{if(!out[c]){const src=list.find(e=>e[c]);if(src)out[c]=src[c];}});
+        const master=DB.master.find(m=>masterKey(m)===mk);
+        if(master&&master.level&&out.level!==master.level){out.level=master.level;levelFixCount++;}
+        rebuilt.push(out);
+      });
+      DB['session'+s]=rebuilt;
+    }
+    rebuildDerived();
+    saveDB();
+    renderAll();
+    updateStats();
+    showAlert(dupCount?('Cleaned up '+dupCount+' duplicate session row'+(dupCount!==1?'s':'')+(levelFixCount?', corrected '+levelFixCount+' level'+(levelFixCount!==1?'s':'')+' to match Master File':'')+'.'):'No duplicate session rows found.','ok');
+  });
+}
 // When a promotion is confirmed, the player needs to actually move to their new level
 // in the session roster (not just in Master File) so they show up correctly in the
 // right LJ/PH group and their attendance grouping updates immediately.
@@ -1942,8 +2002,10 @@ function updateSessionRowLevel(masterRow,newLevel){
   for(let s=1;s<=6;s++){
     const sk='session'+s;
     if(!DB[sk])continue;
-    const row=DB[sk].find(r=>masterKey(r)===masterKey(masterRow));
-    if(row)row.level=newLevel;
+    // Update every matching row, not just the first -- if a stale duplicate exists
+    // from the tab-mismatch bug above, leaving it on the old level is exactly what
+    // let it silently overwrite the real (promoted) level again later.
+    DB[sk].forEach(row=>{if(masterKey(row)===masterKey(masterRow))row.level=newLevel;});
   }
 }
 // Attendance check-ins are stored per sub-level group (lj1, lj2, ph1, etc). When a kid
@@ -2040,7 +2102,7 @@ function renderMasterTab(){
   syncMasterFromSessions();
   const mf=window._masterFilter||{q:'',status:'all'};
   const{rows,disp,idx,sort}=getMasterFilteredSorted();
-  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left" id="master-count-label">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.q=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.status=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div><div style="margin-top:6px;text-align:right;display:flex;gap:14px;justify-content:flex-end;"><span onclick="mergeDuplicateMasterEntries()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Merge Duplicate Athletes</span><span onclick="resetMasterFile()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Reset Master File (one-time full restart)</span></div>';
+  const toolbar='<div class="toolbar" style="flex-wrap:wrap;gap:8px;"><div class="toolbar-left" id="master-count-label">Master File &mdash; '+disp.length+'/'+rows.length+' athlete'+(rows.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><input id="master-search" type="text" placeholder="Search..." value="'+mf.q.replace(/"/g,'&quot;')+'" oninput="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.q=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;width:180px;outline:none;"><select onchange="window._masterFilter=window._masterFilter||{status:\'all\'};window._masterFilter.status=this.value;updateMasterTable();" style="background:var(--surf3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:12px;outline:none;"><option value="all"'+(mf.status==='all'?' selected':'')+'>All Status</option><option value="Active"'+(mf.status==='Active'?' selected':'')+'>Active</option><option value="Inactive"'+(mf.status==='Inactive'?' selected':'')+'>Inactive</option><option value="Lost"'+(mf.status==='Lost'?' selected':'')+'>Lost</option></select><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportMasterCSV()">&#x2193; Export</button><button class="btn-sm" onclick="printRoster()">Print</button><button class="btn-sm" onclick="startNewSeason()" style="border-color:#F07050;color:#F07050;">Start New Season</button></div></div><div style="margin-top:6px;text-align:right;display:flex;gap:14px;justify-content:flex-end;"><span onclick="mergeDuplicateMasterEntries()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Merge Duplicate Athletes</span><span onclick="cleanupDuplicateSessionRows()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Clean Up Duplicate Session Entries</span><span onclick="resetMasterFile()" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);text-decoration:underline dotted;cursor:pointer;">Reset Master File (one-time full restart)</span></div>';
   div.innerHTML=toolbar+'<div id="master-table-area">'+buildMasterTableInner(rows,disp,idx,sort)+'</div>';
 }
 function exportMasterCSV(){
