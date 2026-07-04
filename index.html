@@ -96,6 +96,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
 </style>
 </head>
 <body>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V1</div>
 
 <nav>
   <div class="nav-left">
@@ -156,10 +157,10 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
       <div class="card-arrow">&#8599;</div>
     </div>
 
-    <div class="app-card" data-key="schedule" draggable="true" onclick="jagOpen('schedule')" ondragstart="jagDragStart(event)" ondragover="jagDragOver(event)" ondragend="jagDragEnd(event)"><div class="card-grip" draggable="false" onclick="event.stopPropagation()"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="app-card" data-key="schedule" draggable="true" onclick="jagOpenScheduler()" ondragstart="jagDragStart(event)" ondragover="jagDragOver(event)" ondragend="jagDragEnd(event)"><div class="card-grip" draggable="false" onclick="event.stopPropagation()"><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <div class="card-icon"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#C9A84C" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
-      <div class="card-name">Schedule</div>
-      <div class="card-desc">View and manage the program's ice times, games, and events.</div>
+      <div class="card-name">Scheduler</div>
+      <div class="card-desc">Season Planning calendar — build sessions, view and manage practice/game dates.</div>
       <div class="card-tag">Planning</div>
       <div class="card-arrow">&#8599;</div>
     </div>
@@ -235,7 +236,7 @@ window.name='jag_home'; // lets apps' Home button find and focus this tab
 var JAG_LABELS = {
   db:"Jaguar Dev Database", coach:"Coach Hours Tracker", adm:"ADM Roster - Fall 2026",
   ih:"InHouse Roster - Fall 2026", drills:"Drill Library",
-  schedule:"Schedule", stats:"Player Stats", notes:"Session Notes"
+  schedule:"Scheduler", stats:"Player Stats", notes:"Session Notes"
 };
 
 // ── HOME GRID: 6-dot drag-to-reorder, persisted per browser ──
@@ -376,6 +377,27 @@ function jagOpen(key) {
   // Tab already running this app? Just switch to it — don't reload and wipe its state.
   if (w.__jagApp === key) { try{w.focus();}catch(e){} return true; }
   w.location.href = url;
+  try{w.focus();}catch(e){}
+  return true;
+}
+
+// The Scheduler shortcut is really Coach Data Center's Season Planning tab, deep-linked
+// straight to its Calendar view. It shares the same named tab as the "Coach Hours
+// Tracker" card (both are coach.html) rather than its own "schedule" tab name — coach.html
+// always renames its own tab to "jag_coach" once loaded, so targeting "jag_schedule"
+// here would silently open a second, duplicate coach.html tab instead of reusing the
+// one that's already open.
+function jagOpenScheduler() {
+  var w = window.open("", "jag_coach");
+  if(!w){alert("Popup blocked! Allow popups then try again.");return false;}
+  if (w.__jagApp === 'coach') {
+    try{w.focus();}catch(e){}
+    // Already open on some other tab -- actively jump it to the calendar view rather
+    // than just focusing wherever it happened to be left.
+    try{ if (typeof w.jumpToPlanningCalendar === 'function') w.jumpToPlanningCalendar(); }catch(e){}
+    return true;
+  }
+  w.location.href = 'coach.html?view=planning-calendar';
   try{w.focus();}catch(e){}
   return true;
 }
