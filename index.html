@@ -99,7 +99,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V2</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V3</div>
 
 <nav>
   <div class="nav-left">
@@ -179,10 +179,10 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
     </div>
 
     <div class="app-card" data-key="notes" draggable="true" onclick="jagOpen('notes')" ondragstart="jagDragStart(event)" ondragover="jagDragOver(event)" ondragend="jagDragEnd(event)"><div class="card-grip" draggable="false" onclick="event.stopPropagation()"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <div class="card-icon"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#C9A84C" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div>
-      <div class="card-name">Session Notes</div>
-      <div class="card-desc">Write and store coaching notes from practice sessions and games.</div>
-      <div class="card-tag">Notes</div>
+      <div class="card-icon"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#C9A84C" stroke-width="1.5"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+      <div class="card-name">Budget</div>
+      <div class="card-desc">Season income vs. expenses — program pricing, enrollment, and coach payroll costs.</div>
+      <div class="card-tag">Finance</div>
       <div class="card-arrow">&#8599;</div>
     </div>
 
@@ -241,7 +241,7 @@ window.name='jag_home'; // lets apps' Home button find and focus this tab
 var JAG_LABELS = {
   db:"Jaguar Dev Database", coach:"Coach Hours Tracker", adm:"ADM Roster - Fall 2026",
   ih:"InHouse Roster - Fall 2026", drills:"Drill Library",
-  schedule:"Scheduler", stats:"Player Stats", notes:"Session Notes"
+  schedule:"Scheduler", stats:"Player Stats", notes:"Budget"
 };
 
 // ── HOME GRID: 6-dot drag-to-reorder, persisted per browser ──
