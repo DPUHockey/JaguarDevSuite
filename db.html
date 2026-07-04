@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V4</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V5</div>
 
 <nav>
   <div class="nav-left">
@@ -1960,7 +1960,7 @@ function mergeDuplicateMasterEntries(){
 function cleanupDuplicateSessionRows(){
   jagConfirm('Scan all sessions for duplicate/stale athlete rows (left over from an editing bug) and clean them up? A backup downloads first.',function(){
     try{
-      const archive={app:'jaguar-db-sessions-archive',v:1,exported:new Date().toISOString(),sessions:{}};
+      const archive={app:'jaguar-db-sessions-archive',v:1,exported:new Date().toISOString(),sessions:{},master:DB.master};
       for(let s=1;s<=6;s++)archive.sessions['session'+s]=DB['session'+s]||[];
       const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
       const a=document.createElement('a'),d=new Date();
@@ -1969,6 +1969,20 @@ function cleanupDuplicateSessionRows(){
       document.body.appendChild(a);a.click();
       setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
     }catch(e){}
+    // Repair current level FIRST, using promotion history as the source of truth --
+    // not the Master File's "level" field itself, which is exactly what a stale
+    // duplicate row could have silently reverted. _promoHistory only ever gets
+    // appended to, never overwritten, so the highest-ranked entry on it is always the
+    // real current level even if the level field drifted away from it.
+    let masterLevelFixCount=0;
+    DB.master.forEach(m=>{
+      const hist=getFullPromoHistory(m);
+      if(!hist.length)return;
+      const ranked=hist.map(h=>LEVEL_ORDER.indexOf(h.level)).filter(i=>i>=0);
+      if(!ranked.length)return;
+      const trueLevel=LEVEL_ORDER[Math.max(...ranked)];
+      if(trueLevel && m.level!==trueLevel){m.level=trueLevel;masterLevelFixCount++;}
+    });
     let dupCount=0,levelFixCount=0;
     for(let s=1;s<=6;s++){
       const arr=DB['session'+s];if(!arr||!arr.length)continue;
@@ -1988,11 +2002,25 @@ function cleanupDuplicateSessionRows(){
       });
       DB['session'+s]=rebuilt;
     }
+    // Also sync level onto any remaining (non-duplicate) session rows now that master
+    // levels have been repaired -- a stale single row can be wrong without ever having
+    // been part of a duplicate group.
+    for(let s=1;s<=6;s++){
+      const arr=DB['session'+s];if(!arr)continue;
+      arr.forEach(row=>{
+        const master=DB.master.find(m=>masterKey(m)===masterKey(row));
+        if(master&&master.level&&row.level!==master.level){row.level=master.level;levelFixCount++;}
+      });
+    }
     rebuildDerived();
     saveDB();
     renderAll();
     updateStats();
-    showAlert(dupCount?('Cleaned up '+dupCount+' duplicate session row'+(dupCount!==1?'s':'')+(levelFixCount?', corrected '+levelFixCount+' level'+(levelFixCount!==1?'s':'')+' to match Master File':'')+'.'):'No duplicate session rows found.','ok');
+    const parts=[];
+    if(dupCount)parts.push(dupCount+' duplicate session row'+(dupCount!==1?'s':''));
+    if(masterLevelFixCount)parts.push(masterLevelFixCount+' Master File level'+(masterLevelFixCount!==1?'s':'')+' corrected from promotion history');
+    if(levelFixCount)parts.push(levelFixCount+' session level'+(levelFixCount!==1?'s':'')+' synced');
+    showAlert(parts.length?('Fixed: '+parts.join(', ')+'.'):'No issues found -- everything already matches.','ok');
   });
 }
 // When a promotion is confirmed, the player needs to actually move to their new level
