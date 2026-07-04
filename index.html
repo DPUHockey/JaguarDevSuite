@@ -59,6 +59,9 @@ nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-co
 .card-desc{font-size:12px;color:var(--white-dim);line-height:1.6;}
 .card-arrow{position:absolute;bottom:20px;right:20px;font-size:14px;color:var(--gold);opacity:0;transition:opacity 0.2s,transform 0.2s;}
 .app-card:hover .card-arrow{opacity:1;transform:translateX(3px);}
+.card-extra-open{position:absolute;top:16px;right:16px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);opacity:0;transition:opacity 0.2s,color 0.2s;padding:3px 7px;border:1px solid var(--border-gold);border-radius:3px;cursor:pointer;}
+.app-card:hover .card-extra-open{opacity:0.7;}
+.card-extra-open:hover{opacity:1 !important;color:var(--gold);border-color:var(--gold);}
 .card-tag{display:inline-block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold-dark);background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);padding:2px 8px;border-radius:2px;margin-top:10px;}
 .app-card:nth-child(1){animation-delay:0.05s;}.app-card:nth-child(2){animation-delay:0.10s;}.app-card:nth-child(3){animation-delay:0.15s;}.app-card:nth-child(4){animation-delay:0.20s;}.app-card:nth-child(5){animation-delay:0.25s;}.app-card:nth-child(6){animation-delay:0.30s;}.app-card:nth-child(7){animation-delay:0.35s;}.app-card:nth-child(8){animation-delay:0.40s;}
 
@@ -96,7 +99,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V1</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V2</div>
 
 <nav>
   <div class="nav-left">
@@ -131,6 +134,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
       <div class="card-desc">Fall 2026 ADM team rosters and game day management.</div>
       <div class="card-tag">ADM</div>
       <div class="card-arrow">&#8599;</div>
+      <div class="card-extra-open" onclick="event.stopPropagation();jagOpenExtra('adm')" title="Open an additional ADM Center window (e.g. to project on a second screen while keeping this one free)">&#x2750; New Window</div>
     </div>
 
     <div class="app-card" data-key="ih" draggable="true" onclick="jagOpen('ih')" ondragstart="jagDragStart(event)" ondragover="jagDragOver(event)" ondragend="jagDragEnd(event)"><div class="card-grip" draggable="false" onclick="event.stopPropagation()"><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -139,6 +143,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
       <div class="card-desc">Fall 2026 InHouse team rosters and game day management.</div>
       <div class="card-tag">InHouse</div>
       <div class="card-arrow">&#8599;</div>
+      <div class="card-extra-open" onclick="event.stopPropagation();jagOpenExtra('ih')" title="Open an additional InHouse Center window (e.g. to project on a second screen while keeping this one free)">&#x2750; New Window</div>
     </div>
 
     <div class="app-card" data-key="coach" draggable="true" onclick="jagOpen('coach')" ondragstart="jagDragStart(event)" ondragover="jagDragOver(event)" ondragend="jagDragEnd(event)"><div class="card-grip" draggable="false" onclick="event.stopPropagation()"><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -367,6 +372,24 @@ function jagRestoreConfirm(){
     jagDataMsg('Restored '+ok+' data sets. Close any open app tabs and reopen them to load the data.','ok');
   }catch(e){ jagDataMsg('Restore stopped after '+ok+' \u2014 '+e.message,'err'); }
   jagRestoreCancel();
+}
+
+// Opens a genuinely separate, independent window for apps where you sometimes want
+// more than one open at once (e.g. projecting InHouse Center to a second screen for
+// game day while still freely using the rest of the suite, including the normal
+// single InHouse tab). Passes ?standalone=1 so the opened app knows not to claim the
+// shared "jag_<key>" tab identity -- otherwise it would hijack that identity and the
+// normal jagOpen() reuse logic would find and reload THIS window instead of the
+// primary one the next time someone clicks the card normally.
+function jagOpenExtra(key) {
+  var url = JAG_URLS[key];
+  if (!url) return false;
+  var sep = url.includes('?') ? '&' : '?';
+  var uniqueName = 'jag_' + key + '_extra_' + Date.now();
+  var w = window.open(url + sep + 'standalone=1', uniqueName);
+  if (!w) { alert("Popup blocked! Allow popups then try again."); return false; }
+  try{w.focus();}catch(e){}
+  return true;
 }
 
 function jagOpen(key) {
