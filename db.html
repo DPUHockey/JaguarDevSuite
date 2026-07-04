@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V11</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V12</div>
 
 <nav>
   <div class="nav-left">
@@ -650,7 +650,7 @@ const ALIASES={
   status:['status','playerstatus'],
   notes:['notes','note','comments']
 };
-const COLS=['first_name','last_name','birthdate','level','gear','gear_returned','class_registered','day','address','city','state','zip','parent1_name','parent1_email','parent1_phone','parent2_name','parent2_email','parent2_phone','waiver','status','notes','date_added'];
+const COLS=['first_name','last_name','birthdate','level','gear','gear_issued_date','gear_returned','class_registered','day','address','city','state','zip','parent1_name','parent1_email','parent1_phone','parent2_name','parent2_email','parent2_phone','waiver','status','notes','date_added'];
 const LABELS=['First Name','Last Name','Birthdate','Level','Gear','Gear Returned','Class Registered','Day','Address','City','State','Zip','Parent 1 Name','Parent 1 Email','Parent 1 Phone','Parent 2 Name','Parent 2 Email','Parent 2 Phone'];
 
 // Day column: only W, S, SW are valid. Normalize common CSV variants; anything else -> '' (shows dropdown).
@@ -2293,6 +2293,7 @@ function gearIssueOpen(sk, idx){
   if(!r) return;
   const isEdit=!!(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO');
   const existing=parseGearValue(r.gear);
+  const issuedDate=r.gear_issued_date||todayISO();
   const body=document.getElementById('gear-modal-body');
   document.getElementById('gear-modal-title').textContent=(isEdit?'Edit Gear':'Issue Gear')+' — '+r.first_name+' '+r.last_name;
   body.innerHTML='<div style="margin-bottom:12px;font-size:12px;color:var(--dim);">'+(isEdit?'Current: <strong style="color:var(--wht);">'+r.gear+'</strong>. Update below or remove gear.':'Select where this player\'s gear is from.')+'</div>'
@@ -2301,6 +2302,7 @@ function gearIssueOpen(sk, idx){
     +GEAR_SOURCES.map(s=>'<option value="'+s+'"'+(existing.source===s?' selected':'')+'>'+s+'</option>').join('')
     +'</select></div>'
     +'<div class="form-field" id="gear-bag-wrap" style="margin-top:10px;'+(existing.source==='Rink Rat Rental'||!existing.source?'display:none;':'')+'"><label>Gear Bag # / Identifier</label><input id="gear-bag-input" type="text" value="'+existing.bag+'" placeholder="e.g. Bag 7, Blue-12" style="width:100%;"/></div>'
+    +'<div class="form-field" style="margin-top:10px;"><label>Date Issued</label><input id="gear-issued-date-input" type="date" value="'+issuedDate+'" style="width:100%;"/></div>'
     +(isEdit?'<div style="margin-top:8px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#F07050;"><input type="checkbox" id="gear-remove-cb" style="width:14px;height:14px;accent-color:#F07050;"> Remove gear (set back to No)</label></div>':'');
   const btn=document.getElementById('gear-modal-confirm');
   btn.textContent=isEdit?'Update Gear':'Issue Gear';
@@ -2308,6 +2310,7 @@ function gearIssueOpen(sk, idx){
     const removeCb=document.getElementById('gear-remove-cb');
     if(removeCb&&removeCb.checked){
       DB[sk][idx].gear='';
+      DB[sk][idx].gear_issued_date='';
       DB[sk][idx].gear_returned='';
       upsertMaster(DB[sk][idx], sk.replace('session',''));
       saveDB();
@@ -2327,6 +2330,7 @@ function gearIssueOpen(sk, idx){
       val=source+' — '+bag;
     }
     DB[sk][idx].gear=val;
+    DB[sk][idx].gear_issued_date=document.getElementById('gear-issued-date-input').value||todayISO();
     upsertMaster(DB[sk][idx], sk.replace('session',''));
     saveDB();
     document.getElementById('gear-modal').style.display='none';
