@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V12</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V13</div>
 
 <nav>
   <div class="nav-left">
@@ -1576,6 +1576,27 @@ function parsePlanKey(k){
   return null;
 }
 
+// This app (Dev Check In) is exclusively for the LJ/PH developmental program. The
+// Coach Data Center's schedule shares calendar dates across LJ/PH, ADM, and InHouse --
+// e.g. Wednesday hosts an LJ/PH slot AND a separate ADM slot on the same date, and
+// Sunday hosts InHouse, LJ/PH, AND ADM. Without checking which program a date actually
+// belongs to, every date on a shared day-of-week was being pulled in indiscriminately,
+// which is why ADM dates were leaking into the LJ/PH attendance tabs here.
+// Each entry may carry a permanently-stamped "code" (see Coach Data Center's "Lock In
+// Program Assignments") -- that's authoritative when present. For older entries that
+// predate that stamp, fall back to the same day+slot-position mapping the Data Center
+// itself currently uses, so this still works correctly before that tool has been run.
+const SCHEDULE_SLOT_CODES={
+  Monday:['adm','ih'],
+  Wednesday:['lj','adm'],
+  Friday:['ih'],
+  Sunday:['ih','lj','adm']
+};
+function resolvePlanEntryCode(dayName,si,storedCode){
+  if(storedCode)return storedCode;
+  const slots=SCHEDULE_SLOT_CODES[dayName];
+  return (slots&&slots[si])||null;
+}
 function getSessionDatesFromPlanData(){
   try{
     const raw=localStorage.getItem(PLAN_KEY);
@@ -1602,6 +1623,9 @@ function getSessionDatesFromPlanData(){
       if(!dp) return;
       const parts=k.split('__');
       const dayName=parts.length>=2?parts[1]:'Unknown';
+      const si=parts.length>=3?+parts[2]:0;
+      const code=resolvePlanEntryCode(dayName,si,v.code);
+      if(code!=='lj')return; // exclude ADM / InHouse dates that share this day-of-week
       if(!streams[dayName]) streams[dayName]=[];
       // Avoid duplicate dates within a stream
       if(!streams[dayName].find(e=>e.dp===dp))
