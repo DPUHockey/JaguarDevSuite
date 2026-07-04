@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V5</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V6</div>
 
 <nav>
   <div class="nav-left">
@@ -520,6 +520,8 @@ function loadDB(){
     if(mRaw||sRaw){
       if(mRaw){const m=JSON.parse(mRaw);if(m.master)DB.master=m.master;}
       if(sRaw){const s=JSON.parse(sRaw);SEASON_FIELDS.forEach(k=>{if(s[k])DB[k]=s[k];});}
+      normalizeStoredDates();
+      saveDB();
       return;
     }
     // one-time migration: old single-key format found, split it into the new keys
@@ -527,9 +529,27 @@ function loadDB(){
     if(legacy){
       const saved=JSON.parse(legacy);
       Object.keys(DB).forEach(k=>{if(saved[k])DB[k]=saved[k];});
+      normalizeStoredDates();
       saveDB();
     }
   }catch(e){}
+}
+// A player's Master File record and their session-tab row(s) are separate copies of
+// the same data. If one copy's birthdate gets normalized to ISO format (by editing it
+// through the form, which now converts on save) while another copy never gets touched,
+// the two copies stop matching identically -- and since birthdate is part of the key
+// used to recognize "this is the same athlete", that mismatch alone was enough to make
+// a promotion silently create a brand new, history-less Master File record instead of
+// updating the real one. Running this on every load keeps every copy, everywhere,
+// converged on the same format, so that can't happen regardless of which copy was
+// last edited.
+function normalizeStoredDates(){
+  const fix=r=>{
+    if(r.birthdate){const n=toISODate(r.birthdate);if(n)r.birthdate=n;}
+    if(r.date_added){const n=toISODate(r.date_added);if(n)r.date_added=n;}
+  };
+  (DB.master||[]).forEach(fix);
+  for(let s=1;s<=6;s++)(DB['session'+s]||[]).forEach(fix);
 }
 function startNewSeason(){
   jagConfirm('Start a new season? This downloads a backup of everything first, then clears all session rosters, check-ins, and promotions for a fresh start. Master File (every athlete\'s career history) is never touched.',function(){
