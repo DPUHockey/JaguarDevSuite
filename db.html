@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V2</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V3</div>
 
 <nav>
   <div class="nav-left">
@@ -610,6 +610,41 @@ function normDay(val){
 }
 
 function norm(s){return s.toLowerCase().replace(/[\s_\-\.]/g,'');}
+// Registration/CSV exports store dates in all kinds of formats (9/1/2025, Excel serial
+// numbers, "Sep 1, 2025", etc). The native <input type="date"> picker used for
+// Birthdate/Date Added REQUIRES exact YYYY-MM-DD -- anything else, it silently shows
+// blank with no error. If that blank then gets saved, it permanently overwrites the
+// real date, and since birthdate is part of a player's identity key, that alone can
+// splinter them into a brand new Master File record with no promotion history. This
+// converts whatever format comes in to the one format the picker (and everything
+// downstream) can rely on. Returns '' if the string genuinely can't be parsed, rather
+// than guessing wrong.
+function toISODate(s){
+  if(!s)return'';
+  s=String(s).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return m[3]+'-'+String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0');
+  m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m)return m[3]+'-'+String(m[1]).padStart(2,'0')+'-'+String(m[2]).padStart(2,'0');
+  m=s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if(m)return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+  if(/^\d{4,6}$/.test(s)){
+    const n=+s;
+    if(n>20000&&n<60000){
+      const epoch=new Date(Date.UTC(1899,11,30));
+      const d=new Date(epoch.getTime()+n*86400000);
+      return d.toISOString().slice(0,10);
+    }
+  }
+  const monthNames={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  m=s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/);
+  if(m){
+    const mo=monthNames[m[1].slice(0,3).toLowerCase()];
+    if(mo)return m[3]+'-'+String(mo).padStart(2,'0')+'-'+String(+m[2]).padStart(2,'0');
+  }
+  return'';
+}
 // Some registration exports only have a "Class" column (e.g. "LJ 2", "PH 1") and no
 // separate Level field. If Level comes in blank, derive it from Class using the same
 // normalization rules as getLevel() below, so promotions/next-level logic still works.
@@ -628,6 +663,11 @@ function mapRow(headers,vals){
   });
   COLS.forEach(c=>{if(row[c]===undefined)row[c]='';});
   row.day=normDay(row.day);
+  // Normalize to the exact format the date pickers require -- keeps masterKey
+  // (name+birthdate) stable across imports and prevents the picker from silently
+  // blanking these fields the first time someone opens Edit on this player.
+  if(row.birthdate)row.birthdate=toISODate(row.birthdate)||row.birthdate;
+  if(row.date_added)row.date_added=toISODate(row.date_added)||row.date_added;
   if(!row.level&&row.class_registered){
     const derived=normLevelString(row.class_registered);
     if(isValidLevelCode(derived))row.level=derived;
@@ -1280,13 +1320,13 @@ function v(id){const el=document.getElementById(id);return el?el.value.trim():''
 
 function fillForm(row){
   function set(id,val){const el=document.getElementById(id);if(el)el.value=val||'';}
-  set('f-first',row.first_name);set('f-last',row.last_name);set('f-bdate',row.birthdate);
+  set('f-first',row.first_name);set('f-last',row.last_name);set('f-bdate',toISODate(row.birthdate));
   set('f-level',row.level);set('f-gear',row.gear);set('f-gear-ret',row.gear_returned);
   set('f-class',row.class_registered);set('f-day',normDay(row.day));set('f-addr',row.address);set('f-city',row.city);
   set('f-state',row.state);set('f-zip',row.zip);
   set('f-p1n',row.parent1_name);set('f-p1e',row.parent1_email);set('f-p1p',row.parent1_phone);
   set('f-p2n',row.parent2_name);set('f-p2e',row.parent2_email);set('f-p2p',row.parent2_phone);
-  set('f-date-added',row.date_added);set('f-status',row.status||'Active');set('f-waiver',row.waiver||'');
+  set('f-date-added',toISODate(row.date_added));set('f-status',row.status||'Active');set('f-waiver',row.waiver||'');
   const fn=document.getElementById('f-notes');if(fn)fn.value=row.notes||'';
 }
 
@@ -1299,6 +1339,18 @@ function clearForm(){
 
 function savePlayer(force){
   const row=getFormRow();
+  // Belt-and-suspenders: if this is an edit and the date picker came back blank while
+  // the record on file already had a real value, keep the real value. This is what
+  // actually stops birthdate/date_added -- and therefore promotion history, which
+  // depends on both -- from being silently wiped out by opening and saving a player
+  // whose stored date didn't match the picker's required format.
+  if(editKey){
+    const orig=DB[editKey.tabKey]&&DB[editKey.tabKey][editKey.idx];
+    if(orig){
+      if(!row.birthdate&&orig.birthdate)row.birthdate=orig.birthdate;
+      if(!row.date_added&&orig.date_added)row.date_added=orig.date_added;
+    }
+  }
   if(!row.first_name&&!row.last_name){showAlert('First or last name required','err');return;}
   if(!editKey&&!force){
     const dup=findDuplicate(row);
