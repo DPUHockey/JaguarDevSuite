@@ -65,6 +65,32 @@ input,select,button{font-family:'Barlow',sans-serif}
 .cp-yn-btn.active-yes{background:rgba(46,204,113,.15);border-color:var(--green);color:var(--green)}
 .cp-yn-btn.active-no{background:rgba(231,76,60,.15);border-color:var(--red);color:var(--red)}
 .cp-resume-box{border:1px dashed var(--gray-border);border-radius:6px;padding:10px 12px;font-size:12px;margin-top:4px}
+
+/* ===== PRINTABLE BLANK COACH APPLICATION ===== */
+#printCoachApp{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #printCoachApp,#printCoachApp *{visibility:visible;}
+  #printCoachApp{display:block;position:absolute;top:0;left:0;width:100%;padding:0.4in;}
+}
+.pca-page{color:#000;background:#fff;font-family:'Barlow',Arial,sans-serif;font-size:13px;line-height:1.5;}
+.pca-header{text-align:center;margin-bottom:18px;border-bottom:3px solid #000;padding-bottom:10px;}
+.pca-header h1{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;margin:0;}
+.pca-header .sub{font-size:12px;color:#444;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.pca-section{margin-bottom:16px;}
+.pca-section-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;border-bottom:1px solid #999;margin-bottom:8px;padding-bottom:3px;}
+.pca-row{display:flex;gap:24px;margin-bottom:10px;flex-wrap:wrap;}
+.pca-field{flex:1;min-width:140px;}
+.pca-field-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#555;display:block;margin-bottom:2px;}
+.pca-line{border-bottom:1px solid #000;height:20px;}
+.pca-checklist{display:flex;gap:16px;flex-wrap:wrap;}
+.pca-check{display:flex;align-items:center;gap:6px;font-size:13px;}
+.pca-box{width:14px;height:14px;border:1.5px solid #000;display:inline-block;flex-shrink:0;}
+.pca-lines{border-bottom:1px solid #999;height:22px;margin-bottom:4px;}
+.pca-note{font-size:10.5px;color:#555;font-style:italic;margin-top:2px;}
+.pca-sig-row{display:flex;gap:40px;margin-top:26px;}
+.pca-sig-line{flex:1;border-bottom:1px solid #000;height:30px;position:relative;}
+.pca-sig-label{font-size:10px;color:#555;margin-top:3px;}
 .card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:8px;padding:16px}
 .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-family:'Barlow Condensed';font-size:11px;letter-spacing:.5px;font-weight:600}
 .badge-admin{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
@@ -318,7 +344,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V7</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -370,7 +396,10 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
   <div id="panel-coaches" class="panel">
     <div class="section-header">
       <div><div class="section-title">Coaches</div><div class="section-note">Onboarding, certifications, and USA Hockey compliance tracking</div></div>
-      <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
+        <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
+      </div>
     </div>
     <div class="alert-bar">USA Hockey Insurance Number, Screening, and SafeSport status are annual requirements and must be re-verified every season. &nbsp;<a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="color:var(--gold-light);text-decoration:underline;">Verify on USA Hockey Registration &#8599;</a></div>
     <div id="coachProfilesGrid" class="cp-grid"></div>
@@ -544,6 +573,12 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <div class="form-group"><span class="form-label">Date of Birth</span><input class="form-input" id="cpDob" type="date"/></div>
       <div class="form-group"><span class="form-label">Phone</span><input class="form-input" id="cpPhone" type="tel"/></div>
       <div class="form-group"><span class="form-label">Email</span><input class="form-input" id="cpEmail" type="email"/></div>
+      <div class="form-group" style="grid-column:1/-1;"><span class="form-label">Address</span><input class="form-input" id="cpAddress" type="text" placeholder="Street, City, State"/></div>
+    </div>
+
+    <div class="form-group">
+      <span class="form-label">Levels Currently Coaching</span>
+      <div class="cp-level-picker" id="cpCurrentLevelPicker"></div>
     </div>
 
     <div class="form-group">
@@ -557,6 +592,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
         <a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="font-size:11px;color:var(--gold-light);">Verify on USA Hockey &#8599;</a>
       </div>
       <div class="form-group"><span class="form-label">USA Hockey Insurance Number</span><input class="form-input" id="cpInsurance" type="text"/></div>
+      <div class="form-group"><span class="form-label">Zip Code <span style="text-transform:none;color:var(--white-dim);">(needed with DOB to verify on USA Hockey)</span></span><input class="form-input" id="cpZip" type="text" inputmode="numeric" maxlength="10" style="max-width:140px;"/></div>
       <div class="form-group"><span class="form-label">Screening Updated</span><div class="cp-yn-toggle" id="cpScreeningToggle"></div></div>
       <div class="form-group"><span class="form-label">SafeSport Certified</span><div class="cp-yn-toggle" id="cpSafeSportToggle"></div></div>
     </div>
@@ -999,6 +1035,7 @@ function refreshAllCoachViews(){
 // necessarily needs an hours-tracking entry or vice versa.
 // ══════════════════════════════════════════════════════════════════════════
 const COACH_LEVELS=['8u','10u','12u','14u','16u','18u'];
+const CURRENT_LEVELS=['lj','ph','adm','ih','travel'];
 function currentSeasonLabel(){
   const d=new Date();
   const y=d.getMonth()>=6?d.getFullYear():d.getFullYear()-1; // hockey season runs Jul-Jun
@@ -1007,8 +1044,8 @@ function currentSeasonLabel(){
 function mkCoachProfile(){
   return{
     id:'cp'+Date.now()+Math.random().toString(36).slice(2,6),
-    name:'',dob:'',phone:'',email:'',photo:'',
-    levels:{},
+    name:'',dob:'',phone:'',email:'',address:'',zip:'',photo:'',
+    levels:{},currentLevels:{},
     usaHockeyId:'',screeningUpdated:false,safeSport:false,complianceSeason:'',
     coachingExperience:'',playingExperience:'',
     resumeFileName:'',resumeFileData:''
@@ -1048,6 +1085,7 @@ function renderCoachProfiles(){
           <div style="font-size:11px;color:var(--white-dim);">${c.email||'No email on file'}</div>
         </div>
       </div>
+      <div style="font-size:10px;color:var(--gold-light);margin-bottom:4px;">${CURRENT_LEVELS.filter(l=>c.currentLevels&&c.currentLevels[l]).map(l=>l.toUpperCase()).join(' \u00b7 ')||'No current levels set'}</div>
       <div class="cp-levels">
         ${COACH_LEVELS.map(l=>`<span class="cp-level-pill ${c.levels&&c.levels[l]?'done':'notdone'}">${l.toUpperCase()}</span>`).join('')}
       </div>
@@ -1074,6 +1112,8 @@ function openCoachProfileModal(id){
   document.getElementById('cpDob').value=c.dob||'';
   document.getElementById('cpPhone').value=c.phone||'';
   document.getElementById('cpEmail').value=c.email||'';
+  document.getElementById('cpAddress').value=c.address||'';
+  document.getElementById('cpZip').value=c.zip||'';
   document.getElementById('cpInsurance').value=c.usaHockeyId||'';
   document.getElementById('cpCoachingExp').value=c.coachingExperience||'';
   document.getElementById('cpPlayingExp').value=c.playingExperience||'';
@@ -1081,6 +1121,7 @@ function openCoachProfileModal(id){
 
   renderCoachPhotoPreview();
   renderLevelPicker(c.levels||{});
+  renderCurrentLevelPicker(c.currentLevels||{});
   renderYNToggle('cpScreeningToggle','screeningUpdated',c.screeningUpdated);
   renderYNToggle('cpSafeSportToggle','safeSport',c.safeSport);
   renderResumeBox();
@@ -1125,6 +1166,17 @@ function renderLevelPicker(levels){
 function toggleCpLevel(l){
   cpLevelState[l]=!cpLevelState[l];
   renderLevelPicker(cpLevelState);
+}
+
+let cpCurrentLevelState={};
+function renderCurrentLevelPicker(levels){
+  cpCurrentLevelState=Object.assign({},levels);
+  const wrap=document.getElementById('cpCurrentLevelPicker');
+  wrap.innerHTML=CURRENT_LEVELS.map(l=>`<div class="cp-level-btn ${cpCurrentLevelState[l]?'active':''}" onclick="toggleCpCurrentLevel('${l}')">${l.toUpperCase()}${cpCurrentLevelState[l]?' \u2713':''}</div>`).join('');
+}
+function toggleCpCurrentLevel(l){
+  cpCurrentLevelState[l]=!cpCurrentLevelState[l];
+  renderCurrentLevelPicker(cpCurrentLevelState);
 }
 
 function renderYNToggle(elId,field,val){
@@ -1182,8 +1234,11 @@ function saveCoachProfileModal(){
   c.dob=document.getElementById('cpDob').value;
   c.phone=document.getElementById('cpPhone').value.trim();
   c.email=document.getElementById('cpEmail').value.trim();
+  c.address=document.getElementById('cpAddress').value.trim();
+  c.zip=document.getElementById('cpZip').value.trim();
   c.photo=cpPendingPhoto||'';
   c.levels=Object.assign({},cpLevelState);
+  c.currentLevels=Object.assign({},cpCurrentLevelState);
   c.usaHockeyId=document.getElementById('cpInsurance').value.trim();
   c.screeningUpdated=!!cpYNState.screeningUpdated;
   c.safeSport=!!cpYNState.safeSport;
@@ -3690,5 +3745,88 @@ function toast(msg,type=''){
   toastTimer=setTimeout(()=>{el.className='';},2800);
 }
 </script>
+<div id="printCoachApp">
+  <div class="pca-page">
+    <div class="pca-header">
+      <h1>Coach Application</h1>
+      <div class="sub">Fronek Skillzone Hockey &middot; Jaguar Hockey Development Program</div>
+    </div>
+
+    <div class="pca-section">
+      <div class="pca-section-title">Personal Information</div>
+      <div class="pca-row">
+        <div class="pca-field"><span class="pca-field-label">Name</span><div class="pca-line"></div></div>
+        <div class="pca-field"><span class="pca-field-label">Date of Birth</span><div class="pca-line"></div></div>
+      </div>
+      <div class="pca-row">
+        <div class="pca-field"><span class="pca-field-label">Phone</span><div class="pca-line"></div></div>
+        <div class="pca-field"><span class="pca-field-label">Email</span><div class="pca-line"></div></div>
+      </div>
+      <div class="pca-row">
+        <div class="pca-field" style="flex:3;"><span class="pca-field-label">Address</span><div class="pca-line"></div></div>
+        <div class="pca-field"><span class="pca-field-label">Zip Code</span><div class="pca-line"></div></div>
+      </div>
+    </div>
+
+    <div class="pca-section">
+      <div class="pca-section-title">USA Hockey Compliance (required annually)</div>
+      <div class="pca-note">Zip Code and Date of Birth above are used together to verify status at usahockeyregistration.com</div>
+      <div class="pca-row" style="margin-top:8px;">
+        <div class="pca-field"><span class="pca-field-label">USA Hockey Insurance Number</span><div class="pca-line"></div></div>
+      </div>
+      <div class="pca-row">
+        <div class="pca-field">
+          <span class="pca-field-label">Screening Updated</span>
+          <div class="pca-checklist"><span class="pca-check"><span class="pca-box"></span> Yes</span><span class="pca-check"><span class="pca-box"></span> No</span></div>
+        </div>
+        <div class="pca-field">
+          <span class="pca-field-label">SafeSport Certified</span>
+          <div class="pca-checklist"><span class="pca-check"><span class="pca-box"></span> Yes</span><span class="pca-check"><span class="pca-box"></span> No</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pca-section">
+      <div class="pca-section-title">USA Hockey Coaching Modules Completed</div>
+      <div class="pca-checklist">
+        <span class="pca-check"><span class="pca-box"></span> 8U</span>
+        <span class="pca-check"><span class="pca-box"></span> 10U</span>
+        <span class="pca-check"><span class="pca-box"></span> 12U</span>
+        <span class="pca-check"><span class="pca-box"></span> 14U</span>
+        <span class="pca-check"><span class="pca-box"></span> 16U</span>
+        <span class="pca-check"><span class="pca-box"></span> 18U</span>
+      </div>
+    </div>
+
+    <div class="pca-section">
+      <div class="pca-section-title">Levels Interested In Coaching</div>
+      <div class="pca-checklist">
+        <span class="pca-check"><span class="pca-box"></span> LJ</span>
+        <span class="pca-check"><span class="pca-box"></span> PH</span>
+        <span class="pca-check"><span class="pca-box"></span> ADM</span>
+        <span class="pca-check"><span class="pca-box"></span> IH</span>
+        <span class="pca-check"><span class="pca-box"></span> Travel</span>
+      </div>
+    </div>
+
+    <div class="pca-section">
+      <div class="pca-section-title">Coaching Experience</div>
+      <div class="pca-lines"></div><div class="pca-lines"></div><div class="pca-lines"></div>
+    </div>
+
+    <div class="pca-section">
+      <div class="pca-section-title">Playing Experience</div>
+      <div class="pca-lines"></div><div class="pca-lines"></div><div class="pca-lines"></div>
+    </div>
+
+    <div class="pca-note">Please attach a resume/CV if available.</div>
+
+    <div class="pca-sig-row">
+      <div class="pca-sig-line"><div class="pca-sig-label">Signature</div></div>
+      <div class="pca-sig-line" style="flex:0.4;"><div class="pca-sig-label">Date</div></div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
