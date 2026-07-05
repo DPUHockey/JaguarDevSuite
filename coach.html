@@ -347,7 +347,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V12</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V13</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -423,7 +423,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
         <button class="btn btn-outline btn-sm" onclick="mergeDuplicateCoaches()">Merge Duplicate Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="cleanOrphanedCoachHours()">Clean Up Orphaned Hours</button>
         <button class="btn btn-outline btn-sm" id="btnArchivedCoaches" onclick="toggleArchivedCoachesPanel()">Archived Coaches</button>
-        <button class="btn btn-gold btn-sm" id="btnAddCoach" onclick="focusNewCoachRow()">+ Add Coach</button>
+        <button class="btn btn-outline btn-sm" onclick="switchTab('coaches')" title="New coaches are onboarded on the Coaches tab, then added here via 'Add to Active'">New coaches: use Coaches tab &#8599;</button>
       </div>
     </div>
     <div id="archivedCoachesPanel" class="hidden" style="background:rgba(255,255,255,.02);border:1px solid var(--gray-border);border-radius:6px;padding:10px 14px;margin-bottom:12px;"></div>
@@ -581,8 +581,8 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
       <div class="form-group"><span class="form-label">Name</span><input class="form-input" id="cpName" type="text"/></div>
       <div class="form-group"><span class="form-label">Date of Birth</span><input class="form-input" id="cpDob" type="date"/></div>
-      <div class="form-group"><span class="form-label">Phone</span><input class="form-input" id="cpPhone" type="tel"/></div>
-      <div class="form-group"><span class="form-label">Email</span><input class="form-input" id="cpEmail" type="email"/></div>
+      <div class="form-group" style="grid-column:1/-1;"><span class="form-label">Phone</span><input class="form-input" id="cpPhone" type="tel"/></div>
+      <div class="form-group" style="grid-column:1/-1;"><span class="form-label">Email</span><input class="form-input" id="cpEmail" type="email"/></div>
       <div class="form-group" style="grid-column:1/-1;"><span class="form-label">Address</span><input class="form-input" id="cpAddress" type="text" placeholder="Street, City, State"/></div>
     </div>
 
@@ -1707,7 +1707,6 @@ function startApp(){
   document.getElementById('headerUserBadge').innerHTML=roleBadge(currentUser.role);
   const canEdit=currentUser.role==='editor'||currentUser.role==='admin';
   document.getElementById('btnClearHours').classList.toggle('hidden',!canEdit);
-  document.getElementById('btnAddCoach').classList.toggle('hidden',!canEdit);
   document.getElementById('viewOnlyBanner').classList.toggle('hidden',canEdit);
   const calActs=document.getElementById('calendarActions');
   if(calActs)calActs.classList.toggle('hidden',!canEdit);
@@ -2088,117 +2087,6 @@ function buildTable(){
     }
   });
 
-  // -- Blank entry rows (always show 3 at bottom for direct grid entry)
-  if(isEdit){
-    const BLANK_ROWS=3;
-    for(let b=0;b<BLANK_ROWS;b++){
-      const tr=body.insertRow();
-      tr.className='blank-row';
-      let newCoach=null; // created once on first character
-
-      // # cell
-      const numTd=tr.insertCell();
-      numTd.className='num-cell';
-      numTd.style.cssText=`width:${NUM_W}px;background:#111;padding:0;text-align:center;color:var(--gray-light);font-size:14px`;
-      numTd.textContent='+';
-
-      // Name input
-      const nameTd=tr.insertCell();nameTd.className='name-cell';
-      const ni=document.createElement('input');
-      ni.className='coach-name-input';
-      ni.placeholder='Add coach name...';
-      ni.style.color='var(--gray-light)';
-      ni.addEventListener('focus',()=>{ni.style.color='';});
-      ni.addEventListener('input',()=>{
-        const pos=ni.selectionStart;
-        ni.value=capFirst(ni.value);
-        ni.setSelectionRange(pos,pos);
-        if(!newCoach){
-          newCoach=mkC(ni.value, currentNewDesig||'volunteer');
-          newCoach.startMonth=currentMonthKey;
-          // Only push if this id isn't already in coaches (guard against double-fire)
-          if(!coaches.find(x=>x.id===newCoach.id)){
-            coaches.push(newCoach);
-          }
-        } else {
-          newCoach.name=ni.value;
-        }
-        saveCoaches();
-      });
-      ni.addEventListener('blur',e=>{
-        // Don't rebuild if focus is moving to another element inside the grid or a modal button
-        const related=e.relatedTarget;
-        if(related&&(related.closest('.coach-grid')||related.closest('.modal-backdrop')))return;
-        if(newCoach){
-          const typedKey=(newCoach.name||'').trim().toLowerCase().replace(/\s+/g,' ');
-          const isDupe=typedKey&&coaches.some(x=>x.id!==newCoach.id&&(x.name||'').trim().toLowerCase().replace(/\s+/g,' ')===typedKey);
-          if(isDupe)toast(newCoach.name+' already exists as a coach \u2014 use "Merge Duplicate Coaches" above if this was added by mistake.','terror');
-          buildTable();
-        }
-        else{ni.style.color='var(--gray-light)';}
-      });
-      nameTd.appendChild(ni);
-
-      // Empty delete cell (no button in blank rows)
-      const blankDelTd=tr.insertCell();
-      blankDelTd.style.cssText=`width:${DEL_W}px;background:#111;border:1px solid var(--gray-border)`;
-
-      // Desig dropdown
-      const dTd=tr.insertCell();dTd.className='desig-cell';
-      const sel=document.createElement('select');
-      sel.className='desig-select';
-      sel.style.color=safeDesig('volunteer').color;
-      DK.forEach(k=>{
-        const o=document.createElement('option');o.value=k;
-        o.textContent=`${DESIG[k].label}($${DESIG[k].rate})`;
-        o.style.color=DESIG[k].color;
-        sel.appendChild(o);
-      });
-      sel.onchange=()=>{
-        currentNewDesig=sel.value;
-        sel.style.color=safeDesig(sel.value).color;
-        if(newCoach){newCoach.desig=sel.value;saveCoaches();}
-        // Show/hide prior hours prompt for probation
-        const existingPrompt=dTd.querySelector('.prob-start-prompt');
-        if(sel.value==='probation'){
-          if(!existingPrompt){
-            const prompt=document.createElement('div');
-            prompt.className='prob-start-prompt';
-            prompt.style.cssText='margin-top:3px;display:flex;align-items:center;gap:3px';
-            prompt.innerHTML='<span style="font-family:\'Barlow Condensed\';font-size:9px;color:#f39c12;white-space:nowrap">Prior hrs:</span>'+
-              '<input type="number" min="0" max="19" placeholder="0" style="width:38px;padding:1px 3px;background:var(--gray-mid);border:1px solid rgba(243,156,18,.4);color:#f39c12;font-size:10px;border-radius:2px">';
-            const inp=prompt.querySelector('input');
-            inp.onchange=()=>{
-              if(newCoach){newCoach.probationStartHrs=Math.max(0,Math.min(19,+inp.value||0));saveCoaches();}
-            };
-            inp.onblur=()=>{
-              if(newCoach){newCoach.probationStartHrs=Math.max(0,Math.min(19,+inp.value||0));saveCoaches();buildTable();}
-            };
-            inp.onkeydown=e=>{
-              if(e.key==='Enter'){
-                if(newCoach){newCoach.probationStartHrs=Math.max(0,Math.min(19,+inp.value||0));saveCoaches();}
-                buildTable();
-              }
-            };
-            dTd.appendChild(prompt);
-          }
-        } else {
-          if(existingPrompt)existingPrompt.remove();
-        }
-      };
-      dTd.appendChild(sel);
-
-      // Empty hour cells
-      cols.forEach(()=>{
-        const td=tr.insertCell();
-        td.style.cssText='background:rgba(255,255,255,.01);border:1px solid var(--gray-border)';
-      });
-      // Empty total/pay cells
-      tr.insertCell().style.cssText='background:rgba(201,168,76,.04);border:1px solid var(--gray-border)';
-      tr.insertCell().style.cssText='background:rgba(201,168,76,.07);border:1px solid var(--gray-border)';
-      if(hasProbation) tr.insertCell().style.cssText='background:rgba(243,156,18,.04);border:1px solid var(--gray-border)';
-    }
-  }
   const fr=foot.insertRow();fr.style.background='#1a1400';
   const fE=fr.insertCell();fE.style.cssText='background:#1a1400;border:1px solid var(--gray-border)';
   const fL=fr.insertCell();fL.colSpan=isEdit?3:2;fL.style.cssText="background:#1a1400;border:1px solid var(--gray-border);padding:4px 8px;font-family:'Barlow Condensed';font-size:11px;color:var(--gold);letter-spacing:1px;text-transform:uppercase";fL.textContent='Col Totals';
