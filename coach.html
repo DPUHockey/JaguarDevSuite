@@ -41,6 +41,8 @@ input,select,button{font-family:'Barlow',sans-serif}
 
 /* ===== COACH PROFILES ===== */
 .cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:16px}
+.cp-filter-pill{padding:6px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--gray-border);background:var(--gray-mid);color:var(--white-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;transition:all .15s}
+.cp-filter-pill.active{background:rgba(201,168,76,.15);border-color:var(--gold-dark);color:var(--gold-light)}
 .cp-card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
 .cp-card:hover{border-color:var(--gold-dark)}
 .cp-card-top{display:flex;gap:12px;align-items:center;margin-bottom:12px}
@@ -69,28 +71,29 @@ input,select,button{font-family:'Barlow',sans-serif}
 /* ===== PRINTABLE BLANK COACH APPLICATION ===== */
 #printCoachApp{display:none;}
 @media print{
+  @page{margin:0.3in;}
   body *{visibility:hidden;}
   #printCoachApp,#printCoachApp *{visibility:visible;}
-  #printCoachApp{display:block;position:absolute;top:0;left:0;width:100%;padding:0.4in;}
+  #printCoachApp{display:block;position:absolute;top:0;left:0;width:100%;padding:0;}
 }
-.pca-page{color:#000;background:#fff;font-family:'Barlow',Arial,sans-serif;font-size:13px;line-height:1.5;}
-.pca-header{text-align:center;margin-bottom:18px;border-bottom:3px solid #000;padding-bottom:10px;}
-.pca-header h1{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:2px;margin:0;}
-.pca-header .sub{font-size:12px;color:#444;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
-.pca-section{margin-bottom:16px;}
-.pca-section-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px;border-bottom:1px solid #999;margin-bottom:8px;padding-bottom:3px;}
-.pca-row{display:flex;gap:24px;margin-bottom:10px;flex-wrap:wrap;}
+.pca-page{color:#000;background:#fff;font-family:'Barlow',Arial,sans-serif;font-size:11.5px;line-height:1.3;}
+.pca-header{text-align:center;margin-bottom:10px;border-bottom:2px solid #000;padding-bottom:6px;}
+.pca-header h1{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin:0;}
+.pca-header .sub{font-size:10.5px;color:#444;letter-spacing:1px;text-transform:uppercase;margin-top:1px;}
+.pca-section{margin-bottom:9px;}
+.pca-section-title{font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;border-bottom:1px solid #999;margin-bottom:5px;padding-bottom:2px;}
+.pca-row{display:flex;gap:20px;margin-bottom:6px;flex-wrap:wrap;}
 .pca-field{flex:1;min-width:140px;}
-.pca-field-label{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#555;display:block;margin-bottom:2px;}
-.pca-line{border-bottom:1px solid #000;height:20px;}
-.pca-checklist{display:flex;gap:16px;flex-wrap:wrap;}
-.pca-check{display:flex;align-items:center;gap:6px;font-size:13px;}
-.pca-box{width:14px;height:14px;border:1.5px solid #000;display:inline-block;flex-shrink:0;}
-.pca-lines{border-bottom:1px solid #999;height:22px;margin-bottom:4px;}
-.pca-note{font-size:10.5px;color:#555;font-style:italic;margin-top:2px;}
-.pca-sig-row{display:flex;gap:40px;margin-top:26px;}
-.pca-sig-line{flex:1;border-bottom:1px solid #000;height:30px;position:relative;}
-.pca-sig-label{font-size:10px;color:#555;margin-top:3px;}
+.pca-field-label{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#555;display:block;margin-bottom:1px;}
+.pca-line{border-bottom:1px solid #000;height:15px;}
+.pca-checklist{display:flex;gap:14px;flex-wrap:wrap;}
+.pca-check{display:flex;align-items:center;gap:5px;font-size:11.5px;}
+.pca-box{width:12px;height:12px;border:1.5px solid #000;display:inline-block;flex-shrink:0;}
+.pca-lines{border-bottom:1px solid #999;height:16px;margin-bottom:3px;}
+.pca-note{font-size:9.5px;color:#555;font-style:italic;margin-top:1px;}
+.pca-sig-row{display:flex;gap:32px;margin-top:14px;}
+.pca-sig-line{flex:1;border-bottom:1px solid #000;height:20px;position:relative;}
+.pca-sig-label{font-size:9px;color:#555;margin-top:2px;}
 .card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:8px;padding:16px}
 .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-family:'Barlow Condensed';font-size:11px;letter-spacing:.5px;font-weight:600}
 .badge-admin{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
@@ -344,7 +347,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V10</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -396,12 +399,14 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
   <div id="panel-coaches" class="panel">
     <div class="section-header">
       <div><div class="section-title">Coaches</div><div class="section-note">Onboarding, certifications, and USA Hockey compliance tracking</div></div>
-      <div style="display:flex;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="migrateExistingCoachesToProfiles()">Migrate Existing Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
         <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
       </div>
     </div>
     <div class="alert-bar">USA Hockey Insurance Number, Screening, and SafeSport status are annual requirements and must be re-verified every season. &nbsp;<a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="color:var(--gold-light);text-decoration:underline;">Verify on USA Hockey Registration &#8599;</a></div>
+    <div id="cpStatusFilterBar" style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap;"></div>
     <div id="coachProfilesGrid" class="cp-grid"></div>
   </div>
 
@@ -604,6 +609,13 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <span class="form-label">Resume / CV</span>
       <div class="cp-resume-box" id="cpResumeBox"></div>
       <input type="file" accept=".pdf,.doc,.docx" id="cpResumeInput" onchange="handleResumeUpload(this)" style="font-size:11px;margin-top:6px;"/>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px;padding-top:14px;border-top:1px solid var(--gray-border);">
+      <button class="btn" style="flex:1;min-width:130px;justify-content:center;background:rgba(46,204,113,.15);border:1px solid var(--green);color:var(--green);" onclick="setCoachProfileStatus('active')" title="Saves this profile and adds them to the active Hours Grid roster">&#10003; Add to Active</button>
+      <button class="btn" style="flex:1;min-width:130px;justify-content:center;background:rgba(243,156,18,.15);border:1px solid #f39c12;color:#f39c12;" onclick="setCoachProfileStatus('pending')" title="Saves this profile as pending, to approve or reject later">Pending Approval</button>
+      <button class="btn" style="flex:1;min-width:100px;justify-content:center;background:rgba(231,76,60,.15);border:1px solid var(--red);color:var(--red);" onclick="setCoachProfileStatus('rejected')" title="Saves this profile and moves it to the Rejected list">Reject</button>
+      <button class="btn" style="flex:1;min-width:100px;justify-content:center;background:rgba(255,255,255,.06);border:1px solid var(--gray-light);color:var(--white-dim);" onclick="setCoachProfileStatus('archived')" title="Keeps all their data but hides them from the active Hours Grid">Archive</button>
     </div>
 
     <div class="modal-footer">
@@ -1048,13 +1060,26 @@ function mkCoachProfile(){
     levels:{},currentLevels:{},
     usaHockeyId:'',screeningUpdated:false,safeSport:false,complianceSeason:'',
     coachingExperience:'',playingExperience:'',
-    resumeFileName:'',resumeFileData:''
+    resumeFileName:'',resumeFileData:'',
+    status:'pending', // 'active' | 'pending' | 'rejected' | 'archived'
+    payrollCoachId:'' // links to a coaches[] entry once added to the Hours Grid
   };
 }
 function loadCoachProfiles(){
   try{
     const s=localStorage.getItem('jag_coach_profiles');
-    if(s){const p=JSON.parse(s);if(Array.isArray(p))return p;}
+    if(s){
+      const p=JSON.parse(s);
+      if(Array.isArray(p)){
+        // Profiles saved before status/payrollCoachId existed default to Active so
+        // they don't silently vanish from view under the new Pending filter.
+        p.forEach(c=>{
+          if(!c.status)c.status='active';
+          if(typeof c.payrollCoachId!=='string')c.payrollCoachId='';
+        });
+        return p;
+      }
+    }
   }catch(e){}
   return[];
 }
@@ -1066,18 +1091,34 @@ let cpPendingResume=null;
 let cpLevelState={};
 let cpYNState={};
 
+let cpStatusFilter='active';
+function setCpStatusFilter(s){ cpStatusFilter=s; renderCoachProfiles(); }
 function renderCoachProfiles(){
   const grid=document.getElementById('coachProfilesGrid');
+  const filterBar=document.getElementById('cpStatusFilterBar');
   if(!grid)return;
-  if(!coachProfiles.length){
-    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--white-dim);padding:40px;">No coach profiles yet. Click "+ Add Coach" to onboard your first coach.</div>';
+  const counts={active:0,pending:0,rejected:0,archived:0};
+  coachProfiles.forEach(c=>{ const s=c.status||'active'; counts[s]=(counts[s]||0)+1; });
+  if(filterBar){
+    filterBar.innerHTML=[
+      {k:'active',label:'Active'},
+      {k:'pending',label:'Pending Approval'},
+      {k:'rejected',label:'Rejected'},
+      {k:'archived',label:'Archived'}
+    ].map(f=>`<div class="cp-filter-pill ${cpStatusFilter===f.k?'active':''}" onclick="setCpStatusFilter('${f.k}')">${f.label} (${counts[f.k]||0})</div>`).join('');
+  }
+  const filtered=coachProfiles.filter(c=>(c.status||'active')===cpStatusFilter);
+  if(!filtered.length){
+    const emptyMsgs={active:'No active coaches. Click "+ Add Coach" to onboard someone, or check Pending Approval.',pending:'No coaches pending approval.',rejected:'No rejected applicants.',archived:'No archived coaches.'};
+    grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;color:var(--white-dim);padding:40px;">${emptyMsgs[cpStatusFilter]||'Nothing here.'}</div>`;
     return;
   }
   const season=currentSeasonLabel();
-  grid.innerHTML=coachProfiles.map(c=>{
+  grid.innerHTML=filtered.map(c=>{
     const stale=c.complianceSeason&&c.complianceSeason!==season;
     const noCompliance=!c.complianceSeason;
-    return`<div class="cp-card" onclick="openCoachProfileModal('${c.id}')">
+    const pendingBorder=c.status==='pending'?'border:2px solid var(--red);':'';
+    return`<div class="cp-card" style="${pendingBorder}" onclick="openCoachProfileModal('${c.id}')">
       <div class="cp-card-top">
         ${c.photo?`<img src="${c.photo}" class="cp-photo" alt=""/>`:`<div class="cp-photo-placeholder">${(c.name||'?').charAt(0)}</div>`}
         <div>
@@ -1219,18 +1260,10 @@ function handleResumeUpload(inputEl){
   reader.readAsDataURL(file);
 }
 
-function saveCoachProfileModal(){
-  const name=document.getElementById('cpName').value.trim();
-  if(!name){toast('Name is required','terror');return;}
-  let c;
-  if(editingCoachProfileId){
-    c=coachProfiles.find(x=>x.id===editingCoachProfileId);
-    if(!c){toast('Coach profile not found','terror');return;}
-  }else{
-    c=mkCoachProfile();
-    coachProfiles.push(c);
-  }
-  c.name=name;
+// Reads every field in the modal into the given profile object. Shared by Save and
+// all four status buttons below, so each doesn't need to duplicate the same 15 lines.
+function gatherCoachProfileFormFields(c){
+  c.name=document.getElementById('cpName').value.trim();
   c.dob=document.getElementById('cpDob').value;
   c.phone=document.getElementById('cpPhone').value.trim();
   c.email=document.getElementById('cpEmail').value.trim();
@@ -1250,11 +1283,69 @@ function saveCoachProfileModal(){
   c.playingExperience=document.getElementById('cpPlayingExp').value;
   c.resumeFileName=cpPendingResume?cpPendingResume.name:'';
   c.resumeFileData=cpPendingResume?cpPendingResume.data:'';
-
+}
+// Returns the profile currently being edited, creating and registering a new one on
+// first use if this is an "Add Coach" session -- so if someone clicks a status button
+// without hitting Save first, a profile still gets created rather than lost, and a
+// second click in the same session updates that same profile instead of duplicating it.
+function getOrCreateEditingProfile(){
+  let c;
+  if(editingCoachProfileId){
+    c=coachProfiles.find(x=>x.id===editingCoachProfileId);
+    if(!c)return null;
+  }else{
+    c=mkCoachProfile();
+    coachProfiles.push(c);
+    editingCoachProfileId=c.id;
+  }
+  return c;
+}
+function saveCoachProfileModal(){
+  const name=document.getElementById('cpName').value.trim();
+  if(!name){toast('Name is required','terror');return;}
+  const c=getOrCreateEditingProfile();
+  if(!c){toast('Coach profile not found','terror');return;}
+  const wasNew=!editingCoachProfileId||c.id===editingCoachProfileId;
+  gatherCoachProfileFormFields(c);
   saveCoachProfilesData();
   closeModal('modalCoachProfile');
   renderCoachProfiles();
-  toast(`${name} ${editingCoachProfileId?'updated':'added'}`);
+  toast(`${name} saved`);
+}
+// Saves the form AND sets the coach's workflow status in one click -- this is what
+// the four buttons at the bottom of the modal do. "Active" additionally creates (or
+// re-links) a real Hours Grid entry so the coach is immediately ready to log hours;
+// "Archived" hides that Hours Grid entry without deleting anything.
+function setCoachProfileStatus(newStatus){
+  const name=document.getElementById('cpName').value.trim();
+  if(!name){toast('Name is required','terror');return;}
+  const c=getOrCreateEditingProfile();
+  if(!c){toast('Coach profile not found','terror');return;}
+  gatherCoachProfileFormFields(c);
+  c.status=newStatus;
+
+  if(newStatus==='active'){
+    let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+    if(!pc){
+      pc=mkC(c.name,'volunteer');
+      coaches.push(pc);
+      c.payrollCoachId=pc.id;
+    }else{
+      pc.name=c.name; // keep payroll name in sync if it was edited here
+      pc.archived=false; // reactivate if this coach had been archived
+    }
+    saveCoaches();
+  } else if(newStatus==='archived'&&c.payrollCoachId){
+    const pc=coaches.find(x=>x.id===c.payrollCoachId);
+    if(pc){pc.archived=true;saveCoaches();}
+  }
+
+  saveCoachProfilesData();
+  refreshAllCoachViews();
+  closeModal('modalCoachProfile');
+  renderCoachProfiles();
+  const labels={active:'added to the active Hours Grid',pending:'marked Pending Approval',rejected:'moved to Rejected',archived:'archived \u2014 hidden from the Hours Grid but all data kept'};
+  toast(`${name} ${labels[newStatus]||('status set to '+newStatus)}`);
 }
 
 function deleteCoachProfile(){
@@ -1267,6 +1358,44 @@ function deleteCoachProfile(){
   closeModal('modalCoachProfile');
   renderCoachProfiles();
   toast(`${c.name} profile deleted`);
+}
+
+// One-time migration: creates an Active profile for every coach currently in the
+// Hours Grid (so they show up in the new Coaches system), then clears the Hours Grid
+// entirely so it can be rebuilt fresh, one coach at a time, using "Add to Active" on
+// each profile going forward -- rather than the old open-ended blank-row entry.
+function migrateExistingCoachesToProfiles(){
+  const existingNames=new Set(coachProfiles.map(p=>(p.name||'').trim().toLowerCase()));
+  const toMigrate=coaches.filter(c=>c.name&&c.name.trim()&&!existingNames.has(c.name.trim().toLowerCase()));
+  if(!coaches.length){
+    toast('Hours Grid is already empty \u2014 nothing to migrate.');
+    return;
+  }
+  if(!confirm(`This will:\n\n1. Create an Active Coach Profile for each of your ${coaches.length} current Hours Grid coaches (${toMigrate.length} new, ${coaches.length-toMigrate.length} already have a profile)\n2. Download a full backup of your current Hours Grid data\n3. Completely clear the Hours Grid so it can be rebuilt fresh via "Add to Active" on each profile\n\nThis cannot be undone except by re-importing the backup. Continue?`))return;
+
+  try{
+    const blob=new Blob([JSON.stringify({app:'jaguar-coaches-backup',v:1,exported:new Date().toISOString(),coaches},null,2)],{type:'application/json'});
+    const a=document.createElement('a'),d=new Date();
+    a.href=URL.createObjectURL(blob);
+    a.download='jaguar-coaches-before-migration-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(e){}
+
+  toMigrate.forEach(c=>{
+    const p=mkCoachProfile();
+    p.name=c.name;
+    p.status='active';
+    coachProfiles.push(p);
+  });
+  saveCoachProfilesData();
+
+  coaches=[];
+  saveCoaches();
+  refreshAllCoachViews();
+  cpStatusFilter='active';
+  renderCoachProfiles();
+  toast(`Created ${toMigrate.length} coach profile${toMigrate.length!==1?'s':''} and cleared the Hours Grid \u2014 use "Add to Active" on each profile to rebuild it.`);
 }
 
 function cleanOrphanedCoachHours(){
@@ -3542,21 +3671,18 @@ function deleteCoach(coachId){
   const idx=coaches.findIndex(x=>x.id===coachId);
   if(idx<0){toast('Coach not found','terror');return;}
   const label=coaches[idx].name||'this coach';
-  // Show inline confirm bar replacing the D button -- offers both Archive (keeps all
-  // logged hours and history, just hides them from the active Hours Grid, for someone
-  // like a coach taking the year off) and Delete (removes them and all their data
-  // entirely, for coaches added by mistake).
+  // Looking to archive instead of delete? That's handled on the Coaches tab now --
+  // open that coach's profile and use the Archive button there. This stays
+  // delete-only since it's a cramped table cell, not a great place for multiple
+  // options to live.
   const btn=document.querySelector(`button[data-id="${coachId}"]`);
   if(!btn)return;
   const td=btn.parentElement;
-  td.style.cssText='background:#1a1a1a;border:1px solid var(--gold-dark);padding:3px 4px;text-align:center;min-width:120px;white-space:nowrap;';
+  td.style.cssText='background:#1a0000;border:1px solid #e74c3c;padding:2px 4px;text-align:center;min-width:95px;white-space:nowrap;';
   td.innerHTML=`
-    <span style="font-family:'Barlow Condensed';font-size:9px;color:var(--white-dim);display:block;margin-bottom:3px;">${label.split(' ')[0]}: archive or delete?</span>
-    <div style="display:flex;gap:3px;justify-content:center;">
-      <button type="button" onclick="archiveCoach('${coachId}')" title="Keep all hours/history, just hide from the active Hours Grid" style="background:var(--gold-dark);border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 6px;border-radius:2px;">Archive</button>
-      <button type="button" onclick="confirmDeleteCoach('${coachId}')" title="Permanently remove this coach and all their data" style="background:#e74c3c;border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 6px;border-radius:2px;">Delete</button>
-      <button type="button" onclick="cancelDeleteCoach('${coachId}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 4px;border-radius:2px;">✕</button>
-    </div>
+    <span style="font-family:'Barlow Condensed';font-size:10px;color:#e74c3c;display:block;margin-bottom:2px;">Delete ${label.split(' ')[0]}?</span>
+    <button type="button" onclick="confirmDeleteCoach('${coachId}')" style="background:#e74c3c;border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed';font-size:11px;padding:3px 8px;border-radius:2px;margin-right:3px;">Yes</button>
+    <button type="button" onclick="cancelDeleteCoach('${coachId}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;font-family:'Barlow Condensed';font-size:11px;padding:3px 8px;border-radius:2px;">No</button>
   `;
 }
 function toggleArchivedCoachesPanel(){
@@ -3749,7 +3875,7 @@ function toast(msg,type=''){
   <div class="pca-page">
     <div class="pca-header">
       <h1>Coach Application</h1>
-      <div class="sub">Fronek Skillzone Hockey &middot; Jaguar Hockey Development Program</div>
+      <div class="sub">Jaguar Hockey Development Program</div>
     </div>
 
     <div class="pca-section">
@@ -3811,12 +3937,12 @@ function toast(msg,type=''){
 
     <div class="pca-section">
       <div class="pca-section-title">Coaching Experience</div>
-      <div class="pca-lines"></div><div class="pca-lines"></div><div class="pca-lines"></div>
+      <div class="pca-lines"></div><div class="pca-lines"></div>
     </div>
 
     <div class="pca-section">
       <div class="pca-section-title">Playing Experience</div>
-      <div class="pca-lines"></div><div class="pca-lines"></div><div class="pca-lines"></div>
+      <div class="pca-lines"></div><div class="pca-lines"></div>
     </div>
 
     <div class="pca-note">Please attach a resume/CV if available.</div>
