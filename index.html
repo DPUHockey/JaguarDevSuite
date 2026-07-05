@@ -101,7 +101,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V7</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
 
 <nav>
   <div class="nav-left">
@@ -271,13 +271,16 @@ function jagApplySavedOrder(){
     const cards=Array.from(grid.querySelectorAll('.app-card[data-key]'));
     const saved=JSON.parse(localStorage.getItem(JAG_ORDER_KEY)||'null');
     if(!saved||!Array.isArray(saved))return;
-    const curKeys=cards.map(c=>c.dataset.key).sort().join(',');
-    const savedKeys=saved.slice().sort().join(',');
-    if(curKeys!==savedKeys)return; // app list changed since last save — ignore stale order
     const byKey={};
     cards.forEach(c=>{byKey[c.dataset.key]=c;});
     const placeholder=grid.querySelector('.app-card:not([data-key])'); // "Add App" slot, stays pinned last
+    // Apply saved order for any app that still exists. Newly added apps (not in the
+    // saved order because they didn't exist yet when it was saved) get appended at
+    // the end afterward, rather than the whole arrangement being thrown out --
+    // otherwise every update that adds a new app card would silently reset the
+    // person's custom order back to default.
     saved.forEach(k=>{ if(byKey[k]) grid.insertBefore(byKey[k], placeholder||null); });
+    cards.forEach(c=>{ if(!saved.includes(c.dataset.key)) grid.insertBefore(c, placeholder||null); });
   }catch(e){}
 }
 function jagSaveOrder(){
