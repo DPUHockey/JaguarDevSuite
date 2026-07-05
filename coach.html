@@ -291,7 +291,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V3</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V5</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -345,6 +345,8 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <div><div class="section-title" id="hoursTitle">Hours Grid</div><div class="section-note">Left-click cell = +1 hr &nbsp;·&nbsp; Right-click = −1 hr &nbsp;·&nbsp; Min 0</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap" id="hoursActions">
         <button class="btn btn-outline btn-sm" id="btnClearHours" onclick="clearMonthHours()">Clear Month</button>
+        <button class="btn btn-outline btn-sm" onclick="mergeDuplicateCoaches()">Merge Duplicate Coaches</button>
+        <button class="btn btn-outline btn-sm" onclick="cleanOrphanedCoachHours()">Clean Up Orphaned Hours</button>
         <button class="btn btn-gold btn-sm" id="btnAddCoach" onclick="focusNewCoachRow()">+ Add Coach</button>
       </div>
     </div>
@@ -804,6 +806,111 @@ function loadCoaches(){
   coaches=[];
 }
 function saveCoaches(){localStorage.setItem('jag_coaches',JSON.stringify(coaches));}
+// Coaches are only ever identified by a randomly-generated id, never by name -- so
+// there's nothing stopping the same person from being added twice if their name gets
+// typed into one of the always-present blank "add coach" rows more than once (e.g. in
+// two different months' views, without noticing they already exist). This repairs
+// that after the fact by merging any coaches that share the same name.
+function mergeDuplicateCoaches(){
+  const groups=new Map();
+  coaches.forEach(c=>{
+    const key=(c.name||'').trim().toLowerCase().replace(/\s+/g,' ');
+    if(!key)return; // leave unnamed entries alone
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(c);
+  });
+  const dupGroups=Array.from(groups.values()).filter(g=>g.length>1);
+  if(!dupGroups.length){
+    toast('No duplicate coaches found.');
+    return;
+  }
+  const names=dupGroups.map(g=>g[0].name).join(', ');
+  if(!confirm('Found possible duplicates: '+names+'. Merge each group into one coach (combining their logged hours)? A backup downloads first.'))return;
+
+  try{
+    const blob=new Blob([JSON.stringify({app:'jaguar-coaches-backup',v:1,exported:new Date().toISOString(),coaches},null,2)],{type:'application/json'});
+    const a=document.createElement('a'),d=new Date();
+    a.href=URL.createObjectURL(blob);
+    a.download='jaguar-coaches-before-merge-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(e){}
+
+  let mergedCount=0;
+  const merged=[];
+  const seen=new Set();
+  coaches.forEach(c=>{
+    const key=(c.name||'').trim().toLowerCase().replace(/\s+/g,' ');
+    if(!key||seen.has(key)){ if(seen.has(key)) return; }
+    const group=groups.get(key);
+    if(!group||group.length===1){ merged.push(c); if(key)seen.add(key); return; }
+    if(seen.has(key))return;
+    seen.add(key);
+    // Combine hours from every duplicate. If the same month/column somehow has hours
+    // logged in more than one duplicate, take the larger value rather than adding them
+    // together -- summing risks silently inflating a coach's pay if the same real
+    // hours got double-entered under both copies.
+    const out={id:group[0].id,name:group[0].name,desig:group[0].desig,hours:{}};
+    group.forEach(g=>{
+      Object.entries(g.hours||{}).forEach(([k,v])=>{
+        out.hours[k]=Math.max(out.hours[k]||0, v||0);
+      });
+      if(g.startMonth&&(!out.startMonth||g.startMonth<out.startMonth))out.startMonth=g.startMonth;
+      if(g.desig&&g.desig!=='volunteer'&&out.desig==='volunteer')out.desig=g.desig;
+    });
+    merged.push(out);
+    mergedCount+=group.length-1;
+  });
+  coaches=merged;
+  saveCoaches();
+  buildTable();
+  toast('Merged '+mergedCount+' duplicate coach'+(mergedCount!==1?'s':'')+' \u2014 combined hours preserved (using the higher value for any overlapping entries, not summed, to avoid inflating pay).');
+}
+
+// An hours grid column only exists for dates currently checked as active in Season
+// Planning (see buildMonthCols). If an hour value was logged against a date that was
+// LATER unchecked, that entry has nowhere left to render -- it vanishes from the grid
+// entirely, but coachMonthHrs/coachSeasonHrs still add it into every total and payout
+// figure, since those sum every entry in a coach's hours object regardless of whether
+// today's schedule still has a column for it. This scans for exactly that.
+function findOrphanedCoachHours(){
+  const orphans=[];
+  coaches.forEach(c=>{
+    Object.entries(c.hours||{}).forEach(([colId,v])=>{
+      if(!v)return;
+      const parts=colId.split('_');
+      if(parts.length!==5){ orphans.push({coach:c,colId,hours:v,label:'unrecognized entry'}); return; }
+      const[monthKey,day,mm,dd,si]=parts;
+      const yr=monthKey.split('-')[0];
+      const sk=`${yr}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}__${day}__${si}`;
+      if(!activeDates.has(sk)) orphans.push({coach:c,colId,hours:v,label:`${mm}/${dd} (${monthKey})`});
+    });
+  });
+  return orphans;
+}
+function cleanOrphanedCoachHours(){
+  const orphans=findOrphanedCoachHours();
+  if(!orphans.length){
+    toast('No orphaned hours found \u2014 every logged hour has a matching active date on the schedule.');
+    return;
+  }
+  const summary=orphans.map(o=>`${o.coach.name||'(unnamed)'}: ${o.hours}h on ${o.label}`).join('\n');
+  if(!confirm(`Found ${orphans.length} orphaned hour ${orphans.length!==1?'entries':'entry'} (logged against a date that's no longer checked active in the schedule):\n\n${summary}\n\nRemove ${orphans.length!==1?'these':'this'}? They're currently being counted in totals and payouts even though they don't appear anywhere in the grid. A backup downloads first.`))return;
+
+  try{
+    const blob=new Blob([JSON.stringify({app:'jaguar-coaches-backup',v:1,exported:new Date().toISOString(),coaches},null,2)],{type:'application/json'});
+    const a=document.createElement('a'),d=new Date();
+    a.href=URL.createObjectURL(blob);
+    a.download='jaguar-coaches-before-orphan-cleanup-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(e){}
+
+  orphans.forEach(o=>{ delete o.coach.hours[o.colId]; });
+  saveCoaches();
+  buildTable();
+  toast(`Removed ${orphans.length} orphaned hour ${orphans.length!==1?'entries':'entry'} \u2014 totals and payouts will now match what's shown in the grid.`);
+}
 
 // Per-month custom sort orders: { '2026-09': ['name1','name2',...], ... }
 // Only set for months where the user explicitly changed the order.
@@ -1422,7 +1529,12 @@ function buildTable(){
         // Don't rebuild if focus is moving to another element inside the grid or a modal button
         const related=e.relatedTarget;
         if(related&&(related.closest('.coach-grid')||related.closest('.modal-backdrop')))return;
-        if(newCoach){buildTable();}
+        if(newCoach){
+          const typedKey=(newCoach.name||'').trim().toLowerCase().replace(/\s+/g,' ');
+          const isDupe=typedKey&&coaches.some(x=>x.id!==newCoach.id&&(x.name||'').trim().toLowerCase().replace(/\s+/g,' ')===typedKey);
+          if(isDupe)toast(newCoach.name+' already exists as a coach \u2014 use "Merge Duplicate Coaches" above if this was added by mistake.','terror');
+          buildTable();
+        }
         else{ni.style.color='var(--gray-light)';}
       });
       nameTd.appendChild(ni);
@@ -2262,6 +2374,24 @@ function togglePlanSlot(sk,checked){
   }
 }
 function applyPlanCheck(sk,sessionNum,checked=true){
+  if(!checked){
+    // Warn if unchecking would orphan already-logged coach hours -- once this date's
+    // column disappears from the grid, any hours logged against it keep counting
+    // toward totals and pay with no visible entry anywhere to explain why.
+    const skParts=sk.split('__');
+    if(skParts.length===3){
+      const[dateKeyStr,day,si]=skParts;
+      const[yr,mm,dd]=dateKeyStr.split('-');
+      const colId=`${yr}-${mm}_${day}_${+mm}_${+dd}_${si}`;
+      const affected=coaches.filter(c=>(c.hours||{})[colId]>0);
+      if(affected.length){
+        const names=affected.map(c=>`${c.name} (${c.hours[colId]}h)`).join(', ');
+        if(!confirm(`${affected.length} coach${affected.length!==1?'es have':' has'} hours logged on this date: ${names}.\n\nUnchecking it will hide those hours from the grid, but they'll still count toward totals and pay until removed with "Clean Up Orphaned Hours" on the Hours tab.\n\nContinue anyway?`)){
+          return;
+        }
+      }
+    }
+  }
   if(!planData[sk])planData[sk]={checked:false,endSession:false};
   planData[sk].checked=checked;
   if(!checked){
@@ -3089,11 +3219,13 @@ function saveCoachModal(){
   const probStartInput=document.getElementById('probationStartHrsInput');
   const probStart=desig==='probation'?Math.max(0,Math.min(19,+probStartInput?.value||0)):0;
   if(editingCoachIdx===null){
+    const typedKey=name.trim().toLowerCase().replace(/\s+/g,' ');
+    const isDupe=typedKey&&coaches.some(x=>(x.name||'').trim().toLowerCase().replace(/\s+/g,' ')===typedKey);
     const nc=mkC(name,desig);
     nc.startMonth=currentMonthKey;
     if(desig==='probation') nc.probationStartHrs=probStart;
     coaches.push(nc);
-    toast(`${name||'Coach'} added from ${SEASON_MONTHS.find(m=>m.key===currentMonthKey).label} onward`);
+    toast(isDupe?`${name} already exists as a coach \u2014 added anyway, but use "Merge Duplicate Coaches" if this was a mistake.`:`${name||'Coach'} added from ${SEASON_MONTHS.find(m=>m.key===currentMonthKey).label} onward`, isDupe?'terror':'');
     logAudit(`Added coach "${name||'(unnamed)'}" as ${desig}${probStart?` (${probStart}h prior)`:''} starting ${currentMonthKey}`);
   } else {
     coaches[editingCoachIdx].name=name;
