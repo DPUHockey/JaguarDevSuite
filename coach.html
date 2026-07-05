@@ -347,7 +347,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V11</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V12</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -405,6 +405,10 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
         <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
       </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;max-width:460px;">
+      <input class="form-input" id="cpQuickAddInput" type="text" placeholder="Quick add coach name, then press Enter&hellip;" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddPendingCoach();}"/>
+      <button class="btn btn-outline btn-sm" onclick="quickAddPendingCoach()">+ Add (Pending)</button>
     </div>
     <div class="alert-bar">USA Hockey Insurance Number, Screening, and SafeSport status are annual requirements and must be re-verified every season. &nbsp;<a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="color:var(--gold-light);text-decoration:underline;">Verify on USA Hockey Registration &#8599;</a></div>
     <div id="cpStatusFilterBar" style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap;"></div>
@@ -1150,6 +1154,33 @@ function renderCoachProfiles(){
 // Active profiles, checking each one individually for whether it's actually linked to
 // the Hours Grid isn't realistic. This links every Active profile that isn't already
 // on the Hours Grid, all in one pass.
+// Rapid entry: type a name, hit Enter, a Pending profile is created immediately with
+// no modal -- for quickly logging a batch of applicant names (e.g. right after handing
+// out paper applications) without breaking workflow to fill out a full form each time.
+// Details can be filled in later by opening their card.
+function quickAddPendingCoach(){
+  const input=document.getElementById('cpQuickAddInput');
+  const name=input.value.trim();
+  if(!name){toast('Enter a name first','terror');return;}
+  const existing=coachProfiles.find(x=>(x.name||'').trim().toLowerCase()===name.toLowerCase());
+  if(existing){
+    if(!confirm(`"${name}" already exists (status: ${existing.status||'active'}). Add another profile with the same name anyway?`)){
+      input.value='';
+      input.focus();
+      return;
+    }
+  }
+  const p=mkCoachProfile();
+  p.name=name;
+  p.status='pending';
+  coachProfiles.push(p);
+  saveCoachProfilesData();
+  input.value='';
+  cpStatusFilter='pending';
+  renderCoachProfiles();
+  toast(`${name} added \u2014 Pending Approval. Open their card any time to fill in details.`);
+  input.focus();
+}
 function addAllActiveToHoursGrid(){
   const needsLinking=coachProfiles.filter(c=>c.status==='active'&&(!c.payrollCoachId||!coaches.some(x=>x.id===c.payrollCoachId&&!x.archived)));
   if(!needsLinking.length){
