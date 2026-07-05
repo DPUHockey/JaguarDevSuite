@@ -291,7 +291,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V5</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V6</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -347,9 +347,11 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
         <button class="btn btn-outline btn-sm" id="btnClearHours" onclick="clearMonthHours()">Clear Month</button>
         <button class="btn btn-outline btn-sm" onclick="mergeDuplicateCoaches()">Merge Duplicate Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="cleanOrphanedCoachHours()">Clean Up Orphaned Hours</button>
+        <button class="btn btn-outline btn-sm" id="btnArchivedCoaches" onclick="toggleArchivedCoachesPanel()">Archived Coaches</button>
         <button class="btn btn-gold btn-sm" id="btnAddCoach" onclick="focusNewCoachRow()">+ Add Coach</button>
       </div>
     </div>
+    <div id="archivedCoachesPanel" class="hidden" style="background:rgba(255,255,255,.02);border:1px solid var(--gray-border);border-radius:6px;padding:10px 14px;margin-bottom:12px;"></div>
     <div class="month-selector" id="monthSelector"></div>
     <div id="futureOrderBar" class="hidden" style="display:flex;align-items:center;gap:10px;background:rgba(201,168,76,.1);border:1px solid var(--gold-dark);border-radius:6px;padding:7px 14px;margin-bottom:10px;flex-wrap:wrap">
       <span style="font-family:'Barlow Condensed';font-size:12px;color:var(--gold-light);letter-spacing:.5px;flex:1">Order updated for <span id="futureOrderMonthLabel"></span></span>
@@ -785,6 +787,7 @@ function sanitizeCoach(c){
   if(!c.hours||typeof c.hours!=='object')c.hours={};
   if(typeof c.name!=='string')c.name='';
   if(c.startMonth&&!SEASON_MONTHS.find(m=>m.key===c.startMonth))delete c.startMonth;
+  if(typeof c.archived!=='boolean')c.archived=false;
   return c;
 }
 function mkC(name='',desig='volunteer'){
@@ -863,7 +866,7 @@ function mergeDuplicateCoaches(){
   });
   coaches=merged;
   saveCoaches();
-  buildTable();
+  refreshAllCoachViews();
   toast('Merged '+mergedCount+' duplicate coach'+(mergedCount!==1?'s':'')+' \u2014 combined hours preserved (using the higher value for any overlapping entries, not summed, to avoid inflating pay).');
 }
 
@@ -888,6 +891,17 @@ function findOrphanedCoachHours(){
   });
   return orphans;
 }
+// Several views (Hours Grid, Season Summary, Hours Matrix, Monthly Payroll) each cache
+// their own rendered totals and only rebuild when their tab is switched to -- so any
+// action that changes coach data needs to explicitly refresh all of them, or whichever
+// one the person is NOT currently looking at will keep showing stale numbers until
+// they happen to click away and back.
+function refreshAllCoachViews(){
+  try{buildTable();}catch(e){}
+  try{buildYearlySummary();}catch(e){}
+  try{buildMatrixView();}catch(e){}
+  try{if(typeof currentAcctMonthKey!=='undefined')buildAcctView();}catch(e){}
+}
 function cleanOrphanedCoachHours(){
   const orphans=findOrphanedCoachHours();
   if(!orphans.length){
@@ -908,7 +922,7 @@ function cleanOrphanedCoachHours(){
 
   orphans.forEach(o=>{ delete o.coach.hours[o.colId]; });
   saveCoaches();
-  buildTable();
+  refreshAllCoachViews();
   toast(`Removed ${orphans.length} orphaned hour ${orphans.length!==1?'entries':'entry'} \u2014 totals and payouts will now match what's shown in the grid.`);
 }
 
@@ -1325,9 +1339,12 @@ function buildTable(){
   addTH(r3,'');addTH(r3,'');
   if(hasProbation) addTH(r3,'',null,`background:rgba(243,156,18,.07);border:1px solid var(--gray-border)`);
 
-  // -- Data rows — only coaches active for this month, in this month's stored order
+  // -- Data rows — only coaches active for this month, in this month's stored order.
+  // Archived coaches (e.g. taking a year off) are hidden here but keep all their
+  // logged hours and still appear normally in Season Summary / Matrix / Payroll
+  // views, since those are historical reports, not an active roster.
   const mk=currentMonthKey;
-  const rawVisible=coaches.filter(c=>!c.startMonth||c.startMonth<=mk);
+  const rawVisible=coaches.filter(c=>(!c.startMonth||c.startMonth<=mk)&&!c.archived);
   const visible=applyMonthOrder(rawVisible,mk);
 
   visible.forEach((c,rowPos)=>{
@@ -3053,7 +3070,7 @@ function buildYearlySummary(){
   });
   document.getElementById('monthlyBreakTable').innerHTML=`
     <thead><tr>
-      <th>Month</th><th>Coaches</th>
+      <th>Month</th><th title="Number of coaches who logged any hours this month -- not an hours figure">Active Coaches</th>
       <th style="color:#ffb6c1">LJ/PH</th>
       <th style="color:#90ee90">ADM</th>
       <th style="color:#ffa500">IH</th>
@@ -3153,17 +3170,63 @@ function deleteCoach(coachId){
   const idx=coaches.findIndex(x=>x.id===coachId);
   if(idx<0){toast('Coach not found','terror');return;}
   const label=coaches[idx].name||'this coach';
-  // Show inline confirm bar replacing the D button
+  // Show inline confirm bar replacing the D button -- offers both Archive (keeps all
+  // logged hours and history, just hides them from the active Hours Grid, for someone
+  // like a coach taking the year off) and Delete (removes them and all their data
+  // entirely, for coaches added by mistake).
   const btn=document.querySelector(`button[data-id="${coachId}"]`);
   if(!btn)return;
   const td=btn.parentElement;
-  // Expand the td temporarily to show confirm
-  td.style.cssText='background:#1a0000;border:1px solid #e74c3c;padding:2px 4px;text-align:center;min-width:90px;white-space:nowrap';
+  td.style.cssText='background:#1a1a1a;border:1px solid var(--gold-dark);padding:3px 4px;text-align:center;min-width:120px;white-space:nowrap;';
   td.innerHTML=`
-    <span style="font-family:'Barlow Condensed';font-size:10px;color:#e74c3c;display:block;margin-bottom:2px">Delete ${label.split(' ')[0]}?</span>
-    <button type="button" onclick="confirmDeleteCoach('${coachId}')" style="background:#e74c3c;border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 6px;border-radius:2px;margin-right:3px">Yes</button>
-    <button type="button" onclick="cancelDeleteCoach('${coachId}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 6px;border-radius:2px">No</button>
+    <span style="font-family:'Barlow Condensed';font-size:9px;color:var(--white-dim);display:block;margin-bottom:3px;">${label.split(' ')[0]}: archive or delete?</span>
+    <div style="display:flex;gap:3px;justify-content:center;">
+      <button type="button" onclick="archiveCoach('${coachId}')" title="Keep all hours/history, just hide from the active Hours Grid" style="background:var(--gold-dark);border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 6px;border-radius:2px;">Archive</button>
+      <button type="button" onclick="confirmDeleteCoach('${coachId}')" title="Permanently remove this coach and all their data" style="background:#e74c3c;border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 6px;border-radius:2px;">Delete</button>
+      <button type="button" onclick="cancelDeleteCoach('${coachId}')" style="background:transparent;border:1px solid #555;color:#aaa;cursor:pointer;font-family:'Barlow Condensed';font-size:10px;padding:2px 4px;border-radius:2px;">✕</button>
+    </div>
   `;
+}
+function toggleArchivedCoachesPanel(){
+  const panel=document.getElementById('archivedCoachesPanel');
+  const willShow=panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if(willShow)renderArchivedCoachesPanel();
+}
+function renderArchivedCoachesPanel(){
+  const panel=document.getElementById('archivedCoachesPanel');
+  const archived=coaches.filter(c=>c.archived);
+  if(!archived.length){
+    panel.innerHTML=`<div style="font-size:12px;color:var(--white-dim);">No archived coaches. Archiving a coach keeps all their logged hours and history, just hides them from the active Hours Grid above.</div>`;
+    return;
+  }
+  panel.innerHTML=`<div style="font-family:'Barlow Condensed';font-size:12px;color:var(--gold-light);letter-spacing:1px;margin-bottom:8px;">ARCHIVED COACHES (${archived.length})</div>`+
+    archived.map(c=>{
+      const seasonHrs=coachSeasonHrs(c);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray-border);">
+        <div><span style="font-weight:500;">${c.name||'(unnamed)'}</span> <span style="font-size:11px;color:var(--white-dim);margin-left:8px;">${seasonHrs} hrs logged this season</span></div>
+        <button class="btn btn-outline btn-sm" onclick="unarchiveCoach('${c.id}')">Unarchive</button>
+      </div>`;
+    }).join('');
+}
+function unarchiveCoach(coachId){
+  const c=coaches.find(x=>x.id===coachId);
+  if(!c)return;
+  c.archived=false;
+  saveCoaches();
+  logAudit(`Unarchived coach "${c.name}"`,'admin');
+  toast(`${c.name} unarchived \u2014 back on the active Hours Grid.`);
+  renderArchivedCoachesPanel();
+  refreshAllCoachViews();
+}
+function archiveCoach(coachId){
+  const c=coaches.find(x=>x.id===coachId);
+  if(!c)return;
+  c.archived=true;
+  saveCoaches();
+  logAudit(`Archived coach "${c.name}" (kept all hours/history, hidden from active Hours Grid)`,'admin');
+  toast(`${c.name} archived \u2014 hidden from the Hours Grid, but all logged hours are preserved. Unarchive any time from "Archived Coaches" below.`);
+  refreshAllCoachViews();
 }
 function confirmDeleteCoach(coachId){
   const i=coaches.findIndex(x=>x.id===coachId);
@@ -3173,8 +3236,7 @@ function confirmDeleteCoach(coachId){
   saveCoaches();
   logAudit(`Deleted coach "${label}"`,'admin');
   toast(`${label} deleted`);
-  buildTable();
-  refreshSummaryIfVisible();
+  refreshAllCoachViews();
 }
 function cancelDeleteCoach(coachId){
   buildTable();
