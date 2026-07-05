@@ -347,7 +347,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V10</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V11</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -401,6 +401,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       <div><div class="section-title">Coaches</div><div class="section-note">Onboarding, certifications, and USA Hockey compliance tracking</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" onclick="migrateExistingCoachesToProfiles()">Migrate Existing Coaches</button>
+        <button class="btn btn-outline btn-sm" onclick="addAllActiveToHoursGrid()">Add All Active to Hours Grid</button>
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
         <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
       </div>
@@ -1118,6 +1119,7 @@ function renderCoachProfiles(){
     const stale=c.complianceSeason&&c.complianceSeason!==season;
     const noCompliance=!c.complianceSeason;
     const pendingBorder=c.status==='pending'?'border:2px solid var(--red);':'';
+    const onGrid=c.status==='active'&&c.payrollCoachId&&coaches.some(x=>x.id===c.payrollCoachId&&!x.archived);
     return`<div class="cp-card" style="${pendingBorder}" onclick="openCoachProfileModal('${c.id}')">
       <div class="cp-card-top">
         ${c.photo?`<img src="${c.photo}" class="cp-photo" alt=""/>`:`<div class="cp-photo-placeholder">${(c.name||'?').charAt(0)}</div>`}
@@ -1126,6 +1128,10 @@ function renderCoachProfiles(){
           <div style="font-size:11px;color:var(--white-dim);">${c.email||'No email on file'}</div>
         </div>
       </div>
+      ${c.status==='active'?`<div style="margin-bottom:8px;">${onGrid?
+          `<span class="cp-badge ok">\u2713 On Hours Grid</span>`
+        :`<span class="cp-badge bad" style="margin-right:6px;">Not on Hours Grid</span><button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:10px;" onclick="event.stopPropagation();quickAddToHoursGrid('${c.id}')">+ Add Now</button>`
+      }</div>`:''}
       <div style="font-size:10px;color:var(--gold-light);margin-bottom:4px;">${CURRENT_LEVELS.filter(l=>c.currentLevels&&c.currentLevels[l]).map(l=>l.toUpperCase()).join(' \u00b7 ')||'No current levels set'}</div>
       <div class="cp-levels">
         ${COACH_LEVELS.map(l=>`<span class="cp-level-pill ${c.levels&&c.levels[l]?'done':'notdone'}">${l.toUpperCase()}</span>`).join('')}
@@ -1138,6 +1144,51 @@ function renderCoachProfiles(){
       </div>
     </div>`;
   }).join('');
+}
+
+// Bulk fixes exactly the gap this was built to solve: with dozens (or a hundred)
+// Active profiles, checking each one individually for whether it's actually linked to
+// the Hours Grid isn't realistic. This links every Active profile that isn't already
+// on the Hours Grid, all in one pass.
+function addAllActiveToHoursGrid(){
+  const needsLinking=coachProfiles.filter(c=>c.status==='active'&&(!c.payrollCoachId||!coaches.some(x=>x.id===c.payrollCoachId&&!x.archived)));
+  if(!needsLinking.length){
+    toast('Every Active coach is already on the Hours Grid.');
+    return;
+  }
+  if(!confirm(`Add ${needsLinking.length} Active coach${needsLinking.length!==1?'es':''} to the Hours Grid now?\n\n${needsLinking.map(c=>c.name).join(', ')}`))return;
+  needsLinking.forEach(c=>{
+    let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+    if(!pc){
+      pc=mkC(c.name,'volunteer');
+      coaches.push(pc);
+      c.payrollCoachId=pc.id;
+    }else{
+      pc.archived=false;
+    }
+  });
+  saveCoaches();
+  saveCoachProfilesData();
+  refreshAllCoachViews();
+  renderCoachProfiles();
+  toast(`Added ${needsLinking.length} coach${needsLinking.length!==1?'es':''} to the Hours Grid.`);
+}
+function quickAddToHoursGrid(id){
+  const c=coachProfiles.find(x=>x.id===id);
+  if(!c)return;
+  let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+  if(!pc){
+    pc=mkC(c.name,'volunteer');
+    coaches.push(pc);
+    c.payrollCoachId=pc.id;
+  }else{
+    pc.archived=false;
+  }
+  saveCoaches();
+  saveCoachProfilesData();
+  refreshAllCoachViews();
+  renderCoachProfiles();
+  toast(`${c.name} added to the Hours Grid`);
 }
 
 function openCoachProfileModal(id){
