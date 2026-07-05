@@ -38,6 +38,33 @@ input,select,button{font-family:'Barlow',sans-serif}
 .form-input:focus{border-color:var(--gold-dark)}
 .form-input::placeholder{color:var(--gray-light)}
 .form-select{background:var(--gray-mid);border:1px solid var(--gray-border);color:var(--white);padding:8px 10px;border-radius:5px;font-size:13px;outline:none;cursor:pointer}
+
+/* ===== COACH PROFILES ===== */
+.cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:16px}
+.cp-card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
+.cp-card:hover{border-color:var(--gold-dark)}
+.cp-card-top{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.cp-photo{width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--gray-mid);border:2px solid var(--gray-border);flex-shrink:0}
+.cp-photo-placeholder{width:56px;height:56px;border-radius:50%;background:var(--gray-mid);border:2px solid var(--gray-border);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);flex-shrink:0}
+.cp-name{font-weight:600;font-size:15px}
+.cp-levels{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.cp-level-pill{font-size:10px;padding:2px 7px;border-radius:10px;font-family:'Barlow Condensed';letter-spacing:.5px}
+.cp-level-pill.done{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.35)}
+.cp-level-pill.notdone{background:rgba(255,255,255,.04);color:var(--gray-light);border:1px solid var(--gray-border)}
+.cp-compliance{display:flex;gap:6px;font-size:10.5px;flex-wrap:wrap}
+.cp-badge{padding:3px 7px;border-radius:4px}
+.cp-badge.ok{background:rgba(46,204,113,.12);color:var(--green)}
+.cp-badge.bad{background:rgba(231,76,60,.12);color:var(--red)}
+.cp-badge.stale{background:rgba(243,156,18,.12);color:#f39c12}
+.cp-level-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.cp-level-btn{padding:6px 12px;border-radius:5px;font-size:12px;cursor:pointer;border:1px solid var(--gray-border);background:var(--gray-mid);color:var(--white-dim);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px;transition:all .15s}
+.cp-level-btn.active{background:rgba(46,204,113,.15);border-color:var(--green);color:var(--green)}
+.cp-photo-upload-wrap{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.cp-yn-toggle{display:flex;gap:6px}
+.cp-yn-btn{padding:6px 14px;border-radius:5px;font-size:12px;cursor:pointer;border:1px solid var(--gray-border);background:var(--gray-mid);color:var(--white-dim);font-family:'Barlow Condensed',sans-serif}
+.cp-yn-btn.active-yes{background:rgba(46,204,113,.15);border-color:var(--green);color:var(--green)}
+.cp-yn-btn.active-no{background:rgba(231,76,60,.15);border-color:var(--red);color:var(--red)}
+.cp-resume-box{border:1px dashed var(--gray-border);border-radius:6px;padding:10px 12px;font-size:12px;margin-top:4px}
 .card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:8px;padding:16px}
 .badge{display:inline-block;padding:2px 8px;border-radius:3px;font-family:'Barlow Condensed';font-size:11px;letter-spacing:.5px;font-weight:600}
 .badge-admin{background:rgba(231,76,60,.15);color:#e74c3c;border:1px solid rgba(231,76,60,.3)}
@@ -291,7 +318,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V6</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V7</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -340,6 +367,15 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
   <div id="tabBar"></div>
 
   <!-- HOURS PANEL -->
+  <div id="panel-coaches" class="panel">
+    <div class="section-header">
+      <div><div class="section-title">Coaches</div><div class="section-note">Onboarding, certifications, and USA Hockey compliance tracking</div></div>
+      <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
+    </div>
+    <div class="alert-bar">USA Hockey Insurance Number, Screening, and SafeSport status are annual requirements and must be re-verified every season. &nbsp;<a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="color:var(--gold-light);text-decoration:underline;">Verify on USA Hockey Registration &#8599;</a></div>
+    <div id="coachProfilesGrid" class="cp-grid"></div>
+  </div>
+
   <div id="panel-hours" class="panel active">
     <div class="section-header">
       <div><div class="section-title" id="hoursTitle">Hours Grid</div><div class="section-note">Left-click cell = +1 hr &nbsp;·&nbsp; Right-click = −1 hr &nbsp;·&nbsp; Min 0</div></div>
@@ -490,6 +526,58 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </div>
 
 <!-- MODALS -->
+<div id="modalCoachProfile" class="modal-backdrop hidden">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header"><div class="modal-title" id="cpModalTitle">Add Coach</div><button class="modal-close" onclick="closeModal('modalCoachProfile')">✕</button></div>
+
+    <div class="cp-photo-upload-wrap">
+      <img id="cpPhotoPreview" class="cp-photo" style="display:none;"/>
+      <div id="cpPhotoPlaceholder" class="cp-photo-placeholder">?</div>
+      <div>
+        <input type="file" accept="image/*" id="cpPhotoInput" onchange="handleCoachPhotoUpload(this)" style="font-size:11px;"/>
+        <div style="font-size:10px;color:var(--white-dim);margin-top:4px;">Photo — resized automatically</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;">
+      <div class="form-group"><span class="form-label">Name</span><input class="form-input" id="cpName" type="text"/></div>
+      <div class="form-group"><span class="form-label">Date of Birth</span><input class="form-input" id="cpDob" type="date"/></div>
+      <div class="form-group"><span class="form-label">Phone</span><input class="form-input" id="cpPhone" type="tel"/></div>
+      <div class="form-group"><span class="form-label">Email</span><input class="form-input" id="cpEmail" type="email"/></div>
+    </div>
+
+    <div class="form-group">
+      <span class="form-label">USA Hockey Coaching Modules Completed</span>
+      <div class="cp-level-picker" id="cpLevelPicker"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--gray-border);margin:16px 0 14px;padding-top:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+        <span class="form-label" style="margin:0;" id="cpComplianceLabel">Annual USA Hockey Compliance</span>
+        <a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="font-size:11px;color:var(--gold-light);">Verify on USA Hockey &#8599;</a>
+      </div>
+      <div class="form-group"><span class="form-label">USA Hockey Insurance Number</span><input class="form-input" id="cpInsurance" type="text"/></div>
+      <div class="form-group"><span class="form-label">Screening Updated</span><div class="cp-yn-toggle" id="cpScreeningToggle"></div></div>
+      <div class="form-group"><span class="form-label">SafeSport Certified</span><div class="cp-yn-toggle" id="cpSafeSportToggle"></div></div>
+    </div>
+
+    <div class="form-group"><span class="form-label">Coaching Experience</span><textarea class="form-input" id="cpCoachingExp" rows="3" style="resize:vertical;width:100%;font-family:inherit;"></textarea></div>
+    <div class="form-group"><span class="form-label">Playing Experience</span><textarea class="form-input" id="cpPlayingExp" rows="3" style="resize:vertical;width:100%;font-family:inherit;"></textarea></div>
+
+    <div class="form-group">
+      <span class="form-label">Resume / CV</span>
+      <div class="cp-resume-box" id="cpResumeBox"></div>
+      <input type="file" accept=".pdf,.doc,.docx" id="cpResumeInput" onchange="handleResumeUpload(this)" style="font-size:11px;margin-top:6px;"/>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="cpDeleteBtn" onclick="deleteCoachProfile()" style="margin-right:auto;">Delete Profile</button>
+      <button class="btn btn-outline" onclick="closeModal('modalCoachProfile')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveCoachProfileModal()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div id="modalCoach" class="modal-backdrop hidden">
   <div class="modal">
     <div class="modal-header"><div class="modal-title" id="coachModalTitle">Add Coach</div><button class="modal-close" onclick="closeModal('modalCoach')">✕</button></div>
@@ -902,6 +990,230 @@ function refreshAllCoachViews(){
   try{buildMatrixView();}catch(e){}
   try{if(typeof currentAcctMonthKey!=='undefined')buildAcctView();}catch(e){}
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// COACH PROFILES — onboarding, certifications, USA Hockey compliance. This is
+// deliberately a SEPARATE data store ('jag_coach_profiles') from the payroll
+// 'coaches' array above -- they track different things about the same people
+// (personal/certification info vs. hours worked), and not every coach profile
+// necessarily needs an hours-tracking entry or vice versa.
+// ══════════════════════════════════════════════════════════════════════════
+const COACH_LEVELS=['8u','10u','12u','14u','16u','18u'];
+function currentSeasonLabel(){
+  const d=new Date();
+  const y=d.getMonth()>=6?d.getFullYear():d.getFullYear()-1; // hockey season runs Jul-Jun
+  return y+'-'+String(y+1).slice(2);
+}
+function mkCoachProfile(){
+  return{
+    id:'cp'+Date.now()+Math.random().toString(36).slice(2,6),
+    name:'',dob:'',phone:'',email:'',photo:'',
+    levels:{},
+    usaHockeyId:'',screeningUpdated:false,safeSport:false,complianceSeason:'',
+    coachingExperience:'',playingExperience:'',
+    resumeFileName:'',resumeFileData:''
+  };
+}
+function loadCoachProfiles(){
+  try{
+    const s=localStorage.getItem('jag_coach_profiles');
+    if(s){const p=JSON.parse(s);if(Array.isArray(p))return p;}
+  }catch(e){}
+  return[];
+}
+function saveCoachProfilesData(){localStorage.setItem('jag_coach_profiles',JSON.stringify(coachProfiles));}
+let coachProfiles=loadCoachProfiles();
+let editingCoachProfileId=null;
+let cpPendingPhoto=null;
+let cpPendingResume=null;
+let cpLevelState={};
+let cpYNState={};
+
+function renderCoachProfiles(){
+  const grid=document.getElementById('coachProfilesGrid');
+  if(!grid)return;
+  if(!coachProfiles.length){
+    grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--white-dim);padding:40px;">No coach profiles yet. Click "+ Add Coach" to onboard your first coach.</div>';
+    return;
+  }
+  const season=currentSeasonLabel();
+  grid.innerHTML=coachProfiles.map(c=>{
+    const stale=c.complianceSeason&&c.complianceSeason!==season;
+    const noCompliance=!c.complianceSeason;
+    return`<div class="cp-card" onclick="openCoachProfileModal('${c.id}')">
+      <div class="cp-card-top">
+        ${c.photo?`<img src="${c.photo}" class="cp-photo" alt=""/>`:`<div class="cp-photo-placeholder">${(c.name||'?').charAt(0)}</div>`}
+        <div>
+          <div class="cp-name">${c.name||'(unnamed)'}</div>
+          <div style="font-size:11px;color:var(--white-dim);">${c.email||'No email on file'}</div>
+        </div>
+      </div>
+      <div class="cp-levels">
+        ${COACH_LEVELS.map(l=>`<span class="cp-level-pill ${c.levels&&c.levels[l]?'done':'notdone'}">${l.toUpperCase()}</span>`).join('')}
+      </div>
+      <div class="cp-compliance">
+        <span class="cp-badge ${c.usaHockeyId?'ok':'bad'}">${c.usaHockeyId?'Insurance \u2713':'No Insurance #'}</span>
+        <span class="cp-badge ${c.screeningUpdated?'ok':'bad'}">Screening ${c.screeningUpdated?'\u2713':'\u2717'}</span>
+        <span class="cp-badge ${c.safeSport?'ok':'bad'}">SafeSport ${c.safeSport?'\u2713':'\u2717'}</span>
+        ${noCompliance?'':stale?`<span class="cp-badge stale">Needs ${season} Renewal</span>`:`<span class="cp-badge ok">${season} Verified</span>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCoachProfileModal(id){
+  editingCoachProfileId=id||null;
+  const c=id?coachProfiles.find(x=>x.id===id):mkCoachProfile();
+  if(!c){toast('Coach profile not found','terror');return;}
+  cpPendingPhoto=c.photo||null;
+  cpPendingResume=c.resumeFileData?{name:c.resumeFileName,data:c.resumeFileData}:null;
+
+  document.getElementById('cpModalTitle').textContent=id?'Edit Coach':'Add Coach';
+  document.getElementById('cpDeleteBtn').style.display=id?'inline-flex':'none';
+  document.getElementById('cpName').value=c.name||'';
+  document.getElementById('cpDob').value=c.dob||'';
+  document.getElementById('cpPhone').value=c.phone||'';
+  document.getElementById('cpEmail').value=c.email||'';
+  document.getElementById('cpInsurance').value=c.usaHockeyId||'';
+  document.getElementById('cpCoachingExp').value=c.coachingExperience||'';
+  document.getElementById('cpPlayingExp').value=c.playingExperience||'';
+  document.getElementById('cpComplianceLabel').textContent=`Annual USA Hockey Compliance \u2014 ${currentSeasonLabel()} Season`;
+
+  renderCoachPhotoPreview();
+  renderLevelPicker(c.levels||{});
+  renderYNToggle('cpScreeningToggle','screeningUpdated',c.screeningUpdated);
+  renderYNToggle('cpSafeSportToggle','safeSport',c.safeSport);
+  renderResumeBox();
+
+  document.getElementById('modalCoachProfile').classList.remove('hidden');
+}
+
+function renderCoachPhotoPreview(){
+  const img=document.getElementById('cpPhotoPreview');
+  const ph=document.getElementById('cpPhotoPlaceholder');
+  if(cpPendingPhoto){img.src=cpPendingPhoto;img.style.display='block';ph.style.display='none';}
+  else{img.style.display='none';ph.style.display='flex';}
+}
+function handleCoachPhotoUpload(inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file)return;
+  if(!file.type.startsWith('image/')){toast('Please choose an image file','terror');return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const maxDim=200;
+      let w=img.width,h=img.height;
+      if(w>=h){if(w>maxDim){h=Math.round(h*maxDim/w);w=maxDim;}}
+      else{if(h>maxDim){w=Math.round(w*maxDim/h);h=maxDim;}}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      cpPendingPhoto=canvas.toDataURL('image/jpeg',0.85);
+      renderCoachPhotoPreview();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderLevelPicker(levels){
+  cpLevelState=Object.assign({},levels);
+  const wrap=document.getElementById('cpLevelPicker');
+  wrap.innerHTML=COACH_LEVELS.map(l=>`<div class="cp-level-btn ${cpLevelState[l]?'active':''}" onclick="toggleCpLevel('${l}')">${l.toUpperCase()}${cpLevelState[l]?' \u2713':''}</div>`).join('');
+}
+function toggleCpLevel(l){
+  cpLevelState[l]=!cpLevelState[l];
+  renderLevelPicker(cpLevelState);
+}
+
+function renderYNToggle(elId,field,val){
+  cpYNState[field]=!!val;
+  const wrap=document.getElementById(elId);
+  wrap.innerHTML=`
+    <div class="cp-yn-btn ${cpYNState[field]?'active-yes':''}" onclick="setCpYN('${elId}','${field}',true)">Yes</div>
+    <div class="cp-yn-btn ${!cpYNState[field]?'active-no':''}" onclick="setCpYN('${elId}','${field}',false)">No</div>
+  `;
+}
+function setCpYN(elId,field,val){
+  cpYNState[field]=val;
+  renderYNToggle(elId,field,val);
+}
+
+function renderResumeBox(){
+  const box=document.getElementById('cpResumeBox');
+  if(cpPendingResume){
+    box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;">
+      <span>\u{1F4C4} ${cpPendingResume.name}</span>
+      <div style="display:flex;gap:10px;">
+        <a href="${cpPendingResume.data}" download="${cpPendingResume.name}" style="color:var(--gold-light);text-decoration:underline;font-size:11px;">Download</a>
+        <span style="color:var(--red);cursor:pointer;font-size:11px;" onclick="removeCpResume()">Remove</span>
+      </div>
+    </div>`;
+  }else{
+    box.innerHTML=`<span style="color:var(--white-dim);">No resume/CV uploaded yet.</span>`;
+  }
+}
+function removeCpResume(){ cpPendingResume=null; renderResumeBox(); }
+function handleResumeUpload(inputEl){
+  const file=inputEl.files&&inputEl.files[0];
+  if(!file)return;
+  if(file.size>5*1024*1024){toast('File too large \u2014 please keep resumes under 5MB','terror');return;}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    cpPendingResume={name:file.name,data:e.target.result};
+    renderResumeBox();
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveCoachProfileModal(){
+  const name=document.getElementById('cpName').value.trim();
+  if(!name){toast('Name is required','terror');return;}
+  let c;
+  if(editingCoachProfileId){
+    c=coachProfiles.find(x=>x.id===editingCoachProfileId);
+    if(!c){toast('Coach profile not found','terror');return;}
+  }else{
+    c=mkCoachProfile();
+    coachProfiles.push(c);
+  }
+  c.name=name;
+  c.dob=document.getElementById('cpDob').value;
+  c.phone=document.getElementById('cpPhone').value.trim();
+  c.email=document.getElementById('cpEmail').value.trim();
+  c.photo=cpPendingPhoto||'';
+  c.levels=Object.assign({},cpLevelState);
+  c.usaHockeyId=document.getElementById('cpInsurance').value.trim();
+  c.screeningUpdated=!!cpYNState.screeningUpdated;
+  c.safeSport=!!cpYNState.safeSport;
+  // Mark compliance verified for the CURRENT season whenever any of the three
+  // annual fields are touched -- this is what next season's "needs renewal" flag
+  // compares against.
+  if(c.usaHockeyId||c.screeningUpdated||c.safeSport)c.complianceSeason=currentSeasonLabel();
+  c.coachingExperience=document.getElementById('cpCoachingExp').value;
+  c.playingExperience=document.getElementById('cpPlayingExp').value;
+  c.resumeFileName=cpPendingResume?cpPendingResume.name:'';
+  c.resumeFileData=cpPendingResume?cpPendingResume.data:'';
+
+  saveCoachProfilesData();
+  closeModal('modalCoachProfile');
+  renderCoachProfiles();
+  toast(`${name} ${editingCoachProfileId?'updated':'added'}`);
+}
+
+function deleteCoachProfile(){
+  if(!editingCoachProfileId)return;
+  const c=coachProfiles.find(x=>x.id===editingCoachProfileId);
+  if(!c)return;
+  if(!confirm(`Delete ${c.name}'s profile? This permanently removes their onboarding info, certifications, and resume.`))return;
+  coachProfiles=coachProfiles.filter(x=>x.id!==editingCoachProfileId);
+  saveCoachProfilesData();
+  closeModal('modalCoachProfile');
+  renderCoachProfiles();
+  toast(`${c.name} profile deleted`);
+}
+
 function cleanOrphanedCoachHours(){
   const orphans=findOrphanedCoachHours();
   if(!orphans.length){
@@ -1088,6 +1400,10 @@ function buildTabBar(){
   tabBar.innerHTML='';
 
   const tabs=[];
+  // Coach onboarding/profiles — admin and editor only (personal data: DOB, phone, etc.)
+  if(isEdit){
+    tabs.push({id:'coaches',label:'Coaches'});
+  }
   // Hours grid — admin, editor, viewer see it
   if(role!=='accountant'){
     tabs.push({id:'hours',label:'Hours Grid'});
@@ -1153,6 +1469,7 @@ function startApp(){
 function switchTab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${n}`));
+  if(n==='coaches'){renderCoachProfiles();}
   if(n==='hours'){buildTable();}
   if(n==='monthly'){
     buildAcctMonthPicker();
