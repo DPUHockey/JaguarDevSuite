@@ -347,7 +347,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V13</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V14</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -603,8 +603,22 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
       </div>
       <div class="form-group"><span class="form-label">USA Hockey Insurance Number</span><input class="form-input" id="cpInsurance" type="text"/></div>
       <div class="form-group"><span class="form-label">Zip Code <span style="text-transform:none;color:var(--white-dim);">(needed with DOB to verify on USA Hockey)</span></span><input class="form-input" id="cpZip" type="text" inputmode="numeric" maxlength="10" style="max-width:140px;"/></div>
-      <div class="form-group"><span class="form-label">Screening Updated</span><div class="cp-yn-toggle" id="cpScreeningToggle"></div></div>
-      <div class="form-group"><span class="form-label">SafeSport Certified</span><div class="cp-yn-toggle" id="cpSafeSportToggle"></div></div>
+      <div class="form-group">
+        <span class="form-label">Screening Updated</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div class="cp-yn-toggle" id="cpScreeningToggle"></div>
+          <span style="font-size:11px;color:var(--white-dim);">Exp. Date</span>
+          <input class="form-input" id="cpScreeningExp" type="date" style="max-width:150px;"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <span class="form-label">SafeSport Certified</span>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div class="cp-yn-toggle" id="cpSafeSportToggle"></div>
+          <span style="font-size:11px;color:var(--white-dim);">Exp. Date</span>
+          <input class="form-input" id="cpSafeSportExp" type="date" style="max-width:150px;"/>
+        </div>
+      </div>
     </div>
 
     <div class="form-group"><span class="form-label">Coaching Experience</span><textarea class="form-input" id="cpCoachingExp" rows="3" style="resize:vertical;width:100%;font-family:inherit;"></textarea></div>
@@ -1053,6 +1067,13 @@ function refreshAllCoachViews(){
 // ══════════════════════════════════════════════════════════════════════════
 const COACH_LEVELS=['8u','10u','12u','14u','16u','18u'];
 const CURRENT_LEVELS=['lj','ph','adm','ih','travel'];
+// Local calendar date as YYYY-MM-DD -- deliberately not toISOString(), which reports
+// UTC and can roll over to the next calendar day in the evening for anyone west of
+// Greenwich (same bug already fixed elsewhere in this suite).
+function todayISO(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function currentSeasonLabel(){
   const d=new Date();
   const y=d.getMonth()>=6?d.getFullYear():d.getFullYear()-1; // hockey season runs Jul-Jun
@@ -1063,7 +1084,7 @@ function mkCoachProfile(){
     id:'cp'+Date.now()+Math.random().toString(36).slice(2,6),
     name:'',dob:'',phone:'',email:'',address:'',zip:'',photo:'',
     levels:{},currentLevels:{},
-    usaHockeyId:'',screeningUpdated:false,safeSport:false,complianceSeason:'',
+    usaHockeyId:'',screeningUpdated:false,screeningExpDate:'',safeSport:false,safeSportExpDate:'',complianceSeason:'',
     coachingExperience:'',playingExperience:'',
     resumeFileName:'',resumeFileData:'',
     status:'pending', // 'active' | 'pending' | 'rejected' | 'archived'
@@ -1124,6 +1145,9 @@ function renderCoachProfiles(){
     const noCompliance=!c.complianceSeason;
     const pendingBorder=c.status==='pending'?'border:2px solid var(--red);':'';
     const onGrid=c.status==='active'&&c.payrollCoachId&&coaches.some(x=>x.id===c.payrollCoachId&&!x.archived);
+    const today=todayISO();
+    const screeningExpired=c.screeningExpDate&&c.screeningExpDate<today;
+    const safeSportExpired=c.safeSportExpDate&&c.safeSportExpDate<today;
     return`<div class="cp-card" style="${pendingBorder}" onclick="openCoachProfileModal('${c.id}')">
       <div class="cp-card-top">
         ${c.photo?`<img src="${c.photo}" class="cp-photo" alt=""/>`:`<div class="cp-photo-placeholder">${(c.name||'?').charAt(0)}</div>`}
@@ -1142,8 +1166,8 @@ function renderCoachProfiles(){
       </div>
       <div class="cp-compliance">
         <span class="cp-badge ${c.usaHockeyId?'ok':'bad'}">${c.usaHockeyId?'Insurance \u2713':'No Insurance #'}</span>
-        <span class="cp-badge ${c.screeningUpdated?'ok':'bad'}">Screening ${c.screeningUpdated?'\u2713':'\u2717'}</span>
-        <span class="cp-badge ${c.safeSport?'ok':'bad'}">SafeSport ${c.safeSport?'\u2713':'\u2717'}</span>
+        <span class="cp-badge ${screeningExpired?'stale':c.screeningUpdated?'ok':'bad'}">Screening ${screeningExpired?'Expired '+c.screeningExpDate:c.screeningUpdated?'\u2713':'\u2717'}</span>
+        <span class="cp-badge ${safeSportExpired?'stale':c.safeSport?'ok':'bad'}">SafeSport ${safeSportExpired?'Expired '+c.safeSportExpDate:c.safeSport?'\u2713':'\u2717'}</span>
         ${noCompliance?'':stale?`<span class="cp-badge stale">Needs ${season} Renewal</span>`:`<span class="cp-badge ok">${season} Verified</span>`}
       </div>
     </div>`;
@@ -1245,6 +1269,8 @@ function openCoachProfileModal(id){
   renderCoachPhotoPreview();
   renderLevelPicker(c.levels||{});
   renderCurrentLevelPicker(c.currentLevels||{});
+  document.getElementById('cpScreeningExp').value=c.screeningExpDate||'';
+  document.getElementById('cpSafeSportExp').value=c.safeSportExpDate||'';
   renderYNToggle('cpScreeningToggle','screeningUpdated',c.screeningUpdated);
   renderYNToggle('cpSafeSportToggle','safeSport',c.safeSport);
   renderResumeBox();
@@ -1356,7 +1382,9 @@ function gatherCoachProfileFormFields(c){
   c.currentLevels=Object.assign({},cpCurrentLevelState);
   c.usaHockeyId=document.getElementById('cpInsurance').value.trim();
   c.screeningUpdated=!!cpYNState.screeningUpdated;
+  c.screeningExpDate=document.getElementById('cpScreeningExp').value;
   c.safeSport=!!cpYNState.safeSport;
+  c.safeSportExpDate=document.getElementById('cpSafeSportExp').value;
   // Mark compliance verified for the CURRENT season whenever any of the three
   // annual fields are touched -- this is what next season's "needs renewal" flag
   // compares against.
