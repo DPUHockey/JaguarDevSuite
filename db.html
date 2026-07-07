@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V17</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V18</div>
 
 <nav>
   <div class="nav-left">
@@ -1180,6 +1180,52 @@ function dciMoveToIH(row){
     }
     localStorage.setItem('ih_roster_v2',JSON.stringify(d));
     return true;
+  }catch(e){ return false; }
+}
+// Reverses dciMoveToAdm -- used when undoing a promotion that had actually been
+// moved immediately. Safely no-ops (returns false) if they were never actually
+// there, e.g. if the promotion had used Next Session instead.
+function dciRemoveFromAdm(row){
+  const matchKey=(row.first_name||'').toLowerCase().trim()+'|'+(row.last_name||'').toLowerCase().trim()+'|'+(row.birthdate||'').trim();
+  try{
+    const raw=localStorage.getItem('adm_roster_v1');
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(!d.SEASONS||!d.currentSeason||!d.SEASONS[d.currentSeason])return false;
+    const season=d.SEASONS[d.currentSeason];
+    const before=(season.masterList||[]).length;
+    season.masterList=(season.masterList||[]).filter(x=>{
+      const k=(x.first||'').toLowerCase().trim()+'|'+(x.last||'').toLowerCase().trim()+'|'+(x.birthdate||'').trim();
+      return !(k===matchKey&&x.promotedInFrom==='devcheckin');
+    });
+    localStorage.setItem('adm_roster_v1',JSON.stringify(d));
+    return season.masterList.length<before;
+  }catch(e){ return false; }
+}
+// Reverses dciMoveToIH -- same safe no-op behavior if never actually moved.
+function dciRemoveFromIH(row){
+  const matchKey=(row.first_name||'').toLowerCase().trim()+'|'+(row.last_name||'').toLowerCase().trim()+'|'+(row.birthdate||'').trim();
+  try{
+    const raw=localStorage.getItem('ih_roster_v2');
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(!d.SEASONS||!d.currentSeason||!d.SEASONS[d.currentSeason])return false;
+    const season=d.SEASONS[d.currentSeason];
+    let removedIds=[];
+    const before=(season.masterList||[]).length;
+    season.masterList=(season.masterList||[]).filter(x=>{
+      const k=(x.first||'').toLowerCase().trim()+'|'+(x.last||'').toLowerCase().trim()+'|'+(x.birthdate||'').trim();
+      if(k===matchKey){ removedIds.push(x.id); return false; }
+      return true;
+    });
+    if(season.main)season.main=season.main.filter(x=>!removedIds.includes(x.id));
+    if(season.rosters){
+      Object.keys(season.rosters).forEach(tid=>{
+        season.rosters[tid]=(season.rosters[tid]||[]).filter(x=>!removedIds.includes(x.id));
+      });
+    }
+    localStorage.setItem('ih_roster_v2',JSON.stringify(d));
+    return removedIds.length>0;
   }catch(e){ return false; }
 }
 function confirmPromo(){
@@ -2357,7 +2403,9 @@ function undoLastPromotion(idx){
   const r=DB.master[idx];if(!r)return;
   if(!r._promoHistory||!r._promoHistory.length){showAlert('No promotions to undo.','err');return;}
   const last=r._promoHistory[r._promoHistory.length-1];
-  jagConfirm('Undo promotion to '+last.level+' ('+(last.date||'no date')+')? This reverts '+(r.first_name||'')+' '+(r.last_name||'')+' back to their previous level.',function(){
+  const crossApp=(last.level==='ADM'||last.level==='InHouse');
+  const warnMsg='Undo promotion to '+last.level+' ('+(last.date||'no date')+')? This reverts '+(r.first_name||'')+' '+(r.last_name||'')+' back to their previous level.'+(crossApp?' If this was an Immediate promotion, they will also be removed from '+last.level+String.fromCharCode(39)+'s live roster on this device.':'');
+  jagConfirm(warnMsg,function(){
     r._promoHistory.pop();
     for(let s=1;s<=6;s++){
       const arr=DB['promo'+s];if(!arr)continue;
@@ -2372,10 +2420,15 @@ function undoLastPromotion(idx){
     }
     updateSessionRowLevel(r,r.level);
     saveDB();
+    let crossAppMsg='';
+    if(crossApp){
+      const removed=last.level==='ADM'?dciRemoveFromAdm(r):dciRemoveFromIH(r);
+      crossAppMsg=removed?(' Also removed from '+last.level+String.fromCharCode(39)+'s live roster.'):'';
+    }
     renderAll();
     updateStats();
     openPlayerCard(idx);
-    showAlert('Promotion undone \u2014 back to '+r.level,'ok');
+    showAlert('Promotion undone \u2014 back to '+r.level+'.'+crossAppMsg,'ok');
   });
 }
 function openPlayerCard(idx){
