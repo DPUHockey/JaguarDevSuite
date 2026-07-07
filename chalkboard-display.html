@@ -16,7 +16,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;}
 #board-surface.white{background:#fafafa;background-image:linear-gradient(rgba(0,0,0,.015) 1px,transparent 1px);background-size:100% 42px;box-shadow:inset 0 0 50px rgba(0,0,0,.08);}
 #board-notes-area{position:relative;width:100%;height:100%;}
 .board-note{position:absolute;overflow:hidden;}
-.board-note-inner{width:100%;height:100%;overflow:hidden;}
+.board-note-inner{width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;}
 .board-note-text{white-space:pre-wrap;word-wrap:break-word;line-height:1.35;}
 .board-note.chalk .board-note-text{color:#fff;text-shadow:0 0 1px rgba(255,255,255,.5),0 0 8px rgba(255,255,255,.15);}
 .board-note.white .board-note-text{text-shadow:0 1px 0 rgba(0,0,0,.06);}
@@ -71,7 +71,7 @@ function render(){
   area.innerHTML=CB.notes.map(n=>{
     const w=n.w||260, h=n.h||140, x=n.x||0, y=n.y||0;
     const body=n.type==='image'
-      ? `<img class="board-note-img" src="${escapeHtml(n.imgUrl)}" alt="" style="max-height:${n.text?'70%':'100%'};object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${noteFontStyle(n)}margin-top:6px;">${escapeHtml(n.text)}</div>`:''}`
+      ? `<img class="board-note-img" src="${escapeHtml(n.imgUrl)}" alt="" style="flex:1;min-height:0;width:100%;object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${noteFontStyle(n)}margin-top:6px;text-align:center;flex-shrink:0;">${escapeHtml(n.text)}</div>`:''}`
       : `<div class="board-note-text" style="${noteFontStyle(n)}">${escapeHtml(n.text)}</div>`;
     return `<div class="board-note ${CB.boardStyle}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;">
       <div class="board-note-inner">${body}</div>
