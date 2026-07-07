@@ -78,16 +78,6 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 textarea.fi{resize:vertical;font-family:inherit;}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
 
-/* ── DISPLAY MODE (2nd screen, fullscreen, no chrome) ── */
-body.display-mode nav,body.display-mode .hero-strip,body.display-mode .card:not(.board-card){display:none!important;}
-body.display-mode{height:100vh;overflow:hidden;}
-body.display-mode .wrap{padding:12px;max-width:100%;height:100vh;display:flex;flex-direction:column;}
-body.display-mode .board-card{margin-bottom:0;border:none;background:none;padding:0;flex:1;display:flex;min-height:0;}
-body.display-mode .board-frame{flex:1;display:flex;min-height:0;}
-body.display-mode .board-surface{flex:1;min-height:0;}
-.exit-display-btn{position:fixed;top:14px;right:14px;z-index:999;padding:8px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.4);color:#fff;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;display:none;}
-body.display-mode .exit-display-btn{display:block;}
-
 .site-footer{text-align:center;padding:24px;font-size:11px;color:var(--dim);}
 </style>
 </head>
@@ -98,7 +88,7 @@ body.display-mode .exit-display-btn{display:block;}
     <div class="nav-logo">JAGUAR</div>
     <div class="nav-sub">Chalkboard</div>
   </div>
-  <button class="nav-btn" onclick="cbEnterDisplayMode()">&#128225; Open on 2nd Screen</button>
+  <button class="nav-btn" onclick="cbOpenDisplayWindow()">&#128225; Open on 2nd Screen</button>
 </nav>
 
 <div class="hero-strip">
@@ -108,7 +98,6 @@ body.display-mode .exit-display-btn{display:block;}
   </div>
 </div>
 
-<button class="exit-display-btn" onclick="cbExitDisplayMode()">&#10005; Exit Display Mode</button>
 
 <div class="wrap">
 
@@ -140,7 +129,8 @@ body.display-mode .exit-display-btn{display:block;}
     <div class="card-title">Add to the Board</div>
     <div class="ctrl-row">
       <button class="btn" onclick="cbOpenAddModal('text')">&#9999;&#65039; Add Note</button>
-      <button class="btn-outline" onclick="cbOpenAddModal('image')">&#128247; Add Picture (link)</button>
+      <button class="btn-outline" onclick="cbOpenAddModal('image')">&#128247; Add Picture</button>
+      <button class="btn-danger" style="margin-left:auto;" onclick="cbClearBoard()">&#128465; Erase Entire Board</button>
     </div>
   </div>
 
@@ -186,6 +176,17 @@ function loadCB(){
 loadCB();
 
 const CB_CHALK_COLORS=[{v:'#ffffff',l:'White Chalk'},{v:'#fff27a',l:'Yellow Chalk'},{v:'#ffb3d9',l:'Pink Chalk'},{v:'#a8d8ff',l:'Blue Chalk'},{v:'#b3ffb3',l:'Green Chalk'}];
+const CB_FONTS=['Kalam','Caveat','Shadows Into Light','Permanent Marker','Gochi Hand','Architects Daughter'];
+function cbNoteFontStyle(n){
+  const font=n.font||CB.font;
+  const decos=[];
+  if(n.underline)decos.push('underline');
+  if(n.strike)decos.push('line-through');
+  return `font-family:'${font}',cursive;font-size:${n.fontSize||28}px;color:${n.color};`
+    +(n.bold?'font-weight:700;':'')
+    +(n.italic?'font-style:italic;':'')
+    +(decos.length?`text-decoration:${decos.join(' ')};`:'');
+}
 const CB_MARKER_COLORS=[{v:'#1a1a1a',l:'Black Marker'},{v:'#2050c0',l:'Blue Marker'},{v:'#d02020',l:'Red Marker'},{v:'#208020',l:'Green Marker'},{v:'#a020c0',l:'Purple Marker'}];
 
 // ── BOARD STYLE / FONT ──
@@ -234,6 +235,22 @@ function cbOpenAddModal(type,editId){
   document.getElementById('cbAddModalTitle').textContent=editId?'Edit '+(type==='image'?'Picture':'Note'):(type==='image'?'Add Picture':'Add Note');
   const colors=CB.boardStyle==='chalk'?CB_CHALK_COLORS:CB_MARKER_COLORS;
   const defaultColor=existing?existing.color:colors[0].v;
+  const defaultFont=existing&&existing.font?existing.font:CB.font;
+  const fontOptions=CB_FONTS.map(f=>`<option value="${f}"${f===defaultFont?' selected':''}>${f}</option>`).join('');
+  const formatRow=(id)=>`
+      <div class="fg">
+        <span class="fl">Writing Style</span>
+        <select id="cbF-font" class="fi">${fontOptions}</select>
+      </div>
+      <div class="fg">
+        <span class="fl">Formatting</span>
+        <div style="display:flex;gap:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cbF-bold"${existing&&existing.bold?' checked':''}/> Bold</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cbF-italic"${existing&&existing.italic?' checked':''}/> Italic</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cbF-underline"${existing&&existing.underline?' checked':''}/> Underline</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="cbF-strike"${existing&&existing.strike?' checked':''}/> Strikethrough</label>
+        </div>
+      </div>`;
   if(type==='text'){
     document.getElementById('cbAddModalBody').innerHTML=`
       <div class="fg">
@@ -255,6 +272,7 @@ function cbOpenAddModal(type,editId){
           <option value="52"${existing&&existing.fontSize===52?' selected':''}>Huge</option>
         </select>
       </div>
+      ${formatRow()}
     `;
   }else{
     cbPendingImageData=existing&&existing.imgUrl&&existing.imgUrl.startsWith('data:')?existing.imgUrl:null;
@@ -278,6 +296,7 @@ function cbOpenAddModal(type,editId){
           ${colors.map(c=>`<option value="${c.v}"${c.v===defaultColor?' selected':''}>${c.l}</option>`).join('')}
         </select>
       </div>
+      ${formatRow()}
     `;
   }
   document.getElementById('cbAddModal').classList.remove('hidden');
@@ -296,25 +315,30 @@ function cbNextPosition(){
 function cbSaveNote(){
   const text=(document.getElementById('cbF-text').value||'').trim();
   const color=document.getElementById('cbF-color').value;
+  const font=document.getElementById('cbF-font').value;
+  const bold=document.getElementById('cbF-bold').checked;
+  const italic=document.getElementById('cbF-italic').checked;
+  const underline=document.getElementById('cbF-underline').checked;
+  const strike=document.getElementById('cbF-strike').checked;
   if(cbAddType==='text'){
     if(!text){ alert('Please enter some text for the note.'); return; }
     const fontSize=parseInt(document.getElementById('cbF-size').value,10);
     if(cbEditingId){
       const n=CB.notes.find(x=>x.id===cbEditingId);
-      if(n)Object.assign(n,{text,color,fontSize});
+      if(n)Object.assign(n,{text,color,fontSize,font,bold,italic,underline,strike});
     }else{
       const pos=cbNextPosition();
-      CB.notes.push({id:uid(),type:'text',text,color,fontSize,x:pos.x,y:pos.y,w:260,h:140,dateAdded:new Date().toISOString()});
+      CB.notes.push({id:uid(),type:'text',text,color,fontSize,font,bold,italic,underline,strike,x:pos.x,y:pos.y,w:260,h:140,dateAdded:new Date().toISOString()});
     }
   }else{
     const imgUrl=cbPendingImageData||(document.getElementById('cbF-img').value||'').trim();
     if(!imgUrl){ alert('Please enter an image URL or browse for a file.'); return; }
     if(cbEditingId){
       const n=CB.notes.find(x=>x.id===cbEditingId);
-      if(n)Object.assign(n,{imgUrl,text,color});
+      if(n)Object.assign(n,{imgUrl,text,color,font,bold,italic,underline,strike});
     }else{
       const pos=cbNextPosition();
-      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,x:pos.x,y:pos.y,w:280,h:220,dateAdded:new Date().toISOString()});
+      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,font,bold,italic,underline,strike,x:pos.x,y:pos.y,w:280,h:220,dateAdded:new Date().toISOString()});
     }
   }
   cbPendingImageData=null;
@@ -333,7 +357,6 @@ function cbDeleteNote(id){
 let cbDragId=null, cbDragStartX=0, cbDragStartY=0, cbDragOrigX=0, cbDragOrigY=0;
 let cbResizeId=null, cbResizeStartX=0, cbResizeStartY=0, cbResizeOrigW=0, cbResizeOrigH=0;
 function cbStartDrag(e,id){
-  if(document.body.classList.contains('display-mode'))return;
   if(e.target.closest('button')||e.target.closest('.resize-handle'))return;
   const n=CB.notes.find(x=>x.id===id);
   if(!n)return;
@@ -361,7 +384,6 @@ function cbOnDragEnd(){
   cbDragId=null;
 }
 function cbStartResize(e,id){
-  if(document.body.classList.contains('display-mode'))return;
   const n=CB.notes.find(x=>x.id===id);
   if(!n)return;
   cbResizeId=id;
@@ -395,25 +417,48 @@ function cbEscapeHtml(s){
   d.textContent=s;
   return d.innerHTML;
 }
+function cbClearBoard(){
+  if(!CB.notes.length){ alert('The board is already empty.'); return; }
+  if(!confirm(`Erase all ${CB.notes.length} item(s) from the board? This cannot be undone.`))return;
+  CB.notes=[];
+  saveCB();
+  cbRenderBoard();
+}
+// Older notes saved before drag/resize existed have no x/y/w/h -- without this,
+// they'd all silently stack at (0,0), making everything but the top one
+// unreachable. Spreads them out and gives them real sizes, once, then saves it.
+function cbMigrateLegacyPositions(){
+  let changed=false;
+  CB.notes.forEach((n,i)=>{
+    if(typeof n.x!=='number'||typeof n.y!=='number'){
+      const pos=cbNextPosition();
+      n.x=pos.x; n.y=pos.y;
+      changed=true;
+    }
+    if(typeof n.w!=='number'){ n.w=n.type==='image'?280:260; changed=true; }
+    if(typeof n.h!=='number'){ n.h=n.type==='image'?220:140; changed=true; }
+  });
+  if(changed)saveCB();
+}
 function cbRenderBoard(){
+  cbMigrateLegacyPositions();
   const area=document.getElementById('board-notes-area');
-  const isDisplay=document.body.classList.contains('display-mode');
   if(!CB.notes.length){
-    area.innerHTML='<div class="board-empty">Nothing on the board yet'+(isDisplay?'':' -- use "Add to the Board" above to get started')+'.</div>';
+    area.innerHTML='<div class="board-empty">Nothing on the board yet -- use "Add to the Board" above to get started.</div>';
     return;
   }
   area.innerHTML=CB.notes.map(n=>{
     const w=n.w||260, h=n.h||140, x=n.x||0, y=n.y||0;
     const noteBody=n.type==='image'
-      ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt="" style="max-height:${n.text?'70%':'100%'};object-fit:contain;"/>${n.text?`<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||20}px;color:${n.color};margin-top:6px;">${cbEscapeHtml(n.text)}</div>`:''}`
-      : `<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||28}px;color:${n.color};">${cbEscapeHtml(n.text)}</div>`;
-    const editControls=isDisplay?'':`
+      ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt="" style="max-height:${n.text?'70%':'100%'};object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${cbNoteFontStyle(n)}margin-top:6px;">${cbEscapeHtml(n.text)}</div>`:''}`
+      : `<div class="board-note-text" style="${cbNoteFontStyle(n)}">${cbEscapeHtml(n.text)}</div>`;
+    const editControls=`
       <div class="note-edit-controls">
         <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();cbOpenAddModal('${n.type}','${n.id}')">Edit</button>
         <button class="btn-danger" onclick="event.stopPropagation();cbDeleteNote('${n.id}')">Remove</button>
       </div>`;
-    const resizeHandle=isDisplay?'':`<div class="resize-handle" onpointerdown="cbStartResize(event,'${n.id}')"></div>`;
-    return `<div class="board-note ${CB.boardStyle}${isDisplay?'':' editable'}" id="note-${n.id}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;" ${isDisplay?'':`onpointerdown="cbStartDrag(event,'${n.id}')"`}>
+    const resizeHandle=`<div class="resize-handle" onpointerdown="cbStartResize(event,'${n.id}')"></div>`;
+    return `<div class="board-note ${CB.boardStyle} editable" id="note-${n.id}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;" onpointerdown="cbStartDrag(event,'${n.id}')">
       <div class="board-note-inner">${noteBody}${editControls}</div>
       ${resizeHandle}
     </div>`;
@@ -421,13 +466,8 @@ function cbRenderBoard(){
 }
 
 // ── DISPLAY MODE (2nd screen) ──
-function cbEnterDisplayMode(){
-  document.body.classList.add('display-mode');
-  cbRenderBoard();
-}
-function cbExitDisplayMode(){
-  document.body.classList.remove('display-mode');
-  cbRenderBoard();
+function cbOpenDisplayWindow(){
+  window.open('chalkboard-display.html','jag_chalkboard_display','width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
 }
 
 // ── INIT ──
