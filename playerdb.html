@@ -126,7 +126,12 @@ table.data-table tbody tr:hover{background:rgba(201,168,76,.04);}
     <div id="pdb-csv-result" class="csv-result"></div>
   </div>
 
-  <div class="card">
+  <div class="pdb-tab-bar" style="display:flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-bottom:20px;max-width:400px;">
+    <button class="pdb-tab on" data-tab="all" onclick="pdbSwitchTab('all')" style="flex:1;padding:11px 16px;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;background:var(--gold);color:#111;font-weight:600;">All Players</button>
+    <button class="pdb-tab" data-tab="bonus" onclick="pdbSwitchTab('bonus')" style="flex:1;padding:11px 16px;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;background:var(--surf);color:var(--dim);">Bonus Eligible</button>
+  </div>
+
+  <div class="card" id="pdb-all-players-card">
     <div class="card-title">All Players</div>
     <div class="search-row">
       <input type="text" class="search-input" id="pdb-search" placeholder="Search name, level, parent..." oninput="pdbUpdateTable()"/>
@@ -141,6 +146,12 @@ table.data-table tbody tr:hover{background:rgba(201,168,76,.04);}
       <button class="btn-outline" onclick="pdbExportCSV()">Export CSV</button>
     </div>
     <div id="pdb-table-area"></div>
+  </div>
+
+  <div class="card" id="pdb-bonus-card" style="display:none;">
+    <div class="card-title">Bonus Eligible</div>
+    <div class="card-sub">Only players marked Bonus Eligible on their card. Pick the team they moved to and today's date fills in automatically -- it also records their Travel promotion. Bonus Paid is a manual click, same as everywhere else.</div>
+    <div id="pdb-bonus-table-area"></div>
   </div>
 
 </div>
@@ -176,6 +187,7 @@ function mkEmptyPDBPlayer(){
     promoHistory:[], // [{level,date}] -- only ever populated for Dev Check In-originated players
     sourceApps:[], // which app(s) this record has been seen coming from
     travelDateAccepted:'', bonusEligible:false, bonusPaid:false,
+    travelTeamLevel:'', travelDateMoved:'', // set from the Bonus Eligible tab when a team is picked
     dateAdded:todayISO()
   };
 }
@@ -336,14 +348,28 @@ function pdbYrs(dateAdded){
   const y=(new Date()-new Date(dateAdded))/(1000*60*60*24*365.25);
   return isNaN(y)?'--':(y<1?'<1':Math.floor(y)+'');
 }
+// Maps a player's actual level string onto its position in the ladder -- ADM's
+// specific sub-levels (Mini/Minor/Major Mite) all collapse onto the single ADM slot,
+// and this comparison is case-normalized so "InHouse" (as stored) correctly matches
+// the ladder's "InHouse" entry instead of silently never matching anything.
+function pdbLadderPosition(level){
+  const up=(level||'').toUpperCase().replace(/\s/g,'');
+  if(!up)return null;
+  if(up.includes('MITE'))return'ADM';
+  if(up==='INHOUSE')return'InHouse';
+  if(up==='TRAVEL')return'Travel';
+  if(up==='ADM')return'ADM';
+  const direct=PDB_PROMO_TRACK.find(l=>l.toUpperCase()===up);
+  return direct||null;
+}
 function pdbAdvancementPathHTML(p){
   const hm={};
   (p.promoHistory||[]).forEach(h=>{ hm[h.level]=h.date; });
-  const cl=(p.level||'').toUpperCase().replace(/\s/g,'');
+  const currentPos=pdbLadderPosition(p.level);
   const cells=PDB_PROMO_TRACK.map(l=>{
     const d=hm[l];
     if(d)return `<td style="text-align:center;font-size:11px;padding:5px 4px;">${pdbLvBadge(l)}<br><span style="color:var(--dim);font-size:10px;">${d}</span></td>`;
-    if(l===cl)return `<td style="text-align:center;font-size:11px;padding:5px 4px;">${pdbLvBadge(l)}${p.dateAdded?`<br><span style="color:var(--dim);font-size:10px;">${p.dateAdded}</span>`:''}</td>`;
+    if(l===currentPos)return `<td style="text-align:center;font-size:11px;padding:5px 4px;">${pdbLvBadge(p.level||l)}${p.dateAdded?`<br><span style="color:var(--dim);font-size:10px;">${p.dateAdded}</span>`:''}</td>`;
     return `<td></td>`;
   }).join('');
   return `<div style="border-top:1px solid var(--border);margin:16px 0;padding-top:12px;">
@@ -514,6 +540,72 @@ function pdbRenderStats(){
     <div class="pill"><span>${bySource.ih}</span>InHouse</div>
     <div class="pill"><span>${bySource.devcheckin}</span>Dev Check In</div>
   `;
+}
+// ── TABS ──
+function pdbSwitchTab(tab){
+  document.querySelectorAll('.pdb-tab').forEach(b=>{
+    const on=b.dataset.tab===tab;
+    b.classList.toggle('on',on);
+    b.style.background=on?'var(--gold)':'var(--surf)';
+    b.style.color=on?'#111':'var(--dim)';
+    b.style.fontWeight=on?'600':'400';
+  });
+  document.getElementById('pdb-all-players-card').style.display=tab==='all'?'':'none';
+  document.getElementById('pdb-bonus-card').style.display=tab==='bonus'?'':'none';
+  if(tab==='bonus')pdbRenderBonusTab();
+}
+const PDB_TRAVEL_TEAMS=['Mite 1','Mite 2','Mite 3','Mite 4','Squirt 1','Squirt 2','Squirt 3','Squirt 4','Squirt 5','Peewee 1','Peewee 2','Peewee 3','Peewee 4','Peewee 5'];
+function pdbRenderBonusTab(){
+  const area=document.getElementById('pdb-bonus-table-area');
+  const disp=PDB.filter(p=>p.bonusEligible);
+  if(!disp.length){
+    area.innerHTML='<div class="empty-state">No players marked Bonus Eligible yet -- mark them on their player card under Travel &amp; Bonus.</div>';
+    return;
+  }
+  const rows=disp.map(p=>`
+    <tr>
+      <td style="cursor:pointer;color:var(--gold2);" onclick="pdbOpenEditModal('${p.id}')">${p.first_name||''} ${p.last_name||''}</td>
+      <td style="color:var(--dim);font-size:11px;">${p.birthdate||''}</td>
+      <td>${p.level||''}</td>
+      <td>
+        <select class="filter-select" onchange="pdbSetTravelTeam('${p.id}',this.value)">
+          <option value=""${!p.travelTeamLevel?' selected':''}>\u2014 Select team</option>
+          ${PDB_TRAVEL_TEAMS.map(t=>`<option value="${t}"${p.travelTeamLevel===t?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </td>
+      <td style="color:var(--dim);font-size:11px;">${p.travelDateMoved||'\u2014'}</td>
+      <td style="text-align:center;">
+        <input type="checkbox" class="chk" ${p.bonusPaid?'checked':''} onchange="pdbToggleBonusPaidQuick('${p.id}',this.checked)"/>
+      </td>
+    </tr>`).join('');
+  area.innerHTML=`<div class="table-outer"><table class="data-table">
+    <thead><tr><th>Name</th><th>Birthdate</th><th>Current Level</th><th>Team Assigned</th><th>Date Moved</th><th>Bonus Paid</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+// Picking a team auto-dates the move to today AND records it as their Travel
+// promotion, so the Advancement Path ladder picks it up too -- this tab is where
+// the bonus/travel move actually gets finalized.
+function pdbSetTravelTeam(id,team){
+  const p=PDB.find(x=>x.id===id);
+  if(!p)return;
+  p.travelTeamLevel=team;
+  p.travelDateMoved=team?todayISO():'';
+  if(team){
+    if(!p.promoHistory)p.promoHistory=[];
+    const existing=p.promoHistory.find(h=>h.level==='Travel');
+    if(existing)existing.date=p.travelDateMoved;
+    else p.promoHistory.push({level:'Travel',date:p.travelDateMoved});
+    p.level=team;
+  }
+  savePDB();
+  pdbRenderBonusTab();
+}
+function pdbToggleBonusPaidQuick(id,val){
+  const p=PDB.find(x=>x.id===id);
+  if(!p)return;
+  p.bonusPaid=val;
+  savePDB();
 }
 function pdbQuickDelete(id){
   const p=PDB.find(x=>x.id===id);
