@@ -555,6 +555,10 @@ function pdbSwitchTab(tab){
   if(tab==='bonus')pdbRenderBonusTab();
 }
 const PDB_TRAVEL_TEAMS=['Mite 1','Mite 2','Mite 3','Mite 4','Squirt 1','Squirt 2','Squirt 3','Squirt 4','Squirt 5','Peewee 1','Peewee 2','Peewee 3','Peewee 4','Peewee 5'];
+function pdbSeasonOptions(){
+  const yr=new Date().getFullYear()%100;
+  return [0,1,2,3].map(i=>'Fall '+(yr+i));
+}
 function pdbRenderBonusTab(){
   const area=document.getElementById('pdb-bonus-table-area');
   const disp=PDB.filter(p=>p.bonusEligible);
@@ -562,6 +566,7 @@ function pdbRenderBonusTab(){
     area.innerHTML='<div class="empty-state">No players marked Bonus Eligible yet -- mark them on their player card under Travel &amp; Bonus.</div>';
     return;
   }
+  const seasonOpts=pdbSeasonOptions();
   const rows=disp.map(p=>`
     <tr>
       <td style="cursor:pointer;color:var(--gold2);" onclick="pdbOpenEditModal('${p.id}')">${p.first_name||''} ${p.last_name||''}</td>
@@ -577,26 +582,131 @@ function pdbRenderBonusTab(){
       <td style="text-align:center;">
         <input type="checkbox" class="chk" ${p.bonusPaid?'checked':''} onchange="pdbToggleBonusPaidQuick('${p.id}',this.checked)"/>
       </td>
+      <td>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <select class="filter-select" style="width:90px;" onchange="pdbSetSeasonPromoted('${p.id}',this.value)">
+            <option value=""${!p.seasonPromoted?' selected':''}>\u2014</option>
+            ${seasonOpts.map(s=>`<option value="${s}"${p.seasonPromoted===s?' selected':''}>${s}</option>`).join('')}
+          </select>
+          <input type="text" class="fi" style="width:70px;padding:6px 8px;font-size:11px;" value="${p.seasonPromoted||''}" placeholder="custom" onchange="pdbSetSeasonPromoted('${p.id}',this.value)"/>
+        </div>
+      </td>
+      <td>
+        <select class="filter-select" onchange="pdbSetAdmPromotionTiming('${p.id}',this.value)">
+          <option value=""${!p.admPromotionTiming?' selected':''}>\u2014</option>
+          <option value="Immediate"${p.admPromotionTiming==='Immediate'?' selected':''}>Immediate</option>
+          <option value="Next Session"${p.admPromotionTiming==='Next Session'?' selected':''}>Next Session</option>
+        </select>
+      </td>
     </tr>`).join('');
   area.innerHTML=`<div class="table-outer"><table class="data-table">
-    <thead><tr><th>Name</th><th>Birthdate</th><th>Current Level</th><th>Team Assigned</th><th>Date Moved</th><th>Bonus Paid</th></tr></thead>
+    <thead><tr><th>Name</th><th>Birthdate</th><th>Current Level</th><th>Team Assigned</th><th>Date Moved</th><th>Bonus Paid</th><th>Season Promoted</th><th>ADM Promotion</th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
-// Picking a team auto-dates the move to today AND records it as their Travel
-// promotion, so the Advancement Path ladder picks it up too -- this tab is where
-// the bonus/travel move actually gets finalized.
+function pdbSetSeasonPromoted(id,val){
+  const p=PDB.find(x=>x.id===id);
+  if(!p)return;
+  p.seasonPromoted=val;
+  savePDB();
+  pdbRenderBonusTab();
+}
+function pdbSetAdmPromotionTiming(id,val){
+  const p=PDB.find(x=>x.id===id);
+  if(!p)return;
+  p.admPromotionTiming=val;
+  savePDB();
+  if(val==='Immediate'){
+    if(confirm(`Move ${p.first_name} ${p.last_name} out of ADM and into InHouse's free agent pool right now? This directly edits ADM's and InHouse's live rosters on this device.`)){
+      pdbMoveAdmToIH(p);
+    }else{
+      p.admPromotionTiming='Next Session';
+      savePDB();
+    }
+  }
+  pdbRenderBonusTab();
+}
+// Directly edits ADM's and InHouse's own live localStorage -- removes the player
+// from ADM's current-season master list, adds them to InHouse's current-season
+// master list AND free agent pool. Matches by the same name+birthdate key used
+// everywhere else in the suite.
+function pdbMoveAdmToIH(p){
+  const matchKey=(p.first_name||'').toLowerCase().trim()+'|'+(p.last_name||'').toLowerCase().trim()+'|'+(p.birthdate||'').trim();
+  let admRemoved=false, ihAdded=false, ihAlready=false;
+
+  try{
+    const raw=localStorage.getItem('adm_roster_v1');
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d.SEASONS&&d.currentSeason&&d.SEASONS[d.currentSeason]){
+        const season=d.SEASONS[d.currentSeason];
+        const before=(season.masterList||[]).length;
+        season.masterList=(season.masterList||[]).filter(m=>{
+          const k=(m.first||'').toLowerCase().trim()+'|'+(m.last||'').toLowerCase().trim()+'|'+(m.birthdate||'').trim();
+          return k!==matchKey;
+        });
+        admRemoved=season.masterList.length<before;
+        localStorage.setItem('adm_roster_v1',JSON.stringify(d));
+      }
+    }
+  }catch(e){}
+
+  try{
+    const raw=localStorage.getItem('ih_roster_v2');
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d.SEASONS&&d.currentSeason&&d.SEASONS[d.currentSeason]){
+        const season=d.SEASONS[d.currentSeason];
+        if(!season.masterList)season.masterList=[];
+        if(!season.main)season.main=[];
+        const already=season.masterList.some(m=>{
+          const k=(m.first||'').toLowerCase().trim()+'|'+(m.last||'').toLowerCase().trim()+'|'+(m.birthdate||'').trim();
+          return k===matchKey;
+        });
+        if(already){
+          ihAlready=true;
+        }else{
+          const newId='_'+Math.random().toString(36).slice(2,9);
+          season.masterList.push({
+            id:newId, first:p.first_name, last:p.last_name, birthdate:p.birthdate, promotionDecision:null,
+            p1Name:p.parent1_name||'', p1Email:p.parent1_email||'', p1Phone:p.parent1_phone||'',
+            p2Name:p.parent2_name||'', p2Email:p.parent2_email||'', p2Phone:p.parent2_phone||'',
+            address:p.address||'', city:p.city||'', state:p.state||'', zip:p.zip||''
+          });
+          season.main.push({id:newId, first:p.first_name, last:p.last_name, birthdate:p.birthdate});
+          ihAdded=true;
+        }
+        localStorage.setItem('ih_roster_v2',JSON.stringify(d));
+      }
+    }
+  }catch(e){}
+
+  p.level='InHouse';
+  savePDB();
+  pdbUpdateTable();
+  alert(`${p.first_name} ${p.last_name}: ${admRemoved?'removed from ADM\u2019s current season.':'was not found in ADM\u2019s current season (nothing to remove).'} ${ihAdded?'Added to InHouse\u2019s free agent pool.':ihAlready?'Already present in InHouse -- not duplicated.':'Could not add to InHouse (no InHouse data found on this device).'}`);
+}
 function pdbSetTravelTeam(id,team){
   const p=PDB.find(x=>x.id===id);
   if(!p)return;
-  p.travelTeamLevel=team;
-  p.travelDateMoved=team?todayISO():'';
+  if(!p.promoHistory)p.promoHistory=[];
   if(team){
-    if(!p.promoHistory)p.promoHistory=[];
+    // Remember what level they were at before their FIRST assignment, so
+    // unassigning later can correctly restore it rather than leaving them stuck
+    // on whatever travel team was last picked.
+    if(!p.travelTeamLevel)p.levelBeforeTravel=p.level;
+    p.travelTeamLevel=team;
+    p.travelDateMoved=todayISO();
     const existing=p.promoHistory.find(h=>h.level==='Travel');
     if(existing)existing.date=p.travelDateMoved;
     else p.promoHistory.push({level:'Travel',date:p.travelDateMoved});
     p.level=team;
+  }else{
+    // Unassigned -- revert to their pre-travel level and remove the Travel record.
+    p.travelTeamLevel='';
+    p.travelDateMoved='';
+    if(p.levelBeforeTravel!==undefined)p.level=p.levelBeforeTravel;
+    p.promoHistory=p.promoHistory.filter(h=>h.level!=='Travel');
   }
   savePDB();
   pdbRenderBonusTab();
