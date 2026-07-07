@@ -45,7 +45,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .board-frame{border-radius:14px;padding:18px;position:relative;}
 .board-frame.chalk{background:linear-gradient(135deg,#5a3a20,#3d2814);box-shadow:0 20px 60px rgba(0,0,0,.6);}
 .board-frame.white{background:linear-gradient(135deg,#c8ccd0,#9aa0a6);box-shadow:0 20px 60px rgba(0,0,0,.5);}
-.board-surface{border-radius:8px;padding:0;min-height:560px;position:relative;overflow:hidden;}
+.board-surface{border-radius:8px;padding:0;min-height:calc(100vh - 320px);position:relative;overflow:hidden;}
 .board-surface.chalk{background:#1f3d2e;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.03) 0%,transparent 8%),radial-gradient(circle at 70% 60%,rgba(255,255,255,.025) 0%,transparent 10%),radial-gradient(circle at 40% 80%,rgba(255,255,255,.02) 0%,transparent 6%);box-shadow:inset 0 0 80px rgba(0,0,0,.5);}
 .board-surface.white{background:#fafafa;background-image:linear-gradient(rgba(0,0,0,.015) 1px,transparent 1px);background-size:100% 42px;box-shadow:inset 0 0 40px rgba(0,0,0,.08);}
 #board-notes-area{position:relative;width:100%;height:100%;min-height:560px;}
@@ -65,7 +65,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .board-empty{color:rgba(255,255,255,.3);font-family:'Barlow Condensed',sans-serif;font-size:16px;letter-spacing:1px;text-align:center;padding:60px 20px;}
 .board-surface.white .board-empty{color:rgba(0,0,0,.25);}
 
-.note-edit-controls{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;}
+.note-edit-controls{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;flex-shrink:0;}
 .note-edit-controls select,.note-edit-controls input[type=color]{background:#0a0a0a;border:1px solid var(--border);color:var(--wht);border-radius:4px;font-size:11px;padding:3px 6px;}
 
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
@@ -450,7 +450,7 @@ function cbRenderBoard(){
   area.innerHTML=CB.notes.map(n=>{
     const w=n.w||260, h=n.h||140, x=n.x||0, y=n.y||0;
     const noteBody=n.type==='image'
-      ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt="" style="max-height:${n.text?'70%':'100%'};object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${cbNoteFontStyle(n)}margin-top:6px;">${cbEscapeHtml(n.text)}</div>`:''}`
+      ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt="" style="flex:1;min-height:0;width:100%;object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${cbNoteFontStyle(n)}margin-top:6px;text-align:center;flex-shrink:0;">${cbEscapeHtml(n.text)}</div>`:''}`
       : `<div class="board-note-text" style="${cbNoteFontStyle(n)}">${cbEscapeHtml(n.text)}</div>`;
     const editControls=`
       <div class="note-edit-controls">
