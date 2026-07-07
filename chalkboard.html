@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0A0A0A"/>
+<title>Jaguar Development — Chalkboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&family=Kalam:wght@400;700&family=Caveat:wght@400;600;700&family=Shadows+Into+Light&family=Permanent+Marker&family=Gochi+Hand&family=Architects+Daughter&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --gold:#C9A84C;--gold2:#E8CC7A;--gdark:#8A6A1F;--gfaint:rgba(201,168,76,0.08);--gborder:rgba(201,168,76,0.25);
+  --blk:#0A0A0A;--dark:#111;--surf:#181818;--surf2:#202020;
+  --border:#2A2A2A;--wht:#F5F3EE;--dim:rgba(245,243,238,0.6);
+}
+html,body{min-height:100vh;background:var(--blk);color:var(--wht);font-family:'Barlow',sans-serif;}
+
+nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:60px;background:rgba(10,10,10,0.97);border-bottom:1px solid var(--gborder);backdrop-filter:blur(16px);}
+.nav-left{display:flex;align-items:center;gap:14px;}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--gold);}
+.nav-sub{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-left:1px solid var(--border);padding-left:14px;}
+.nav-btn{padding:8px 18px;border-radius:6px;border:1px solid var(--gold);background:var(--gold);color:#111;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;letter-spacing:.5px;}
+.nav-btn.outline{background:none;color:var(--gold);}
+
+.hero-strip{padding:20px 28px 14px;border-bottom:1px solid var(--border);background:linear-gradient(to right,var(--surf),var(--blk));}
+.hero-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:4px;color:var(--gold);line-height:1;}
+.hero-desc{font-size:13px;color:var(--dim);margin-top:4px;letter-spacing:.5px;}
+
+.wrap{padding:24px 28px 60px;max-width:1600px;margin:0 auto;}
+.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--gold);margin-bottom:12px;}
+.ctrl-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.ctrl-group{display:flex;flex-direction:column;gap:4px;}
+.ctrl-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);}
+.style-pick-row{display:flex;gap:8px;}
+.style-pick{padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:var(--surf2);color:var(--wht);cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;}
+.style-pick.on{border-color:var(--gold);background:var(--gfaint);color:var(--gold);}
+.font-select,.color-select{background:#0a0a0a;border:1px solid var(--border);color:var(--wht);padding:8px 12px;border-radius:6px;font-size:13px;}
+.btn{padding:9px 20px;border-radius:6px;border:1px solid var(--gold);background:var(--gold);color:#111;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;letter-spacing:.5px;}
+.btn-outline{padding:9px 20px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--wht);cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.5px;}
+.btn-danger{padding:6px 14px;border-radius:5px;border:1px solid #7a3030;background:none;color:#e07070;cursor:pointer;font-size:11px;}
+
+/* ── THE BOARD ITSELF ── */
+.board-frame{border-radius:14px;padding:18px;position:relative;}
+.board-frame.chalk{background:linear-gradient(135deg,#5a3a20,#3d2814);box-shadow:0 20px 60px rgba(0,0,0,.6);}
+.board-frame.white{background:linear-gradient(135deg,#c8ccd0,#9aa0a6);box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.board-surface{border-radius:8px;padding:36px;min-height:400px;position:relative;overflow:hidden;}
+.board-surface.chalk{background:#1f3d2e;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.03) 0%,transparent 8%),radial-gradient(circle at 70% 60%,rgba(255,255,255,.025) 0%,transparent 10%),radial-gradient(circle at 40% 80%,rgba(255,255,255,.02) 0%,transparent 6%);box-shadow:inset 0 0 80px rgba(0,0,0,.5);}
+.board-surface.white{background:#fafafa;background-image:linear-gradient(rgba(0,0,0,.015) 1px,transparent 1px);background-size:100% 42px;box-shadow:inset 0 0 40px rgba(0,0,0,.08);}
+.board-notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:28px;align-items:start;}
+.board-note{position:relative;}
+.board-note-text{white-space:pre-wrap;word-wrap:break-word;line-height:1.35;}
+.board-note-img{max-width:100%;border-radius:4px;display:block;margin-top:8px;}
+.board-note.chalk .board-note-text{color:#fff;text-shadow:0 0 1px rgba(255,255,255,.5),0 0 8px rgba(255,255,255,.15);}
+.board-note.white .board-note-text{text-shadow:0 1px 0 rgba(0,0,0,.06);}
+.board-empty{color:rgba(255,255,255,.3);font-family:'Barlow Condensed',sans-serif;font-size:16px;letter-spacing:1px;text-align:center;padding:60px 20px;}
+.board-surface.white .board-empty{color:rgba(0,0,0,.25);}
+
+.note-edit-controls{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center;}
+.note-edit-controls select,.note-edit-controls input[type=color]{background:#0a0a0a;border:1px solid var(--border);color:var(--wht);border-radius:4px;font-size:11px;padding:3px 6px;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-overlay.hidden{display:none;}
+.modal{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:28px;width:min(520px,92vw);max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.8);}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold);margin-bottom:20px;}
+.fg{margin-bottom:12px;}
+.fl{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:4px;}
+.fi{width:100%;background:#0a0a0a;border:1px solid var(--border);color:var(--wht);padding:8px 10px;border-radius:5px;font-size:13px;}
+textarea.fi{resize:vertical;font-family:inherit;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
+
+/* ── DISPLAY MODE (2nd screen, fullscreen, no chrome) ── */
+body.display-mode nav,body.display-mode .hero-strip,body.display-mode .card:not(.board-card){display:none!important;}
+body.display-mode .wrap{padding:20px;max-width:100%;}
+body.display-mode .board-card{margin-bottom:0;border:none;background:none;padding:0;}
+.exit-display-btn{position:fixed;top:14px;right:14px;z-index:999;padding:8px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.4);color:#fff;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;display:none;}
+body.display-mode .exit-display-btn{display:block;}
+
+.site-footer{text-align:center;padding:24px;font-size:11px;color:var(--dim);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <div class="nav-logo">JAGUAR</div>
+    <div class="nav-sub">Chalkboard</div>
+  </div>
+  <button class="nav-btn" onclick="cbEnterDisplayMode()">&#128225; Open on 2nd Screen</button>
+</nav>
+
+<div class="hero-strip">
+  <div class="hero-inner">
+    <div class="hero-title">Chalk<span style="color:var(--wht);">board</span></div>
+    <div class="hero-desc">Notes and reminders for parents -- write it here, display it on the rink's second screen</div>
+  </div>
+</div>
+
+<button class="exit-display-btn" onclick="cbExitDisplayMode()">&#10005; Exit Display Mode</button>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="card-title">Board Style</div>
+    <div class="ctrl-row">
+      <div class="ctrl-group">
+        <span class="ctrl-label">Look</span>
+        <div class="style-pick-row">
+          <button class="style-pick" id="style-chalk" onclick="cbSetBoardStyle('chalk')">&#127981; Chalkboard</button>
+          <button class="style-pick" id="style-white" onclick="cbSetBoardStyle('white')">&#128221; Whiteboard</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <span class="ctrl-label">Handwriting Style</span>
+        <select class="font-select" id="cb-font-select" onchange="cbSetFont(this.value)">
+          <option value="Kalam">Kalam</option>
+          <option value="Caveat">Caveat</option>
+          <option value="Shadows Into Light">Shadows Into Light</option>
+          <option value="Permanent Marker">Permanent Marker</option>
+          <option value="Gochi Hand">Gochi Hand</option>
+          <option value="Architects Daughter">Architects Daughter</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Add to the Board</div>
+    <div class="ctrl-row">
+      <button class="btn" onclick="cbOpenAddModal('text')">&#9999;&#65039; Add Note</button>
+      <button class="btn-outline" onclick="cbOpenAddModal('image')">&#128247; Add Picture (link)</button>
+    </div>
+  </div>
+
+  <div class="card board-card">
+    <div class="board-frame chalk" id="board-frame">
+      <div class="board-surface chalk" id="board-surface">
+        <div id="board-notes-area"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-overlay hidden" id="cbAddModal">
+  <div class="modal">
+    <div class="modal-title" id="cbAddModalTitle">Add Note</div>
+    <div id="cbAddModalBody"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="cbCloseAddModal()">Cancel</button>
+      <button class="btn" onclick="cbSaveNote()">Add to Board</button>
+    </div>
+  </div>
+</div>
+
+<div class="site-footer">Jaguar Development Suite — Chalkboard</div>
+
+<script>
+// ── DATA MODEL ──
+const CB_KEY='jag_chalkboard_v1';
+function uid(){ return '_'+Math.random().toString(36).slice(2,9); }
+let CB={
+  boardStyle:'chalk', // 'chalk' or 'white'
+  font:'Kalam',
+  notes:[] // {id, type:'text'|'image', text, imgUrl, color, fontSize, dateAdded}
+};
+function saveCB(){ try{localStorage.setItem(CB_KEY,JSON.stringify(CB));}catch(e){} }
+function loadCB(){
+  try{
+    const raw=localStorage.getItem(CB_KEY);
+    if(raw){ const d=JSON.parse(raw); CB=Object.assign(CB,d); if(!Array.isArray(CB.notes))CB.notes=[]; }
+  }catch(e){}
+}
+loadCB();
+
+const CB_CHALK_COLORS=[{v:'#ffffff',l:'White Chalk'},{v:'#fff27a',l:'Yellow Chalk'},{v:'#ffb3d9',l:'Pink Chalk'},{v:'#a8d8ff',l:'Blue Chalk'},{v:'#b3ffb3',l:'Green Chalk'}];
+const CB_MARKER_COLORS=[{v:'#1a1a1a',l:'Black Marker'},{v:'#2050c0',l:'Blue Marker'},{v:'#d02020',l:'Red Marker'},{v:'#208020',l:'Green Marker'},{v:'#a020c0',l:'Purple Marker'}];
+
+// ── BOARD STYLE / FONT ──
+function cbSetBoardStyle(style){
+  CB.boardStyle=style;
+  saveCB();
+  cbRenderControls();
+  cbRenderBoard();
+}
+function cbSetFont(font){
+  CB.font=font;
+  saveCB();
+  cbRenderBoard();
+}
+function cbRenderControls(){
+  document.getElementById('style-chalk').classList.toggle('on',CB.boardStyle==='chalk');
+  document.getElementById('style-white').classList.toggle('on',CB.boardStyle==='white');
+  document.getElementById('cb-font-select').value=CB.font;
+  const frame=document.getElementById('board-frame');
+  const surface=document.getElementById('board-surface');
+  frame.className='board-frame '+CB.boardStyle;
+  surface.className='board-surface '+CB.boardStyle;
+}
+
+// ── ADD / EDIT NOTES ──
+let cbEditingId=null, cbAddType='text';
+function cbOpenAddModal(type,editId){
+  cbAddType=type;
+  cbEditingId=editId||null;
+  const existing=editId?CB.notes.find(n=>n.id===editId):null;
+  document.getElementById('cbAddModalTitle').textContent=editId?'Edit '+(type==='image'?'Picture':'Note'):(type==='image'?'Add Picture':'Add Note');
+  const colors=CB.boardStyle==='chalk'?CB_CHALK_COLORS:CB_MARKER_COLORS;
+  const defaultColor=existing?existing.color:colors[0].v;
+  if(type==='text'){
+    document.getElementById('cbAddModalBody').innerHTML=`
+      <div class="fg">
+        <span class="fl">Note Text</span>
+        <textarea id="cbF-text" class="fi" rows="4" placeholder="e.g. Please check in before class!!">${existing?existing.text:''}</textarea>
+      </div>
+      <div class="fg">
+        <span class="fl">Color</span>
+        <select id="cbF-color" class="fi">
+          ${colors.map(c=>`<option value="${c.v}"${c.v===defaultColor?' selected':''}>${c.l}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg">
+        <span class="fl">Size</span>
+        <select id="cbF-size" class="fi">
+          <option value="20"${existing&&existing.fontSize===20?' selected':''}>Small</option>
+          <option value="28"${!existing||existing.fontSize===28?' selected':''}>Medium</option>
+          <option value="38"${existing&&existing.fontSize===38?' selected':''}>Large</option>
+          <option value="52"${existing&&existing.fontSize===52?' selected':''}>Huge</option>
+        </select>
+      </div>
+    `;
+  }else{
+    document.getElementById('cbAddModalBody').innerHTML=`
+      <div class="fg">
+        <span class="fl">Image URL / Link</span>
+        <input type="text" id="cbF-img" class="fi" placeholder="https://..." value="${existing?existing.imgUrl:''}"/>
+      </div>
+      <div class="fg">
+        <span class="fl">Caption (optional)</span>
+        <textarea id="cbF-text" class="fi" rows="2" placeholder="e.g. New team photo!">${existing?existing.text:''}</textarea>
+      </div>
+      <div class="fg">
+        <span class="fl">Caption Color</span>
+        <select id="cbF-color" class="fi">
+          ${colors.map(c=>`<option value="${c.v}"${c.v===defaultColor?' selected':''}>${c.l}</option>`).join('')}
+        </select>
+      </div>
+    `;
+  }
+  document.getElementById('cbAddModal').classList.remove('hidden');
+}
+function cbCloseAddModal(){
+  document.getElementById('cbAddModal').classList.add('hidden');
+  cbEditingId=null;
+}
+function cbSaveNote(){
+  const text=(document.getElementById('cbF-text').value||'').trim();
+  const color=document.getElementById('cbF-color').value;
+  if(cbAddType==='text'){
+    if(!text){ alert('Please enter some text for the note.'); return; }
+    const fontSize=parseInt(document.getElementById('cbF-size').value,10);
+    if(cbEditingId){
+      const n=CB.notes.find(x=>x.id===cbEditingId);
+      if(n)Object.assign(n,{text,color,fontSize});
+    }else{
+      CB.notes.push({id:uid(),type:'text',text,color,fontSize,dateAdded:new Date().toISOString()});
+    }
+  }else{
+    const imgUrl=(document.getElementById('cbF-img').value||'').trim();
+    if(!imgUrl){ alert('Please enter an image URL.'); return; }
+    if(cbEditingId){
+      const n=CB.notes.find(x=>x.id===cbEditingId);
+      if(n)Object.assign(n,{imgUrl,text,color});
+    }else{
+      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,dateAdded:new Date().toISOString()});
+    }
+  }
+  saveCB();
+  cbCloseAddModal();
+  cbRenderBoard();
+}
+function cbDeleteNote(id){
+  if(!confirm('Remove this from the board?'))return;
+  CB.notes=CB.notes.filter(n=>n.id!==id);
+  saveCB();
+  cbRenderBoard();
+}
+
+// ── RENDER BOARD ──
+function cbEscapeHtml(s){
+  const d=document.createElement('div');
+  d.textContent=s;
+  return d.innerHTML;
+}
+function cbRenderBoard(){
+  const area=document.getElementById('board-notes-area');
+  const isDisplay=document.body.classList.contains('display-mode');
+  if(!CB.notes.length){
+    area.innerHTML='<div class="board-empty">Nothing on the board yet'+(isDisplay?'':' -- use "Add to the Board" above to get started')+'.</div>';
+    return;
+  }
+  area.innerHTML=`<div class="board-notes-grid">
+    ${CB.notes.map(n=>{
+      const noteBody=n.type==='image'
+        ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt=""/>${n.text?`<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||20}px;color:${n.color};margin-top:8px;">${cbEscapeHtml(n.text)}</div>`:''}`
+        : `<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||28}px;color:${n.color};">${cbEscapeHtml(n.text)}</div>`;
+      const editControls=isDisplay?'':`
+        <div class="note-edit-controls">
+          <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="cbOpenAddModal('${n.type}','${n.id}')">Edit</button>
+          <button class="btn-danger" onclick="cbDeleteNote('${n.id}')">Remove</button>
+        </div>`;
+      return `<div class="board-note ${CB.boardStyle}">${noteBody}${editControls}</div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── DISPLAY MODE (2nd screen) ──
+function cbEnterDisplayMode(){
+  document.body.classList.add('display-mode');
+  cbRenderBoard();
+  if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});
+}
+function cbExitDisplayMode(){
+  document.body.classList.remove('display-mode');
+  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+  cbRenderBoard();
+}
+
+// ── INIT ──
+cbRenderControls();
+cbRenderBoard();
+</script>
+</body>
+</html>
