@@ -101,7 +101,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V9</div>
 
 <nav>
   <div class="nav-left">
@@ -208,6 +208,14 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
       <div class="card-arrow">&#8599;</div>
     </div>
 
+    <div class="app-card" data-key="playerdb" draggable="true" onclick="jagOpen('playerdb')" ondragstart="jagDragStart(event)" ondragover="jagDragOver(event)" ondragend="jagDragEnd(event)"><div class="card-grip" draggable="false" onclick="event.stopPropagation()"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="card-icon"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#C9A84C" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <div class="card-name">Player Database</div>
+      <div class="card-desc">Every athlete across ADM, InHouse, and Dev Check In — one shared, deduplicated record.</div>
+      <div class="card-tag">Database</div>
+      <div class="card-arrow">&#8599;</div>
+    </div>
+
     <div class="app-card" style="border-style:dashed;cursor:default;opacity:0.35;">
       <div class="card-icon" style="opacity:0.5;"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#C9A84C" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg></div>
       <div class="card-name">Add App</div>
@@ -249,7 +257,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:24
 var JAG_URLS = {
   db:'db.html', coach:'coach.html', adm:'adm.html', ih:'ih.html',
   drills:'drills.html', schedule:'schedule.html', stats:'stats.html', notes:'notes.html',
-  admin:'admin.html'
+  admin:'admin.html', playerdb:'playerdb.html'
 };
 window.__jagApp='home';
 window.name='jag_home'; // lets apps' Home button find and focus this tab
@@ -257,7 +265,8 @@ window.name='jag_home'; // lets apps' Home button find and focus this tab
 var JAG_LABELS = {
   db:"Jaguar Dev Database", coach:"Coach Hours Tracker", adm:"ADM Roster - Fall 2026",
   ih:"InHouse Roster - Fall 2026", drills:"Drill Library",
-  schedule:"Scheduler", stats:"Player Stats", notes:"Budget", admin:"Admin Center"
+  schedule:"Scheduler", stats:"Player Stats", notes:"Budget", admin:"Admin Center",
+  playerdb:"Player Database"
 };
 
 // ── HOME GRID: 6-dot drag-to-reorder, persisted per browser ──
