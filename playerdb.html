@@ -260,7 +260,7 @@ function pdbSyncAllApps(){
           parent2_name:m.parent2_name||'', parent2_email:m.parent2_email||'', parent2_phone:m.parent2_phone||'',
           address:m.address||'', city:m.city||'', state:m.state||'', zip:m.zip||'',
           level:m.level||'', status:m.status||'Active', waiver:m.waiver||'',
-          sessions:m._sessions||[], promoHistory:m._promoHistory||[]
+          sessions:m._sessions||[], promoHistory:m._promoHistory||[], sourceDateAdded:m.date_added||''
         },'devcheckin');
         if(rec==='added')added++; else if(rec==='updated')updated++;
         sources.devcheckin++;
@@ -294,9 +294,11 @@ function pdbUpsertFromSource(fields, sourceApp){
     if(fields.level&&!ex.level)ex.level=fields.level;
     if(fields.sessions&&fields.sessions.length){ fields.sessions.forEach(s=>{ if(!ex.sessions.includes(s))ex.sessions.push(s); }); }
     if(fields.promoHistory&&fields.promoHistory.length&&!ex.promoHistory.length)ex.promoHistory=fields.promoHistory;
+    if(fields.sourceDateAdded)ex.dateAdded=fields.sourceDateAdded;
     return 'updated';
   }else{
     const rec=Object.assign(mkEmptyPDBPlayer(),fields,{sourceApps:[sourceApp]});
+    if(fields.sourceDateAdded)rec.dateAdded=fields.sourceDateAdded;
     PDB.push(rec);
     return 'added';
   }
@@ -321,6 +323,43 @@ function pdbParseCsvLine(line){
   return result.map(s=>s.trim());
 }
 function pdbCapitalize(s){ return (s||'').trim().split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1).toLowerCase():'').join(' '); }
+
+// ── ADVANCEMENT PATH (matches Dev Check In's Master File ladder exactly) ──
+const PDB_PROMO_TRACK=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','InHouse','Travel'];
+function pdbLvBadge(v){
+  const up=(v||'').toUpperCase();
+  const cls=up.includes('LJ')?'#5CCC88':up.includes('PH')?'#F07050':'var(--gold)';
+  return `<span style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;padding:2px 7px;border-radius:10px;border:1px solid ${cls};color:${cls};">${v||'\u2014'}</span>`;
+}
+function pdbYrs(dateAdded){
+  if(!dateAdded)return'--';
+  const y=(new Date()-new Date(dateAdded))/(1000*60*60*24*365.25);
+  return isNaN(y)?'--':(y<1?'<1':Math.floor(y)+'');
+}
+function pdbAdvancementPathHTML(p){
+  const hm={};
+  (p.promoHistory||[]).forEach(h=>{ hm[h.level]=h.date; });
+  const cl=(p.level||'').toUpperCase().replace(/\s/g,'');
+  const cells=PDB_PROMO_TRACK.map(l=>{
+    const d=hm[l];
+    if(d)return `<td style="text-align:center;font-size:11px;padding:5px 4px;">${pdbLvBadge(l)}<br><span style="color:var(--dim);font-size:10px;">${d}</span></td>`;
+    if(l===cl)return `<td style="text-align:center;font-size:11px;padding:5px 4px;">${pdbLvBadge(l)}${p.dateAdded?`<br><span style="color:var(--dim);font-size:10px;">${p.dateAdded}</span>`:''}</td>`;
+    return `<td></td>`;
+  }).join('');
+  return `<div style="border-top:1px solid var(--border);margin:16px 0;padding-top:12px;">
+    <div class="fl" style="margin-bottom:8px;">Advancement Path \u2014 where they are, where they came from</div>
+    <div class="table-outer">
+      <table class="data-table" style="width:100%;">
+        <thead><tr><th>Yrs</th><th>Sessions</th>${PDB_PROMO_TRACK.map(l=>`<th style="min-width:60px;font-size:10px;">${l}</th>`).join('')}</tr></thead>
+        <tbody><tr>
+          <td style="text-align:center;color:var(--dim);">${pdbYrs(p.dateAdded)}</td>
+          <td style="font-size:11px;color:var(--dim);white-space:nowrap;" title="${(p.sessions||[]).join(', ')}">${(p.sessions||[]).map(s=>s.replace('Session ','S')).join(', ')||'\u2014'}</td>
+          ${cells}
+        </tr></tbody>
+      </table>
+    </div>
+  </div>`;
+}
 function pdbHandleCSVFile(file, inputEl){
   if(!file)return;
   const reader=new FileReader();
@@ -534,6 +573,7 @@ function pdbRenderModalBody(p){
         </div>
       </div>
     </div>
+    ${pdbEditingId?pdbAdvancementPathHTML(p):''}
   `;
 }
 function pdbCloseEditModal(){
