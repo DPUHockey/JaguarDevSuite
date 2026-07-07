@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V15</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V16</div>
 
 <nav>
   <div class="nav-left">
@@ -1072,9 +1072,25 @@ function openPromoModal(sNum, rowIdx, overrideToLevel){
       </div>
       <div style="margin-top:8px;">
         <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">Override Promoted-To Level</label>
-        <select id="promo-override" class="promo-select" style="width:100%;padding:7px 10px;font-size:13px;">
+        <select id="promo-override" class="promo-select" style="width:100%;padding:7px 10px;font-size:13px;" onchange="promoOverrideChanged()">
           ${LEVEL_ORDER.map(l=>`<option value="${l}"${l===nl?' selected':''}>${l}</option>`).join('')}
         </select>
+      </div>
+      <div id="promo-timing-wrap" style="margin-top:8px;display:${(nl==='ADM'||nl==='InHouse')?'block':'none'};">
+        <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">When</label>
+        <select id="promo-timing" class="promo-select" style="width:100%;padding:7px 10px;font-size:13px;">
+          <option value="next">Next Session</option>
+          <option value="immediate">Immediate</option>
+        </select>
+        <div style="font-size:11px;color:var(--dim);margin-top:4px;">Immediate directly adds this athlete to <span id="promo-timing-target">ADM</span>'s active roster on this device right now. Next Session just records the decision -- no data moves yet.</div>
+        <div id="promo-adm-level-wrap" style="margin-top:8px;display:${nl==='ADM'?'block':'none'};">
+          <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">Starting ADM Level</label>
+          <select id="promo-adm-level" class="promo-select" style="width:100%;padding:7px 10px;font-size:13px;">
+            <option value="co">ADM Mini</option>
+            <option value="al">ADM Minor</option>
+            <option value="ea">ADM Major</option>
+          </select>
+        </div>
       </div>
       <div style="margin-top:8px;">
         <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">Promotion Notes</label>
@@ -1096,11 +1112,89 @@ function closePromoModal(){
   pendingPromo=null;
 }
 
+function promoOverrideChanged(){
+  const val=document.getElementById('promo-override').value;
+  const wrap=document.getElementById('promo-timing-wrap');
+  const targetLbl=document.getElementById('promo-timing-target');
+  const admLevelWrap=document.getElementById('promo-adm-level-wrap');
+  if(val==='ADM'||val==='InHouse'){
+    wrap.style.display='block';
+    if(targetLbl)targetLbl.textContent=val;
+    if(admLevelWrap)admLevelWrap.style.display=val==='ADM'?'block':'none';
+  }else{
+    wrap.style.display='none';
+  }
+}
+function dciUid(){ return '_'+Math.random().toString(36).slice(2,9); }
+// Directly adds this athlete to ADM's CURRENT season master list on this device.
+function dciMoveToAdm(row,admLevel){
+  try{
+    const raw=localStorage.getItem('adm_roster_v1');
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(!d.SEASONS||!d.currentSeason||!d.SEASONS[d.currentSeason])return false;
+    const season=d.SEASONS[d.currentSeason];
+    if(!season.masterList)season.masterList=[];
+    const matchKey=(row.first_name||'').toLowerCase().trim()+'|'+(row.last_name||'').toLowerCase().trim()+'|'+(row.birthdate||'').trim();
+    const already=season.masterList.some(x=>{
+      const k=(x.first||'').toLowerCase().trim()+'|'+(x.last||'').toLowerCase().trim()+'|'+(x.birthdate||'').trim();
+      return k===matchKey;
+    });
+    if(!already){
+      season.masterList.push({
+        id:dciUid(), first:row.first_name, last:row.last_name, birthdate:row.birthdate, level:admLevel||'co', promotionDecision:null,
+        p1Name:row.parent1_name||'', p1Email:row.parent1_email||'', p1Phone:row.parent1_phone||'',
+        p2Name:row.parent2_name||'', p2Email:row.parent2_email||'', p2Phone:row.parent2_phone||'',
+        address:row.address||'', city:row.city||'', state:row.state||'', zip:row.zip||'',
+        promotedInFrom:'devcheckin', promotedInDate:todayISO()
+      });
+    }
+    localStorage.setItem('adm_roster_v1',JSON.stringify(d));
+    return true;
+  }catch(e){ return false; }
+}
+// Directly adds this athlete to InHouse's CURRENT season master list + free agent pool.
+function dciMoveToIH(row){
+  try{
+    const raw=localStorage.getItem('ih_roster_v2');
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(!d.SEASONS||!d.currentSeason||!d.SEASONS[d.currentSeason])return false;
+    const season=d.SEASONS[d.currentSeason];
+    if(!season.masterList)season.masterList=[];
+    if(!season.main)season.main=[];
+    const matchKey=(row.first_name||'').toLowerCase().trim()+'|'+(row.last_name||'').toLowerCase().trim()+'|'+(row.birthdate||'').trim();
+    const already=season.masterList.some(x=>{
+      const k=(x.first||'').toLowerCase().trim()+'|'+(x.last||'').toLowerCase().trim()+'|'+(x.birthdate||'').trim();
+      return k===matchKey;
+    });
+    if(!already){
+      const newId=dciUid();
+      season.masterList.push({
+        id:newId, first:row.first_name, last:row.last_name, birthdate:row.birthdate, promotionDecision:null,
+        p1Name:row.parent1_name||'', p1Email:row.parent1_email||'', p1Phone:row.parent1_phone||'',
+        p2Name:row.parent2_name||'', p2Email:row.parent2_email||'', p2Phone:row.parent2_phone||'',
+        address:row.address||'', city:row.city||'', state:row.state||'', zip:row.zip||''
+      });
+      season.main.push({id:newId, first:row.first_name, last:row.last_name, birthdate:row.birthdate});
+    }
+    localStorage.setItem('ih_roster_v2',JSON.stringify(d));
+    return true;
+  }catch(e){ return false; }
+}
 function confirmPromo(){
   if(!pendingPromo)return;
   const{sNum,rowIdx,fromLevel,row}=pendingPromo;
   const toLevel=document.getElementById('promo-override').value||pendingPromo.toLevel;
   if(!toLevel){showAlert('Please select a promoted-to level','err');return;}
+  const isAdmOrIH=(toLevel==='ADM'||toLevel==='InHouse');
+  const timingEl=document.getElementById('promo-timing');
+  const timing=isAdmOrIH?(timingEl?timingEl.value:'next'):null;
+  if(isAdmOrIH&&timing==='immediate'){
+    if(!confirm(`Add ${row.first_name} ${row.last_name} directly to ${toLevel}'s active roster right now? This directly edits ${toLevel}'s live data on this device.`)){
+      return;
+    }
+  }
   const promoNotes=v('promo-notes');const promoSt='Confirmed';
   const promoRecord={first_name:row.first_name,last_name:row.last_name,birthdate:row.birthdate,from_level:fromLevel,to_level:toLevel,promoted_on:todayISO(),promo_status:promoSt,notes:promoNotes,parent1_name:row.parent1_name,parent1_email:row.parent1_email,parent1_phone:row.parent1_phone,parent2_name:row.parent2_name,parent2_email:row.parent2_email,parent2_phone:row.parent2_phone};
   if(!DB['promo'+sNum])DB['promo'+sNum]=[];
@@ -1128,7 +1222,14 @@ function confirmPromo(){
   // switch to promotions sub-tab
   activeSubTab['session'+sNum]='promo';
   renderSessionPanel(sNum);updateStats();
-  showAlert(`✓ ${row.first_name} ${row.last_name} promoted ${fromLevel} → ${toLevel}`,'ok');
+  if(isAdmOrIH&&timing==='immediate'){
+    const admLevelEl=document.getElementById('promo-adm-level');
+    const admLevel=admLevelEl?admLevelEl.value:'co';
+    const moved=toLevel==='ADM'?dciMoveToAdm(row,admLevel):dciMoveToIH(row);
+    showAlert(moved?`\u2713 ${row.first_name} ${row.last_name} promoted ${fromLevel} \u2192 ${toLevel} and added to ${toLevel}'s active roster.`:`Promotion recorded, but couldn't reach ${toLevel}'s data on this device \u2014 add them there manually.`, moved?'ok':'err');
+  }else{
+    showAlert(`\u2713 ${row.first_name} ${row.last_name} promoted ${fromLevel} \u2192 ${toLevel}`,'ok');
+  }
 }
 
 function updateNextLevelDisplay(sk,i){} // no-op, value read at promote-click time
