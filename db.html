@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V16</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V17</div>
 
 <nav>
   <div class="nav-left">
@@ -1079,8 +1079,8 @@ function openPromoModal(sNum, rowIdx, overrideToLevel){
       <div id="promo-timing-wrap" style="margin-top:8px;display:${(nl==='ADM'||nl==='InHouse')?'block':'none'};">
         <label style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:6px;">When</label>
         <select id="promo-timing" class="promo-select" style="width:100%;padding:7px 10px;font-size:13px;">
+          <option value="immediate" selected>Immediate</option>
           <option value="next">Next Session</option>
-          <option value="immediate">Immediate</option>
         </select>
         <div style="font-size:11px;color:var(--dim);margin-top:4px;">Immediate directly adds this athlete to <span id="promo-timing-target">ADM</span>'s active roster on this device right now. Next Session just records the decision -- no data moves yet.</div>
         <div id="promo-adm-level-wrap" style="margin-top:8px;display:${nl==='ADM'?'block':'none'};">
