@@ -45,11 +45,19 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .board-frame{border-radius:14px;padding:18px;position:relative;}
 .board-frame.chalk{background:linear-gradient(135deg,#5a3a20,#3d2814);box-shadow:0 20px 60px rgba(0,0,0,.6);}
 .board-frame.white{background:linear-gradient(135deg,#c8ccd0,#9aa0a6);box-shadow:0 20px 60px rgba(0,0,0,.5);}
-.board-surface{border-radius:8px;padding:36px;min-height:400px;position:relative;overflow:hidden;}
+.board-surface{border-radius:8px;padding:0;min-height:560px;position:relative;overflow:hidden;}
 .board-surface.chalk{background:#1f3d2e;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.03) 0%,transparent 8%),radial-gradient(circle at 70% 60%,rgba(255,255,255,.025) 0%,transparent 10%),radial-gradient(circle at 40% 80%,rgba(255,255,255,.02) 0%,transparent 6%);box-shadow:inset 0 0 80px rgba(0,0,0,.5);}
 .board-surface.white{background:#fafafa;background-image:linear-gradient(rgba(0,0,0,.015) 1px,transparent 1px);background-size:100% 42px;box-shadow:inset 0 0 40px rgba(0,0,0,.08);}
-.board-notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:28px;align-items:start;}
-.board-note{position:relative;}
+#board-notes-area{position:relative;width:100%;height:100%;min-height:560px;}
+.board-note{position:absolute;touch-action:none;user-select:none;}
+.board-note.editable{cursor:grab;}
+.board-note.editable:active{cursor:grabbing;}
+.board-note-inner{width:100%;height:100%;overflow:hidden;display:flex;flex-direction:column;}
+.resize-handle{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;opacity:0;transition:opacity .15s;}
+.board-note:hover .resize-handle{opacity:.6;}
+.resize-handle::after{content:'';position:absolute;right:2px;bottom:2px;width:10px;height:10px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;color:inherit;}
+.board-note.chalk .resize-handle{color:#fff;}
+.board-note.white .resize-handle{color:#333;}
 .board-note-text{white-space:pre-wrap;word-wrap:break-word;line-height:1.35;}
 .board-note-img{max-width:100%;border-radius:4px;display:block;margin-top:8px;}
 .board-note.chalk .board-note-text{color:#fff;text-shadow:0 0 1px rgba(255,255,255,.5),0 0 8px rgba(255,255,255,.15);}
@@ -72,8 +80,11 @@ textarea.fi{resize:vertical;font-family:inherit;}
 
 /* ── DISPLAY MODE (2nd screen, fullscreen, no chrome) ── */
 body.display-mode nav,body.display-mode .hero-strip,body.display-mode .card:not(.board-card){display:none!important;}
-body.display-mode .wrap{padding:20px;max-width:100%;}
-body.display-mode .board-card{margin-bottom:0;border:none;background:none;padding:0;}
+body.display-mode{height:100vh;overflow:hidden;}
+body.display-mode .wrap{padding:12px;max-width:100%;height:100vh;display:flex;flex-direction:column;}
+body.display-mode .board-card{margin-bottom:0;border:none;background:none;padding:0;flex:1;display:flex;min-height:0;}
+body.display-mode .board-frame{flex:1;display:flex;min-height:0;}
+body.display-mode .board-surface{flex:1;min-height:0;}
 .exit-display-btn{position:fixed;top:14px;right:14px;z-index:999;padding:8px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.4);color:#fff;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:12px;display:none;}
 body.display-mode .exit-display-btn{display:block;}
 
@@ -200,7 +211,22 @@ function cbRenderControls(){
 }
 
 // ── ADD / EDIT NOTES ──
-let cbEditingId=null, cbAddType='text';
+let cbEditingId=null, cbAddType='text', cbPendingImageData=null;
+function cbHandleImageFile(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    cbPendingImageData=e.target.result;
+    const preview=document.getElementById('cbF-preview');
+    if(preview){
+      preview.style.display='block';
+      preview.innerHTML=`<img src="${cbPendingImageData}" style="max-width:100%;max-height:140px;border-radius:4px;"/>`;
+    }
+    const urlField=document.getElementById('cbF-img');
+    if(urlField)urlField.value='';
+  };
+  reader.readAsDataURL(file);
+}
 function cbOpenAddModal(type,editId){
   cbAddType=type;
   cbEditingId=editId||null;
@@ -231,10 +257,16 @@ function cbOpenAddModal(type,editId){
       </div>
     `;
   }else{
+    cbPendingImageData=existing&&existing.imgUrl&&existing.imgUrl.startsWith('data:')?existing.imgUrl:null;
     document.getElementById('cbAddModalBody').innerHTML=`
       <div class="fg">
-        <span class="fl">Image URL / Link</span>
-        <input type="text" id="cbF-img" class="fi" placeholder="https://..." value="${existing?existing.imgUrl:''}"/>
+        <span class="fl">Browse for a Picture (PNG or JPEG)</span>
+        <input type="file" id="cbF-file" class="fi" accept="image/png,image/jpeg" onchange="cbHandleImageFile(this.files[0])"/>
+        <div id="cbF-preview" style="margin-top:8px;${cbPendingImageData?'':'display:none;'}"><img src="${cbPendingImageData||''}" style="max-width:100%;max-height:140px;border-radius:4px;"/></div>
+      </div>
+      <div class="fg">
+        <span class="fl">...or paste an Image URL / Link instead</span>
+        <input type="text" id="cbF-img" class="fi" placeholder="https://..." value="${existing&&existing.imgUrl&&!existing.imgUrl.startsWith('data:')?existing.imgUrl:''}"/>
       </div>
       <div class="fg">
         <span class="fl">Caption (optional)</span>
@@ -253,6 +285,13 @@ function cbOpenAddModal(type,editId){
 function cbCloseAddModal(){
   document.getElementById('cbAddModal').classList.add('hidden');
   cbEditingId=null;
+  cbPendingImageData=null;
+}
+// New notes cascade diagonally so they don't all land in exactly the same spot;
+// existing notes keep whatever position/size they were last dragged/resized to.
+function cbNextPosition(){
+  const n=CB.notes.length;
+  return { x: 24 + (n%6)*36, y: 24 + (n%6)*36 };
 }
 function cbSaveNote(){
   const text=(document.getElementById('cbF-text').value||'').trim();
@@ -264,18 +303,21 @@ function cbSaveNote(){
       const n=CB.notes.find(x=>x.id===cbEditingId);
       if(n)Object.assign(n,{text,color,fontSize});
     }else{
-      CB.notes.push({id:uid(),type:'text',text,color,fontSize,dateAdded:new Date().toISOString()});
+      const pos=cbNextPosition();
+      CB.notes.push({id:uid(),type:'text',text,color,fontSize,x:pos.x,y:pos.y,w:260,h:140,dateAdded:new Date().toISOString()});
     }
   }else{
-    const imgUrl=(document.getElementById('cbF-img').value||'').trim();
-    if(!imgUrl){ alert('Please enter an image URL.'); return; }
+    const imgUrl=cbPendingImageData||(document.getElementById('cbF-img').value||'').trim();
+    if(!imgUrl){ alert('Please enter an image URL or browse for a file.'); return; }
     if(cbEditingId){
       const n=CB.notes.find(x=>x.id===cbEditingId);
       if(n)Object.assign(n,{imgUrl,text,color});
     }else{
-      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,dateAdded:new Date().toISOString()});
+      const pos=cbNextPosition();
+      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,x:pos.x,y:pos.y,w:280,h:220,dateAdded:new Date().toISOString()});
     }
   }
+  cbPendingImageData=null;
   saveCB();
   cbCloseAddModal();
   cbRenderBoard();
@@ -285,6 +327,66 @@ function cbDeleteNote(id){
   CB.notes=CB.notes.filter(n=>n.id!==id);
   saveCB();
   cbRenderBoard();
+}
+
+// ── DRAG & RESIZE (edit mode only) ──
+let cbDragId=null, cbDragStartX=0, cbDragStartY=0, cbDragOrigX=0, cbDragOrigY=0;
+let cbResizeId=null, cbResizeStartX=0, cbResizeStartY=0, cbResizeOrigW=0, cbResizeOrigH=0;
+function cbStartDrag(e,id){
+  if(document.body.classList.contains('display-mode'))return;
+  if(e.target.closest('button')||e.target.closest('.resize-handle'))return;
+  const n=CB.notes.find(x=>x.id===id);
+  if(!n)return;
+  cbDragId=id;
+  cbDragStartX=e.clientX; cbDragStartY=e.clientY;
+  cbDragOrigX=n.x; cbDragOrigY=n.y;
+  document.addEventListener('pointermove',cbOnDragMove);
+  document.addEventListener('pointerup',cbOnDragEnd);
+  e.preventDefault();
+}
+function cbOnDragMove(e){
+  if(!cbDragId)return;
+  const n=CB.notes.find(x=>x.id===cbDragId);
+  if(!n)return;
+  const dx=e.clientX-cbDragStartX, dy=e.clientY-cbDragStartY;
+  n.x=Math.max(0,cbDragOrigX+dx);
+  n.y=Math.max(0,cbDragOrigY+dy);
+  const el=document.getElementById('note-'+cbDragId);
+  if(el){ el.style.left=n.x+'px'; el.style.top=n.y+'px'; }
+}
+function cbOnDragEnd(){
+  document.removeEventListener('pointermove',cbOnDragMove);
+  document.removeEventListener('pointerup',cbOnDragEnd);
+  if(cbDragId)saveCB();
+  cbDragId=null;
+}
+function cbStartResize(e,id){
+  if(document.body.classList.contains('display-mode'))return;
+  const n=CB.notes.find(x=>x.id===id);
+  if(!n)return;
+  cbResizeId=id;
+  cbResizeStartX=e.clientX; cbResizeStartY=e.clientY;
+  cbResizeOrigW=n.w; cbResizeOrigH=n.h;
+  document.addEventListener('pointermove',cbOnResizeMove);
+  document.addEventListener('pointerup',cbOnResizeEnd);
+  e.preventDefault();
+  e.stopPropagation();
+}
+function cbOnResizeMove(e){
+  if(!cbResizeId)return;
+  const n=CB.notes.find(x=>x.id===cbResizeId);
+  if(!n)return;
+  const dx=e.clientX-cbResizeStartX, dy=e.clientY-cbResizeStartY;
+  n.w=Math.max(140,cbResizeOrigW+dx);
+  n.h=Math.max(80,cbResizeOrigH+dy);
+  const el=document.getElementById('note-'+cbResizeId);
+  if(el){ el.style.width=n.w+'px'; el.style.height=n.h+'px'; }
+}
+function cbOnResizeEnd(){
+  document.removeEventListener('pointermove',cbOnResizeMove);
+  document.removeEventListener('pointerup',cbOnResizeEnd);
+  if(cbResizeId)saveCB();
+  cbResizeId=null;
 }
 
 // ── RENDER BOARD ──
@@ -300,30 +402,31 @@ function cbRenderBoard(){
     area.innerHTML='<div class="board-empty">Nothing on the board yet'+(isDisplay?'':' -- use "Add to the Board" above to get started')+'.</div>';
     return;
   }
-  area.innerHTML=`<div class="board-notes-grid">
-    ${CB.notes.map(n=>{
-      const noteBody=n.type==='image'
-        ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt=""/>${n.text?`<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||20}px;color:${n.color};margin-top:8px;">${cbEscapeHtml(n.text)}</div>`:''}`
-        : `<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||28}px;color:${n.color};">${cbEscapeHtml(n.text)}</div>`;
-      const editControls=isDisplay?'':`
-        <div class="note-edit-controls">
-          <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="cbOpenAddModal('${n.type}','${n.id}')">Edit</button>
-          <button class="btn-danger" onclick="cbDeleteNote('${n.id}')">Remove</button>
-        </div>`;
-      return `<div class="board-note ${CB.boardStyle}">${noteBody}${editControls}</div>`;
-    }).join('')}
-  </div>`;
+  area.innerHTML=CB.notes.map(n=>{
+    const w=n.w||260, h=n.h||140, x=n.x||0, y=n.y||0;
+    const noteBody=n.type==='image'
+      ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt="" style="max-height:${n.text?'70%':'100%'};object-fit:contain;"/>${n.text?`<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||20}px;color:${n.color};margin-top:6px;">${cbEscapeHtml(n.text)}</div>`:''}`
+      : `<div class="board-note-text" style="font-family:'${CB.font}',cursive;font-size:${n.fontSize||28}px;color:${n.color};">${cbEscapeHtml(n.text)}</div>`;
+    const editControls=isDisplay?'':`
+      <div class="note-edit-controls">
+        <button class="btn-outline" style="padding:4px 10px;font-size:11px;" onclick="event.stopPropagation();cbOpenAddModal('${n.type}','${n.id}')">Edit</button>
+        <button class="btn-danger" onclick="event.stopPropagation();cbDeleteNote('${n.id}')">Remove</button>
+      </div>`;
+    const resizeHandle=isDisplay?'':`<div class="resize-handle" onpointerdown="cbStartResize(event,'${n.id}')"></div>`;
+    return `<div class="board-note ${CB.boardStyle}${isDisplay?'':' editable'}" id="note-${n.id}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;" ${isDisplay?'':`onpointerdown="cbStartDrag(event,'${n.id}')"`}>
+      <div class="board-note-inner">${noteBody}${editControls}</div>
+      ${resizeHandle}
+    </div>`;
+  }).join('');
 }
 
 // ── DISPLAY MODE (2nd screen) ──
 function cbEnterDisplayMode(){
   document.body.classList.add('display-mode');
   cbRenderBoard();
-  if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});
 }
 function cbExitDisplayMode(){
   document.body.classList.remove('display-mode');
-  if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});
   cbRenderBoard();
 }
 
