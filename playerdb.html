@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+<meta name="theme-color" content="#0A0A0A"/>
+<title>Jaguar Development — Player Database</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --gold:#C9A84C;--gold2:#E8CC7A;--gdark:#8A6A1F;--gfaint:rgba(201,168,76,0.08);--gborder:rgba(201,168,76,0.25);
+  --blk:#0A0A0A;--dark:#111;--surf:#181818;--surf2:#202020;--surf3:#282828;
+  --border:#2A2A2A;--wht:#F5F3EE;--dim:rgba(245,243,238,0.6);--faint:rgba(245,243,238,0.08);
+}
+html,body{min-height:100vh;background:var(--blk);color:var(--wht);font-family:'Barlow',sans-serif;}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 60px,rgba(201,168,76,0.012) 60px,rgba(201,168,76,0.012) 61px),repeating-linear-gradient(90deg,transparent,transparent 60px,rgba(201,168,76,0.012) 60px,rgba(201,168,76,0.012) 61px);pointer-events:none;z-index:0;}
+
+nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:60px;background:rgba(10,10,10,0.97);border-bottom:1px solid var(--gborder);backdrop-filter:blur(16px);}
+.nav-left{display:flex;align-items:center;gap:14px;}
+.nav-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--gold);}
+.nav-sub{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-left:1px solid var(--border);padding-left:14px;}
+
+.hero-strip{position:relative;z-index:1;padding:20px 28px 14px;border-bottom:1px solid var(--border);background:linear-gradient(to right,var(--surf),var(--blk));}
+.hero-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.hero-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:4px;color:var(--gold);line-height:1;}
+.hero-desc{font-size:13px;color:var(--dim);margin-top:4px;letter-spacing:.5px;}
+.stat-pills{display:flex;gap:8px;flex-wrap:wrap;}
+.pill{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1px;padding:5px 14px;border-radius:20px;border:1px solid var(--border);color:var(--dim);}
+.pill span{color:var(--gold);font-weight:600;margin-right:4px;}
+
+.wrap{position:relative;z-index:1;padding:20px 28px 60px;max-width:1900px;margin:0 auto;}
+
+.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;}
+.card-sub{font-size:12px;color:var(--dim);margin-bottom:14px;}
+
+.btn{padding:9px 20px;border-radius:6px;border:1px solid var(--gold);background:var(--gold);color:#111;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;letter-spacing:.5px;}
+.btn:hover{background:var(--gold2);}
+.btn-outline{padding:9px 20px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--wht);cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.5px;}
+.btn-outline:hover{border-color:var(--gborder);color:var(--gold);}
+.btn-danger{padding:9px 20px;border-radius:6px;border:1px solid #7a3030;background:none;color:#e07070;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:.5px;}
+
+.upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:22px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surf2);position:relative;}
+.upload-zone:hover{border-color:var(--gold);background:var(--gfaint);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-zone strong{font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:1px;color:var(--wht);display:block;margin-bottom:4px;}
+.csv-format{margin-top:12px;font-size:11px;color:var(--dim);line-height:1.6;background:var(--surf2);border-radius:6px;padding:10px 12px;}
+.csv-result{margin-top:10px;padding:10px 14px;border-radius:6px;font-size:12px;display:none;}
+.csv-result.ok{background:rgba(92,204,136,.1);border:1px solid rgba(92,204,136,.25);color:#5CCC88;}
+.csv-result.err{background:rgba(220,80,80,.1);border:1px solid rgba(220,80,80,.25);color:#e07070;}
+
+.search-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+.search-input{flex:1;min-width:220px;background:#0a0a0a;border:1px solid var(--border);color:var(--wht);padding:8px 12px;border-radius:6px;font-size:13px;}
+.filter-select{background:#0a0a0a;border:1px solid var(--border);color:var(--wht);padding:8px 12px;border-radius:6px;font-size:12px;}
+
+.table-outer{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+table.data-table{width:100%;border-collapse:collapse;font-size:12px;}
+table.data-table thead th{background:var(--surf2);padding:8px 9px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;}
+table.data-table thead th:hover{color:var(--gold);}
+table.data-table tbody td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--wht);white-space:nowrap;}
+table.data-table tbody tr:hover{background:rgba(201,168,76,.04);}
+.tbl-del{background:none;border:1px solid #7a3030;color:#e07070;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;}
+.src-badge{font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;padding:2px 6px;border-radius:10px;border:1px solid var(--border);color:var(--dim);text-transform:uppercase;}
+.src-badge.src-adm{border-color:#4A90D9;color:#7BAEE8;}
+.src-badge.src-ih{border-color:#7CB87C;color:#9CD89C;}
+.src-badge.src-devcheckin{border-color:var(--gborder);color:var(--gold);}
+.src-badge.src-manual{border-color:#B080D0;color:#C8A0E8;}
+.chk{width:16px;height:16px;cursor:pointer;}
+.empty-state{padding:40px;text-align:center;color:#666;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-overlay.hidden{display:none;}
+.modal{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:28px;width:min(600px,92vw);max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.8);}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold);margin-bottom:20px;}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+.fg{margin-bottom:10px;}
+.fl{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:4px;}
+.fi{width:100%;background:#0a0a0a;border:1px solid var(--border);color:var(--wht);padding:7px 10px;border-radius:5px;font-size:13px;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+
+.site-footer{text-align:center;padding:24px;font-size:11px;color:var(--dim);}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-left">
+    <div class="nav-logo">JAGUAR</div>
+    <div class="nav-sub">Player Database</div>
+  </div>
+</nav>
+
+<div class="hero-strip">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-title">Player <span style="color:var(--wht);">Database</span></div>
+      <div class="hero-desc">Every athlete across ADM, InHouse, and Dev Check In — one shared, deduplicated record</div>
+    </div>
+    <div class="stat-pills" id="stat-pills"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <div class="card-title">Sync From Apps</div>
+    <div class="card-sub">Pulls current rosters from ADM, InHouse, and Dev Check In on this device, matching existing records by name + birthdate. No promotion history is backfilled for players who entered directly through ADM or InHouse.</div>
+    <button class="btn" onclick="pdbSyncAllApps()">&#8635; Sync From All Apps Now</button>
+    <div id="pdb-sync-result" class="csv-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Import CSV</div>
+    <div class="card-sub">Add players directly via CSV — same duplicate detection applies.</div>
+    <div class="upload-zone" id="pdb-csv-drop">
+      <input type="file" accept=".csv,text/csv" onchange="pdbHandleCSVFile(this.files[0], this)"/>
+      <strong>Drop CSV here or click to browse</strong>
+    </div>
+    <div class="csv-format">
+      <b>Required column order:</b><br>
+      First &nbsp;|&nbsp; Last &nbsp;|&nbsp; Birthdate &nbsp;|&nbsp; Level &nbsp;|&nbsp; P1 Name &nbsp;|&nbsp; P1 Email &nbsp;|&nbsp; P1 Phone &nbsp;|&nbsp; P2 Name &nbsp;|&nbsp; P2 Email &nbsp;|&nbsp; P2 Phone &nbsp;|&nbsp; Address &nbsp;|&nbsp; City &nbsp;|&nbsp; State &nbsp;|&nbsp; Zip
+    </div>
+    <div id="pdb-csv-result" class="csv-result"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">All Players</div>
+    <div class="search-row">
+      <input type="text" class="search-input" id="pdb-search" placeholder="Search name, level, parent..." oninput="pdbUpdateTable()"/>
+      <select class="filter-select" id="pdb-source-filter" onchange="pdbUpdateTable()">
+        <option value="all">All Sources</option>
+        <option value="adm">ADM</option>
+        <option value="ih">InHouse</option>
+        <option value="devcheckin">Dev Check In</option>
+        <option value="manual">Manual</option>
+      </select>
+      <button class="btn-outline" onclick="pdbOpenAddModal()">+ Add Player</button>
+      <button class="btn-outline" onclick="pdbExportCSV()">Export CSV</button>
+    </div>
+    <div id="pdb-table-area"></div>
+  </div>
+
+</div>
+
+<div class="modal-overlay hidden" id="pdbEditModal">
+  <div class="modal">
+    <div class="modal-title" id="pdbEditModalTitle">Edit Player</div>
+    <div id="pdbEditModalBody"></div>
+    <div class="modal-actions">
+      <button class="btn-danger" onclick="pdbDeleteFromModal()" style="margin-right:auto;">Delete</button>
+      <button class="btn-outline" onclick="pdbCloseEditModal()">Cancel</button>
+      <button class="btn" onclick="pdbSaveEditModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="site-footer">Jaguar Development Suite — Player Database</div>
+
+<script>
+// ── DATA MODEL ──
+const PDB_KEY='jag_player_database_v1';
+function uid(){ return '_'+Math.random().toString(36).slice(2,9); }
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function mkEmptyPDBPlayer(){
+  return{
+    id:uid(),
+    first_name:'', last_name:'', birthdate:'',
+    parent1_name:'', parent1_email:'', parent1_phone:'',
+    parent2_name:'', parent2_email:'', parent2_phone:'',
+    address:'', city:'', state:'', zip:'',
+    level:'', status:'Active', waiver:'',
+    sessions:[], // Dev Check In specific (e.g. "Session 1")
+    promoHistory:[], // [{level,date}] -- only ever populated for Dev Check In-originated players
+    sourceApps:[], // which app(s) this record has been seen coming from
+    travelDateAccepted:'', bonusEligible:false, bonusPaid:false,
+    dateAdded:todayISO()
+  };
+}
+let PDB=[];
+function savePDB(){ try{localStorage.setItem(PDB_KEY,JSON.stringify(PDB));}catch(e){} }
+function loadPDB(){
+  try{
+    const raw=localStorage.getItem(PDB_KEY);
+    if(raw){ const p=JSON.parse(raw); if(Array.isArray(p))PDB=p; }
+  }catch(e){}
+}
+loadPDB();
+
+// Matches ADM/IH/Dev Check In's own existing duplicate-detection convention exactly:
+// lowercased first + last + birthdate.
+function pdbKey(p){
+  return (p.first_name||'').toLowerCase().trim()+'|'+(p.last_name||'').toLowerCase().trim()+'|'+(p.birthdate||'').trim();
+}
+
+// ── SYNC FROM OTHER APPS ──
+// Pulls whatever's CURRENTLY in each app's storage on this device/browser. Doesn't
+// backfill promotion history for players who entered through ADM or InHouse directly
+// -- they just start fresh from whatever level they're at, per design.
+function pdbSyncAllApps(){
+  let added=0, updated=0, sources={adm:0,ih:0,devcheckin:0};
+
+  // ADM: adm_roster_v1 -> SEASONS.{fall,winter,spring,summer}.masterList
+  try{
+    const raw=localStorage.getItem('adm_roster_v1');
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d.SEASONS){
+        Object.values(d.SEASONS).forEach(season=>{
+          (season.masterList||[]).forEach(m=>{
+            const rec=pdbUpsertFromSource({
+              first_name:m.first||'', last_name:m.last||'', birthdate:m.birthdate||'',
+              parent1_name:m.p1Name||'', parent1_email:m.p1Email||'', parent1_phone:m.p1Phone||'',
+              parent2_name:m.p2Name||'', parent2_email:m.p2Email||'', parent2_phone:m.p2Phone||'',
+              address:m.address||'', city:m.city||'', state:m.state||'', zip:m.zip||'',
+              level: m.level? ({co:'Mini Mite',al:'Minor Mite',ea:'Major Mite'}[m.level]||m.level) : ''
+            },'adm');
+            if(rec==='added')added++; else if(rec==='updated')updated++;
+            sources.adm++;
+          });
+        });
+      }
+    }
+  }catch(e){}
+
+  // InHouse: ih_roster_v2 -> SEASONS.{fall,...}.masterList
+  try{
+    const raw=localStorage.getItem('ih_roster_v2');
+    if(raw){
+      const d=JSON.parse(raw);
+      if(d.SEASONS){
+        Object.values(d.SEASONS).forEach(season=>{
+          (season.masterList||[]).forEach(m=>{
+            const rec=pdbUpsertFromSource({
+              first_name:m.first||'', last_name:m.last||'', birthdate:m.birthdate||'',
+              parent1_name:m.p1Name||'', parent1_email:m.p1Email||'', parent1_phone:m.p1Phone||'',
+              parent2_name:m.p2Name||'', parent2_email:m.p2Email||'', parent2_phone:m.p2Phone||'',
+              address:m.address||'', city:m.city||'', state:m.state||'', zip:m.zip||'',
+              level:'InHouse'
+            },'ih');
+            if(rec==='added')added++; else if(rec==='updated')updated++;
+            sources.ih++;
+          });
+        });
+      }
+    }
+  }catch(e){}
+
+  // Dev Check In: jaguar_master_v1 -> master[] (richest source -- carries real promo history)
+  try{
+    const raw=localStorage.getItem('jaguar_master_v1');
+    if(raw){
+      const d=JSON.parse(raw);
+      (d.master||[]).forEach(m=>{
+        const rec=pdbUpsertFromSource({
+          first_name:m.first_name||'', last_name:m.last_name||'', birthdate:m.birthdate||'',
+          parent1_name:m.parent1_name||'', parent1_email:m.parent1_email||'', parent1_phone:m.parent1_phone||'',
+          parent2_name:m.parent2_name||'', parent2_email:m.parent2_email||'', parent2_phone:m.parent2_phone||'',
+          address:m.address||'', city:m.city||'', state:m.state||'', zip:m.zip||'',
+          level:m.level||'', status:m.status||'Active', waiver:m.waiver||'',
+          sessions:m._sessions||[], promoHistory:m._promoHistory||[]
+        },'devcheckin');
+        if(rec==='added')added++; else if(rec==='updated')updated++;
+        sources.devcheckin++;
+      });
+    }
+  }catch(e){}
+
+  savePDB();
+  pdbRenderStats();
+  pdbUpdateTable();
+  const el=document.getElementById('pdb-sync-result');
+  el.className='csv-result ok';
+  el.textContent=`Synced \u2014 checked ${sources.adm} ADM, ${sources.ih} InHouse, ${sources.devcheckin} Dev Check In record(s). ${added} new player(s) added, ${updated} existing record(s) updated.`;
+  el.style.display='block';
+  setTimeout(()=>{el.style.display='none';},8000);
+}
+// Adds a new player or updates an existing one's contact/level info (without ever
+// erasing promo history or bonus/travel fields already on file), tagging which
+// source app(s) this record has been seen coming from.
+function pdbUpsertFromSource(fields, sourceApp){
+  if(!fields.first_name&&!fields.last_name)return null;
+  const key=pdbKey(fields);
+  const existingIdx=PDB.findIndex(p=>pdbKey(p)===key);
+  if(existingIdx>=0){
+    const ex=PDB[existingIdx];
+    if(!ex.sourceApps.includes(sourceApp))ex.sourceApps.push(sourceApp);
+    // Fill in any blank contact fields from this source; never overwrite non-blank data.
+    ['parent1_name','parent1_email','parent1_phone','parent2_name','parent2_email','parent2_phone','address','city','state','zip'].forEach(f=>{
+      if(!ex[f]&&fields[f])ex[f]=fields[f];
+    });
+    if(fields.level&&!ex.level)ex.level=fields.level;
+    if(fields.sessions&&fields.sessions.length){ fields.sessions.forEach(s=>{ if(!ex.sessions.includes(s))ex.sessions.push(s); }); }
+    if(fields.promoHistory&&fields.promoHistory.length&&!ex.promoHistory.length)ex.promoHistory=fields.promoHistory;
+    return 'updated';
+  }else{
+    const rec=Object.assign(mkEmptyPDBPlayer(),fields,{sourceApps:[sourceApp]});
+    PDB.push(rec);
+    return 'added';
+  }
+}
+
+// ── CSV IMPORT (quote-aware, position-based Parent 1/2 detection) ──
+function pdbParseCsvLine(line){
+  const result=[];
+  let cur='', inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(inQuotes){
+      if(c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else{inQuotes=false;} }
+      else{cur+=c;}
+    }else{
+      if(c==='"'){inQuotes=true;}
+      else if(c===','){result.push(cur);cur='';}
+      else{cur+=c;}
+    }
+  }
+  result.push(cur);
+  return result.map(s=>s.trim());
+}
+function pdbCapitalize(s){ return (s||'').trim().split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1).toLowerCase():'').join(' '); }
+function pdbHandleCSVFile(file, inputEl){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    pdbImportCSVText(e.target.result);
+    if(inputEl)inputEl.value='';
+  };
+  reader.onerror=()=>{ pdbShowCSVResult('err','Could not read file.'); if(inputEl)inputEl.value=''; };
+  reader.readAsText(file);
+}
+function pdbShowCSVResult(type,msg){
+  const el=document.getElementById('pdb-csv-result');
+  if(!el){ alert(msg); return; }
+  el.className='csv-result '+type;
+  el.textContent=msg;
+  el.style.display='block';
+  setTimeout(()=>{el.style.display='none';},8000);
+}
+function pdbImportCSVText(text){
+  try{
+    const lines=text.split(/\r\n|\r|\n/).filter(l=>l.trim());
+    if(lines.length<2){ pdbShowCSVResult('err','File appears empty or has no data rows.'); return; }
+    const headers=pdbParseCsvLine(lines[0]).map(h=>h.trim().toLowerCase().replace(/[^a-z0-9]/g,''));
+    const fi=headers.findIndex(h=>h.includes('first'));
+    const li=headers.findIndex(h=>h.includes('last'));
+    const bi=headers.findIndex(h=>h.includes('birth')||h.includes('dob'));
+    const lvi=headers.findIndex(h=>h.includes('level'));
+    const nameIdx=headers.map((h,i)=>(h.includes('name')&&!h.includes('first')&&!h.includes('last'))?i:-1).filter(i=>i>=0);
+    const emailIdx=headers.map((h,i)=>h.includes('email')?i:-1).filter(i=>i>=0);
+    const phoneIdx=headers.map((h,i)=>h.includes('phone')?i:-1).filter(i=>i>=0);
+    const p1ni=nameIdx[0]??-1, p2ni=nameIdx[1]??-1;
+    const p1ei=emailIdx[0]??-1, p2ei=emailIdx[1]??-1;
+    const p1pi=phoneIdx[0]??-1, p2pi=phoneIdx[1]??-1;
+    const adi=headers.findIndex(h=>h.includes('address'));
+    const cii=headers.findIndex(h=>h.includes('city'));
+    const sti=headers.findIndex(h=>h.includes('state'));
+    const zii=headers.findIndex(h=>h.includes('zip')||h.includes('postal'));
+    if(fi<0||li<0){ pdbShowCSVResult('err','Could not find required columns. Need at least: First, Last.'); return; }
+
+    let added=0, updated=0, skipped=0;
+    for(let i=1;i<lines.length;i++){
+      const cols=pdbParseCsvLine(lines[i]).map(c=>c.replace(/^"|"$/g,''));
+      if(cols.length<Math.max(fi,li)+1){ skipped++; continue; }
+      const first=pdbCapitalize(cols[fi]||'');
+      const last=pdbCapitalize(cols[li]||'');
+      if(!first&&!last){ skipped++; continue; }
+      const fields={
+        first_name:first, last_name:last, birthdate:bi>=0?(cols[bi]||''):'',
+        level:lvi>=0?(cols[lvi]||''):'',
+        parent1_name:p1ni>=0?(cols[p1ni]||''):'', parent1_email:p1ei>=0?(cols[p1ei]||''):'', parent1_phone:p1pi>=0?(cols[p1pi]||''):'',
+        parent2_name:p2ni>=0?(cols[p2ni]||''):'', parent2_email:p2ei>=0?(cols[p2ei]||''):'', parent2_phone:p2pi>=0?(cols[p2pi]||''):'',
+        address:adi>=0?(cols[adi]||''):'', city:cii>=0?(cols[cii]||''):'', state:sti>=0?(cols[sti]||''):'', zip:zii>=0?(cols[zii]||''):''
+      };
+      const result=pdbUpsertFromSource(fields,'manual');
+      if(result==='added')added++; else if(result==='updated')updated++;
+    }
+    savePDB();
+    pdbRenderStats();
+    pdbUpdateTable();
+    pdbShowCSVResult('ok', `${added} player${added!==1?'s':''} added, ${updated} updated.${skipped?' ('+skipped+' rows skipped)':''}`);
+  }catch(err){
+    pdbShowCSVResult('err','Import failed: '+(err&&err.message?err.message:err));
+  }
+}
+
+// ── TABLE RENDERING ──
+let pdbSort={col:'last_name',dir:'asc'};
+function pdbSortBy(col){
+  if(pdbSort.col===col){ pdbSort.dir=pdbSort.dir==='asc'?'desc':'asc'; }
+  else{ pdbSort.col=col; pdbSort.dir='asc'; }
+  pdbUpdateTable();
+}
+function pdbSortVal(p,col){ return (p[col]||'').toString().toLowerCase(); }
+function pdbTh(col,label){
+  const arrow=pdbSort.col===col?(pdbSort.dir==='asc'?' \u25B2':' \u25BC'):'';
+  return `<th onclick="pdbSortBy('${col}')">${label}${arrow}</th>`;
+}
+function pdbGetFiltered(){
+  const q=(document.getElementById('pdb-search').value||'').toLowerCase();
+  const srcFilter=document.getElementById('pdb-source-filter').value;
+  let disp=PDB;
+  if(q){
+    disp=disp.filter(p=>
+      (p.first_name||'').toLowerCase().includes(q)||
+      (p.last_name||'').toLowerCase().includes(q)||
+      (p.level||'').toLowerCase().includes(q)||
+      (p.parent1_name||'').toLowerCase().includes(q)
+    );
+  }
+  if(srcFilter!=='all')disp=disp.filter(p=>(p.sourceApps||[]).includes(srcFilter));
+  disp=disp.slice().sort((a,b)=>{
+    const av=pdbSortVal(a,pdbSort.col), bv=pdbSortVal(b,pdbSort.col);
+    const cmp=av<bv?-1:av>bv?1:0;
+    return pdbSort.dir==='asc'?cmp:-cmp;
+  });
+  return disp;
+}
+function pdbSrcBadges(p){
+  return (p.sourceApps||[]).map(s=>`<span class="src-badge src-${s}">${s==='devcheckin'?'Dev CI':s.toUpperCase()}</span>`).join(' ');
+}
+function pdbUpdateTable(){
+  const area=document.getElementById('pdb-table-area');
+  const disp=pdbGetFiltered();
+  if(!disp.length){
+    area.innerHTML='<div class="empty-state">No players yet. Sync from apps or import a CSV above.</div>';
+    return;
+  }
+  const rows=disp.map(p=>{
+    const oi=PDB.indexOf(p);
+    return `<tr>
+      <td style="cursor:pointer;color:var(--gold2);" onclick="pdbOpenEditModal('${p.id}')">${p.first_name||''}</td>
+      <td style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="pdbOpenEditModal('${p.id}')">${p.last_name||''}</td>
+      <td style="color:var(--dim);font-size:11px;">${p.birthdate||''}</td>
+      <td>${p.level||''}</td>
+      <td>${pdbSrcBadges(p)}</td>
+      <td style="font-size:11px;">${(p.promoHistory||[]).map(h=>h.level).join(', ')}</td>
+      <td>${p.travelDateAccepted||''}</td>
+      <td style="text-align:center;">${p.bonusEligible?'\u2713':''}</td>
+      <td style="text-align:center;">${p.bonusPaid?'\u2713':''}</td>
+      <td><button class="tbl-del" onclick="pdbQuickDelete('${p.id}')">Del</button></td>
+      <td style="font-size:11px;">${p.parent1_name||''}</td>
+      <td style="font-size:11px;">${p.parent1_email||''}</td>
+      <td style="font-size:11px;">${p.parent1_phone||''}</td>
+      <td style="font-size:11px;">${p.parent2_name||''}</td>
+      <td style="font-size:11px;">${p.parent2_email||''}</td>
+      <td style="font-size:11px;">${p.parent2_phone||''}</td>
+      <td style="font-size:11px;">${p.address||''}</td>
+      <td style="font-size:11px;">${p.city||''}</td>
+      <td style="font-size:11px;">${p.state||''}</td>
+      <td style="font-size:11px;">${p.zip||''}</td>
+    </tr>`;
+  }).join('');
+  area.innerHTML=`<div class="table-outer"><table class="data-table">
+    <thead><tr>
+      ${pdbTh('first_name','First')}${pdbTh('last_name','Last')}${pdbTh('birthdate','Birthdate')}${pdbTh('level','Level')}
+      <th>Source</th><th>Promo History</th>
+      ${pdbTh('travelDateAccepted','Travel Date Accepted')}<th>Bonus Eligible</th><th>Bonus Paid</th><th>Actions</th>
+      ${pdbTh('parent1_name','P1 Name')}${pdbTh('parent1_email','P1 Email')}${pdbTh('parent1_phone','P1 Phone')}
+      ${pdbTh('parent2_name','P2 Name')}${pdbTh('parent2_email','P2 Email')}${pdbTh('parent2_phone','P2 Phone')}
+      ${pdbTh('address','Address')}${pdbTh('city','City')}${pdbTh('state','State')}${pdbTh('zip','Zip')}
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+function pdbRenderStats(){
+  const wrap=document.getElementById('stat-pills');
+  const bySource={adm:0,ih:0,devcheckin:0,manual:0};
+  PDB.forEach(p=>(p.sourceApps||[]).forEach(s=>{ if(bySource[s]!==undefined)bySource[s]++; }));
+  wrap.innerHTML=`
+    <div class="pill"><span>${PDB.length}</span>Total Players</div>
+    <div class="pill"><span>${bySource.adm}</span>ADM</div>
+    <div class="pill"><span>${bySource.ih}</span>InHouse</div>
+    <div class="pill"><span>${bySource.devcheckin}</span>Dev Check In</div>
+  `;
+}
+function pdbQuickDelete(id){
+  const p=PDB.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm(`Delete ${p.first_name} ${p.last_name} from the Player Database? This cannot be undone. (This does NOT delete them from ADM/InHouse/Dev Check In -- only from this shared database.)`))return;
+  PDB=PDB.filter(x=>x.id!==id);
+  savePDB();
+  pdbRenderStats();
+  pdbUpdateTable();
+}
+
+// ── ADD / EDIT MODAL ──
+let pdbEditingId=null;
+function pdbOpenAddModal(){
+  pdbEditingId=null;
+  document.getElementById('pdbEditModalTitle').textContent='Add Player';
+  pdbRenderModalBody(mkEmptyPDBPlayer());
+  document.getElementById('pdbEditModal').classList.remove('hidden');
+}
+function pdbOpenEditModal(id){
+  const p=PDB.find(x=>x.id===id);
+  if(!p)return;
+  pdbEditingId=id;
+  document.getElementById('pdbEditModalTitle').textContent='Edit '+(p.first_name||'')+' '+(p.last_name||'');
+  pdbRenderModalBody(p);
+  document.getElementById('pdbEditModal').classList.remove('hidden');
+}
+function pdbRenderModalBody(p){
+  document.getElementById('pdbEditModalBody').innerHTML=`
+    <div class="modal-grid">
+      <div class="fg"><span class="fl">First Name</span><input class="fi" id="pdbF-first" value="${p.first_name||''}"/></div>
+      <div class="fg"><span class="fl">Last Name</span><input class="fi" id="pdbF-last" value="${p.last_name||''}"/></div>
+      <div class="fg"><span class="fl">Birthdate</span><input class="fi" id="pdbF-bd" value="${p.birthdate||''}"/></div>
+      <div class="fg"><span class="fl">Level</span><input class="fi" id="pdbF-level" value="${p.level||''}"/></div>
+    </div>
+    <div class="modal-grid">
+      <div class="fg"><span class="fl">P1 Name</span><input class="fi" id="pdbF-p1n" value="${p.parent1_name||''}"/></div>
+      <div class="fg"><span class="fl">P1 Email</span><input class="fi" id="pdbF-p1e" value="${p.parent1_email||''}"/></div>
+      <div class="fg"><span class="fl">P1 Phone</span><input class="fi" id="pdbF-p1p" value="${p.parent1_phone||''}"/></div>
+      <div class="fg"><span class="fl">P2 Name</span><input class="fi" id="pdbF-p2n" value="${p.parent2_name||''}"/></div>
+      <div class="fg"><span class="fl">P2 Email</span><input class="fi" id="pdbF-p2e" value="${p.parent2_email||''}"/></div>
+      <div class="fg"><span class="fl">P2 Phone</span><input class="fi" id="pdbF-p2p" value="${p.parent2_phone||''}"/></div>
+    </div>
+    <div class="modal-grid">
+      <div class="fg"><span class="fl">Address</span><input class="fi" id="pdbF-addr" value="${p.address||''}"/></div>
+      <div class="fg"><span class="fl">City</span><input class="fi" id="pdbF-city" value="${p.city||''}"/></div>
+      <div class="fg"><span class="fl">State</span><input class="fi" id="pdbF-state" value="${p.state||''}"/></div>
+      <div class="fg"><span class="fl">Zip</span><input class="fi" id="pdbF-zip" value="${p.zip||''}"/></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:12px;">
+      <div class="fl" style="margin-bottom:8px;">Travel &amp; Bonus</div>
+      <div class="modal-grid">
+        <div class="fg"><span class="fl">Travel Date Accepted</span><input class="fi" id="pdbF-traveldate" value="${p.travelDateAccepted||''}" placeholder="YYYY-MM-DD"/></div>
+        <div class="fg" style="display:flex;gap:20px;align-items:center;padding-top:14px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="chk" id="pdbF-bonuselig" ${p.bonusEligible?'checked':''}/> Bonus Eligible</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" class="chk" id="pdbF-bonuspaid" ${p.bonusPaid?'checked':''}/> Bonus Paid</label>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function pdbCloseEditModal(){
+  document.getElementById('pdbEditModal').classList.add('hidden');
+  pdbEditingId=null;
+}
+function pdbSaveEditModal(){
+  const fields={
+    first_name:pdbCapitalize(document.getElementById('pdbF-first').value),
+    last_name:pdbCapitalize(document.getElementById('pdbF-last').value),
+    birthdate:document.getElementById('pdbF-bd').value.trim(),
+    level:document.getElementById('pdbF-level').value.trim(),
+    parent1_name:document.getElementById('pdbF-p1n').value.trim(),
+    parent1_email:document.getElementById('pdbF-p1e').value.trim(),
+    parent1_phone:document.getElementById('pdbF-p1p').value.trim(),
+    parent2_name:document.getElementById('pdbF-p2n').value.trim(),
+    parent2_email:document.getElementById('pdbF-p2e').value.trim(),
+    parent2_phone:document.getElementById('pdbF-p2p').value.trim(),
+    address:document.getElementById('pdbF-addr').value.trim(),
+    city:document.getElementById('pdbF-city').value.trim(),
+    state:document.getElementById('pdbF-state').value.trim(),
+    zip:document.getElementById('pdbF-zip').value.trim(),
+    travelDateAccepted:document.getElementById('pdbF-traveldate').value.trim(),
+    bonusEligible:document.getElementById('pdbF-bonuselig').checked,
+    bonusPaid:document.getElementById('pdbF-bonuspaid').checked
+  };
+  if(!fields.first_name&&!fields.last_name){ alert('First or last name is required.'); return; }
+  if(pdbEditingId){
+    const p=PDB.find(x=>x.id===pdbEditingId);
+    if(p)Object.assign(p,fields);
+  }else{
+    const key=(fields.first_name||'').toLowerCase().trim()+'|'+(fields.last_name||'').toLowerCase().trim()+'|'+(fields.birthdate||'').trim();
+    if(PDB.some(p=>pdbKey(p)===key)){
+      if(!confirm('A player with this name and birthdate already exists. Add as a separate record anyway?'))return;
+    }
+    const rec=Object.assign(mkEmptyPDBPlayer(),fields,{sourceApps:['manual']});
+    PDB.push(rec);
+  }
+  savePDB();
+  pdbCloseEditModal();
+  pdbRenderStats();
+  pdbUpdateTable();
+}
+function pdbDeleteFromModal(){
+  if(!pdbEditingId){ pdbCloseEditModal(); return; }
+  const p=PDB.find(x=>x.id===pdbEditingId);
+  if(!p)return;
+  if(!confirm(`Delete ${p.first_name} ${p.last_name}? This cannot be undone.`))return;
+  PDB=PDB.filter(x=>x.id!==pdbEditingId);
+  savePDB();
+  pdbCloseEditModal();
+  pdbRenderStats();
+  pdbUpdateTable();
+}
+
+// ── EXPORT ──
+function pdbExportCSV(){
+  const headers=['First','Last','Birthdate','Level','Sources','Promo History','Travel Date Accepted','Bonus Eligible','Bonus Paid','P1 Name','P1 Email','P1 Phone','P2 Name','P2 Email','P2 Phone','Address','City','State','Zip'];
+  const rows=PDB.map(p=>[
+    p.first_name,p.last_name,p.birthdate,p.level,(p.sourceApps||[]).join('/'),
+    (p.promoHistory||[]).map(h=>h.level+':'+h.date).join(';'),
+    p.travelDateAccepted,p.bonusEligible?'Yes':'No',p.bonusPaid?'Yes':'No',
+    p.parent1_name,p.parent1_email,p.parent1_phone,p.parent2_name,p.parent2_email,p.parent2_phone,
+    p.address,p.city,p.state,p.zip
+  ].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
+  const csv=[headers.join(','),...rows].join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='player-database-'+todayISO()+'.csv';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+}
+
+// ── INIT ──
+pdbRenderStats();
+pdbUpdateTable();
+</script>
+</body>
+</html>
