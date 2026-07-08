@@ -43,7 +43,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .btn-danger{padding:6px 14px;border-radius:5px;border:1px solid #7a3030;background:none;color:#e07070;cursor:pointer;font-size:11px;}
 
 /* ── THE BOARD ITSELF ── */
-.board-frame{border-radius:14px;padding:18px;position:relative;box-sizing:border-box;}
+.board-frame{border-radius:14px;padding:18px;position:relative;box-sizing:border-box;height:78vh;}
 .board-frame.chalk{background:linear-gradient(135deg,#5a3a20,#3d2814);box-shadow:0 20px 60px rgba(0,0,0,.6);}
 .board-frame.white{background:linear-gradient(135deg,#c8ccd0,#9aa0a6);box-shadow:0 20px 60px rgba(0,0,0,.5);}
 .board-surface{border-radius:8px;padding:0;position:relative;overflow:hidden;height:100%;box-sizing:border-box;}
@@ -157,6 +157,7 @@ textarea.fi{resize:vertical;font-family:inherit;}
 </div>
 
 <div class="site-footer">Jaguar Development Suite — Chalkboard</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V7</div>
 
 <script>
 // ── DATA MODEL ──
@@ -471,24 +472,9 @@ function cbOpenDisplayWindow(){
   window.open('chalkboard-display.html','jag_chalkboard_display','width=1280,height=800,menubar=no,toolbar=no,location=no,status=no');
 }
 
-// ── SIZE THE BOARD (measured directly, not via CSS flex cascading) ──
-// Fills whatever vertical space is actually left below the board frame's top
-// position, down to near the bottom of the window. Re-runs on resize so it stays
-// correct if the window moves to a different monitor or gets resized.
-function cbSizeBoard(){
-  const frame=document.getElementById('board-frame');
-  if(!frame)return;
-  const top=frame.getBoundingClientRect().top;
-  const available=window.innerHeight-top-24;
-  frame.style.height=Math.max(360,available)+'px';
-}
-window.addEventListener('resize',cbSizeBoard);
-window.addEventListener('load',cbSizeBoard);
-
 // ── INIT ──
 cbRenderControls();
 cbRenderBoard();
-setTimeout(cbSizeBoard,0);
 </script>
 </body>
 </html>
