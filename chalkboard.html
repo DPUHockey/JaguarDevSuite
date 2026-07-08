@@ -14,21 +14,23 @@
   --blk:#0A0A0A;--dark:#111;--surf:#181818;--surf2:#202020;
   --border:#2A2A2A;--wht:#F5F3EE;--dim:rgba(245,243,238,0.6);
 }
-html,body{min-height:100vh;background:var(--blk);color:var(--wht);font-family:'Barlow',sans-serif;}
+html,body{width:100%;height:100%;background:var(--blk);color:var(--wht);font-family:'Barlow',sans-serif;overflow-x:hidden;}
+body{display:flex;flex-direction:column;min-height:100vh;}
 
-nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:60px;background:rgba(10,10,10,0.97);border-bottom:1px solid var(--gborder);backdrop-filter:blur(16px);}
+nav{flex-shrink:0;position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:60px;background:rgba(10,10,10,0.97);border-bottom:1px solid var(--gborder);backdrop-filter:blur(16px);}
 .nav-left{display:flex;align-items:center;gap:14px;}
 .nav-logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--gold);}
 .nav-sub{font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);border-left:1px solid var(--border);padding-left:14px;}
 .nav-btn{padding:8px 18px;border-radius:6px;border:1px solid var(--gold);background:var(--gold);color:#111;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:600;letter-spacing:.5px;}
 .nav-btn.outline{background:none;color:var(--gold);}
 
-.hero-strip{padding:20px 28px 14px;border-bottom:1px solid var(--border);background:linear-gradient(to right,var(--surf),var(--blk));}
+.hero-strip{flex-shrink:0;padding:20px 28px 14px;border-bottom:1px solid var(--border);background:linear-gradient(to right,var(--surf),var(--blk));}
 .hero-title{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:4px;color:var(--gold);line-height:1;}
 .hero-desc{font-size:13px;color:var(--dim);margin-top:4px;letter-spacing:.5px;}
 
-.wrap{padding:24px 28px 60px;max-width:1600px;margin:0 auto;}
-.card{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;}
+.wrap{flex:1;display:flex;flex-direction:column;width:100%;padding:16px 20px;box-sizing:border-box;min-height:0;}
+.card{flex-shrink:0;background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;}
+.board-card{flex:1;display:flex;flex-direction:column;min-height:0;margin-bottom:0;}
 .card-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--gold);margin-bottom:12px;}
 .ctrl-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
 .ctrl-group{display:flex;flex-direction:column;gap:4px;}
@@ -42,13 +44,13 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .btn-danger{padding:6px 14px;border-radius:5px;border:1px solid #7a3030;background:none;color:#e07070;cursor:pointer;font-size:11px;}
 
 /* ── THE BOARD ITSELF ── */
-.board-frame{border-radius:14px;padding:18px;position:relative;}
+.board-frame{flex:1;display:flex;min-height:0;border-radius:14px;padding:18px;position:relative;}
 .board-frame.chalk{background:linear-gradient(135deg,#5a3a20,#3d2814);box-shadow:0 20px 60px rgba(0,0,0,.6);}
 .board-frame.white{background:linear-gradient(135deg,#c8ccd0,#9aa0a6);box-shadow:0 20px 60px rgba(0,0,0,.5);}
-.board-surface{border-radius:8px;padding:0;min-height:calc(100vh - 320px);position:relative;overflow:hidden;}
+.board-surface{flex:1;min-height:0;border-radius:8px;padding:0;position:relative;overflow:hidden;}
 .board-surface.chalk{background:#1f3d2e;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.03) 0%,transparent 8%),radial-gradient(circle at 70% 60%,rgba(255,255,255,.025) 0%,transparent 10%),radial-gradient(circle at 40% 80%,rgba(255,255,255,.02) 0%,transparent 6%);box-shadow:inset 0 0 80px rgba(0,0,0,.5);}
 .board-surface.white{background:#fafafa;background-image:linear-gradient(rgba(0,0,0,.015) 1px,transparent 1px);background-size:100% 42px;box-shadow:inset 0 0 40px rgba(0,0,0,.08);}
-#board-notes-area{position:relative;width:100%;height:100%;min-height:560px;}
+#board-notes-area{position:relative;width:100%;height:100%;}
 .board-note{position:absolute;touch-action:none;user-select:none;}
 .board-note.editable{cursor:grab;}
 .board-note.editable:active{cursor:grabbing;}
