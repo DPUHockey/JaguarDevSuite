@@ -157,7 +157,7 @@ textarea.fi{resize:vertical;font-family:inherit;}
 </div>
 
 <div class="site-footer">Jaguar Development Suite — Chalkboard</div>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V8</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V9</div>
 
 <script>
 // ── DATA MODEL ──
@@ -310,9 +310,17 @@ function cbCloseAddModal(){
 }
 // New notes cascade diagonally so they don't all land in exactly the same spot;
 // existing notes keep whatever position/size they were last dragged/resized to.
+function cbBoardEl(){ return document.getElementById('board-notes-area'); }
+function cbBoardRect(){
+  const el=cbBoardEl();
+  return el?el.getBoundingClientRect():{width:1000,height:600};
+}
+// Positions/sizes are stored as PERCENTAGES of the board (0-100), not pixels --
+// pixel coordinates from the edit screen would land somewhere completely different
+// on the display screen, since the two are almost never the same size.
 function cbNextPosition(){
   const n=CB.notes.length;
-  return { x: 24 + (n%6)*36, y: 24 + (n%6)*36 };
+  return { x: 3+(n%6)*4, y: 3+(n%6)*4 };
 }
 function cbSaveNote(){
   const text=(document.getElementById('cbF-text').value||'').trim();
@@ -330,7 +338,7 @@ function cbSaveNote(){
       if(n)Object.assign(n,{text,color,fontSize,font,bold,italic,underline,strike});
     }else{
       const pos=cbNextPosition();
-      CB.notes.push({id:uid(),type:'text',text,color,fontSize,font,bold,italic,underline,strike,x:pos.x,y:pos.y,w:260,h:140,dateAdded:new Date().toISOString()});
+      CB.notes.push({id:uid(),type:'text',text,color,fontSize,font,bold,italic,underline,strike,x:pos.x,y:pos.y,w:22,h:20,dateAdded:new Date().toISOString()});
     }
   }else{
     const imgUrl=cbPendingImageData||(document.getElementById('cbF-img').value||'').trim();
@@ -340,7 +348,7 @@ function cbSaveNote(){
       if(n)Object.assign(n,{imgUrl,text,color,font,bold,italic,underline,strike});
     }else{
       const pos=cbNextPosition();
-      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,font,bold,italic,underline,strike,x:pos.x,y:pos.y,w:280,h:220,dateAdded:new Date().toISOString()});
+      CB.notes.push({id:uid(),type:'image',imgUrl,text,color,fontSize:20,font,bold,italic,underline,strike,x:pos.x,y:pos.y,w:24,h:30,dateAdded:new Date().toISOString()});
     }
   }
   cbPendingImageData=null;
@@ -355,7 +363,7 @@ function cbDeleteNote(id){
   cbRenderBoard();
 }
 
-// ── DRAG & RESIZE (edit mode only) ──
+// ── DRAG & RESIZE (percentage-based, so position translates correctly to any screen) ──
 let cbDragId=null, cbDragStartX=0, cbDragStartY=0, cbDragOrigX=0, cbDragOrigY=0;
 let cbResizeId=null, cbResizeStartX=0, cbResizeStartY=0, cbResizeOrigW=0, cbResizeOrigH=0;
 function cbStartDrag(e,id){
@@ -373,11 +381,13 @@ function cbOnDragMove(e){
   if(!cbDragId)return;
   const n=CB.notes.find(x=>x.id===cbDragId);
   if(!n)return;
-  const dx=e.clientX-cbDragStartX, dy=e.clientY-cbDragStartY;
-  n.x=Math.max(0,cbDragOrigX+dx);
-  n.y=Math.max(0,cbDragOrigY+dy);
+  const rect=cbBoardRect();
+  const dxPct=((e.clientX-cbDragStartX)/rect.width)*100;
+  const dyPct=((e.clientY-cbDragStartY)/rect.height)*100;
+  n.x=Math.max(0,Math.min(100-(n.w||20),cbDragOrigX+dxPct));
+  n.y=Math.max(0,Math.min(100-(n.h||10),cbDragOrigY+dyPct));
   const el=document.getElementById('note-'+cbDragId);
-  if(el){ el.style.left=n.x+'px'; el.style.top=n.y+'px'; }
+  if(el){ el.style.left=n.x+'%'; el.style.top=n.y+'%'; }
 }
 function cbOnDragEnd(){
   document.removeEventListener('pointermove',cbOnDragMove);
@@ -400,11 +410,13 @@ function cbOnResizeMove(e){
   if(!cbResizeId)return;
   const n=CB.notes.find(x=>x.id===cbResizeId);
   if(!n)return;
-  const dx=e.clientX-cbResizeStartX, dy=e.clientY-cbResizeStartY;
-  n.w=Math.max(140,cbResizeOrigW+dx);
-  n.h=Math.max(80,cbResizeOrigH+dy);
+  const rect=cbBoardRect();
+  const dwPct=((e.clientX-cbResizeStartX)/rect.width)*100;
+  const dhPct=((e.clientY-cbResizeStartY)/rect.height)*100;
+  n.w=Math.max(10,Math.min(100-n.x,cbResizeOrigW+dwPct));
+  n.h=Math.max(6,Math.min(100-n.y,cbResizeOrigH+dhPct));
   const el=document.getElementById('note-'+cbResizeId);
-  if(el){ el.style.width=n.w+'px'; el.style.height=n.h+'px'; }
+  if(el){ el.style.width=n.w+'%'; el.style.height=n.h+'%'; }
 }
 function cbOnResizeEnd(){
   document.removeEventListener('pointermove',cbOnResizeMove);
@@ -432,13 +444,17 @@ function cbClearBoard(){
 function cbMigrateLegacyPositions(){
   let changed=false;
   CB.notes.forEach((n,i)=>{
-    if(typeof n.x!=='number'||typeof n.y!=='number'){
+    // Anything over 100 can't be a valid percentage -- it's a leftover pixel value
+    // from before positions were stored relative to the board, which is exactly
+    // what caused notes to land in the wrong place on a differently-sized screen.
+    const bad=typeof n.x!=='number'||typeof n.y!=='number'||typeof n.w!=='number'||typeof n.h!=='number'||n.x>100||n.y>100||n.w>100||n.h>100;
+    if(bad){
       const pos=cbNextPosition();
       n.x=pos.x; n.y=pos.y;
+      n.w=n.type==='image'?24:22;
+      n.h=n.type==='image'?30:20;
       changed=true;
     }
-    if(typeof n.w!=='number'){ n.w=n.type==='image'?280:260; changed=true; }
-    if(typeof n.h!=='number'){ n.h=n.type==='image'?220:140; changed=true; }
   });
   if(changed)saveCB();
 }
@@ -450,7 +466,7 @@ function cbRenderBoard(){
     return;
   }
   area.innerHTML=CB.notes.map(n=>{
-    const w=n.w||260, h=n.h||140, x=n.x||0, y=n.y||0;
+    const w=n.w||22, h=n.h||20, x=n.x||0, y=n.y||0;
     const noteBody=n.type==='image'
       ? `<img class="board-note-img" src="${cbEscapeHtml(n.imgUrl)}" alt="" style="flex:1;min-height:0;width:100%;object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${cbNoteFontStyle(n)}margin-top:6px;text-align:center;flex-shrink:0;">${cbEscapeHtml(n.text)}</div>`:''}`
       : `<div class="board-note-text" style="${cbNoteFontStyle(n)}">${cbEscapeHtml(n.text)}</div>`;
@@ -460,7 +476,7 @@ function cbRenderBoard(){
         <button class="btn-danger" onclick="event.stopPropagation();cbDeleteNote('${n.id}')">Remove</button>
       </div>`;
     const resizeHandle=`<div class="resize-handle" onpointerdown="cbStartResize(event,'${n.id}')"></div>`;
-    return `<div class="board-note ${CB.boardStyle} editable" id="note-${n.id}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;" onpointerdown="cbStartDrag(event,'${n.id}')">
+    return `<div class="board-note ${CB.boardStyle} editable" id="note-${n.id}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;" onpointerdown="cbStartDrag(event,'${n.id}')">
       <div class="board-note-inner">${noteBody}${editControls}</div>
       ${resizeHandle}
     </div>`;
