@@ -34,6 +34,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;}
   </div>
 </div>
 <div id="live-dot" title="Live -- updates automatically when the board changes"></div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:sans-serif;font-size:10px;letter-spacing:1px;color:rgba(255,255,255,0.35);pointer-events:none;">V3</div>
 
 <script>
 const CB_KEY='jag_chalkboard_v1';
@@ -69,11 +70,11 @@ function render(){
     return;
   }
   area.innerHTML=CB.notes.map(n=>{
-    const w=n.w||260, h=n.h||140, x=n.x||0, y=n.y||0;
+    const w=n.w||22, h=n.h||20, x=n.x||0, y=n.y||0;
     const body=n.type==='image'
       ? `<img class="board-note-img" src="${escapeHtml(n.imgUrl)}" alt="" style="flex:1;min-height:0;width:100%;object-fit:contain;"/>${n.text?`<div class="board-note-text" style="${noteFontStyle(n)}margin-top:6px;text-align:center;flex-shrink:0;">${escapeHtml(n.text)}</div>`:''}`
       : `<div class="board-note-text" style="${noteFontStyle(n)}">${escapeHtml(n.text)}</div>`;
-    return `<div class="board-note ${CB.boardStyle}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;">
+    return `<div class="board-note ${CB.boardStyle}" style="left:${x}%;top:${y}%;width:${w}%;height:${h}%;">
       <div class="board-note-inner">${body}</div>
     </div>`;
   }).join('');
