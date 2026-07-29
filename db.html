@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V22</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V23</div>
 
 <nav>
   <div class="nav-left">
@@ -871,45 +871,37 @@ function compareValsMulti(a,b,sorts){
   }
   return 0;
 }
+// sortState[tabKey] is now an ARRAY of {col, dir} — first entry = highest priority.
+// Clicking a col: not in stack → append asc; already asc → flip to desc; already desc → remove.
 function applySortRows(rows,sort){
   const indexed=rows.map((r,i)=>({r,i}));
-  // Build sort chain from whatever is set
-  const chain=[];
-  if(sort&&sort.col)chain.push(sort);
-  if(sort&&sort.secondary&&sort.secondary.col)chain.push(sort.secondary);
-  if(!chain.length)return indexed; // nothing to sort by
+  const chain=Array.isArray(sort)?sort.filter(s=>s&&s.col):(sort&&sort.col?[sort]:[]);
+  if(!chain.length)return indexed;
   indexed.sort((a,b)=>compareValsMulti(a,b,chain));
   return indexed;
 }
+// thSort now reads from an array stack
 function thSort(col, label, sort, _fn, tabKey){
-  const active=sort&&sort.col===col;
-  const isSecondary=sort&&sort.secondary&&sort.secondary.col===col;
-  const arrow=active?(sort.dir==='asc'?' ▲':' ▼'):'';
-  const secArrow=isSecondary?(sort.secondary.dir==='asc'?' ▲²':' ▼²'):'';
-  const style=`cursor:pointer;user-select:none;${active?'color:var(--gold);':isSecondary?'color:var(--gold2);opacity:.7;':''}`;
-  return`<th style="${style}" onclick="sortTab('${tabKey}','${col}')">${label}${arrow}${secArrow}</th>`;
+  const stack=Array.isArray(sort)?sort:[];
+  const idx=stack.findIndex(s=>s.col===col);
+  const inStack=idx>=0;
+  const entry=inStack?stack[idx]:null;
+  const arrow=inStack?(entry.dir==='asc'?' ▲':' ▼'):'';
+  const num=inStack&&stack.length>1?' '+(idx+1):'';
+  const style=`cursor:pointer;user-select:none;${inStack?'color:var(--gold);':''}`;
+  return`<th style="${style}" onclick="sortTab('${tabKey}','${col}')">${label}${num}${arrow}</th>`;
 }
-// Set a secondary sort key (e.g. after sorting by Day, also sort by first/last name within each day)
-function setSecondarySort(tabKey, col, dir){
-  const cur=sortState[tabKey]||{col:null,dir:'asc'};
-  if(!col){
-    sortState[tabKey]=Object.assign({},cur,{secondary:null});
-  } else {
-    // Always set secondary sort — even if no primary sort is active yet.
-    // If secondary col matches primary, secondary is effectively ignored in the
-    // sort chain (same field, same dir) which is fine — user can still click
-    // the header to establish a real primary first.
-    sortState[tabKey]=Object.assign({},cur,{secondary:{col,dir:dir||'asc'}});
-  }
-  // Re-render immediately
+function clearSortStack(tabKey,sNum,grp){
+  sortState[tabKey]=[];
+  if(grp!==undefined){activeSubTab['session'+sNum]=grp;}
+  reRenderTabKey(tabKey,sNum,grp);
+}
+function reRenderTabKey(tabKey,sNum,grp){
+  if(tabKey==='master'){renderMasterTab();return;}
+  const pm=tabKey.match(/^promo(\d)$/);
+  if(pm){activeSubTab['session'+parseInt(pm[1])]='promo';renderSessionPanel(parseInt(pm[1]));return;}
   const sm=tabKey.match(/^session(\d)(?:_(.+))?$/);
-  if(sm){const sNum=parseInt(sm[1]);if(sm[2])activeSubTab['session'+sNum]=sm[2];renderSessionPanel(sNum);}
-}
-function clearSecondarySort(tabKey,sNum,grp){
-  const cur=sortState[tabKey]||{col:null,dir:'asc'};
-  sortState[tabKey]=Object.assign({},cur,{secondary:null});
-  activeSubTab['session'+sNum]=grp;
-  renderSessionPanel(sNum);
+  if(sm){const n=parseInt(sm[1]);if(sm[2])activeSubTab['session'+n]=sm[2];renderSessionPanel(n);}
 }
 function setGrpDayFilter(filterKey,day,sNum,grp){
   if(!window._grpDayFilter)window._grpDayFilter={};
@@ -918,13 +910,22 @@ function setGrpDayFilter(filterKey,day,sNum,grp){
   renderSessionPanel(sNum);
 }
 
-// Single global sort dispatcher for all tables
+// Single global sort dispatcher — stacked multi-sort
 function sortTab(tabKey, col){
-  const cur=sortState[tabKey]||{col:null,dir:'asc'};
-  const newDir=cur.col===col&&cur.dir==='asc'?'desc':'asc';
-  // Preserve secondary sort when changing primary; clear secondary when clicking secondary col
-  const prevSecondary=cur.secondary&&cur.secondary.col!==col?cur.secondary:null;
-  sortState[tabKey]={col,dir:newDir,secondary:prevSecondary};
+  const stack=Array.isArray(sortState[tabKey])?sortState[tabKey]:[];
+  const idx=stack.findIndex(s=>s.col===col);
+  let newStack;
+  if(idx<0){
+    // Not in stack — add as lowest priority (end of chain), ascending
+    newStack=[...stack,{col,dir:'asc'}];
+  } else if(stack[idx].dir==='asc'){
+    // Already asc — flip to desc
+    newStack=stack.map((s,i)=>i===idx?{col,dir:'desc'}:s);
+  } else {
+    // Already desc — remove from stack
+    newStack=stack.filter((_,i)=>i!==idx);
+  }
+  sortState[tabKey]=newStack;
   // Re-render the right panel
   if(tabKey==='master'){renderMasterTab();} else {
     // tabKey patterns: 'session1', 'promo1', or 'session1_lj1' etc.
@@ -948,7 +949,7 @@ function renderPanel(containerId, rows, cols, labels, isEditable, tabKey){
   if(!rows.length){
     return `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><p>No records — upload a CSV or add a player manually</p></div>`;
   }
-  const sort=sortState[tabKey]||{col:null,dir:'asc'};
+  const sort=Array.isArray(sortState[tabKey])?sortState[tabKey]:[];
   const indexed=applySortRows(rows,sort);
   const toolbar=`<div class="toolbar"><div class="toolbar-left">${rows.length} record${rows.length!==1?'s':''}</div><div style="display:flex;gap:6px;"><button class="btn-sm gold" onclick="openAddModal()">&#43; Add Player</button><button class="btn-sm" onclick="exportTabCSV('${tabKey}')">&#x2193; Export CSV</button></div></div>`;
   const actionCol=isEditable?`<th style="width:80px;">Actions</th>`:'';
@@ -1034,7 +1035,7 @@ const sortState={};
 function renderAllSubTab(sNum){
   const sk='session'+sNum,rawRows=DB[sk];
   if(!rawRows.length)return'<div class="empty-state"><p>No records</p></div>';
-  const sort=sortState[sk]||{col:null,dir:'asc'},indexed=applySortRows(rawRows,sort);
+  const sort=Array.isArray(sortState[sk])?sortState[sk]:[],indexed=applySortRows(rawRows,sort);
   function th(c,l){return thSort(c,l,sort,null,sk);}
   const promoSet=new Set((DB['promo'+sNum]||[]).map(p=>p.first_name+'|'+p.last_name+'|'+(p.birthdate||'')));
   const tb='<div class="toolbar"><div class="toolbar-left">'+rawRows.length+' record'+(rawRows.length!==1?'s':'')+' </div><div style="display:flex;gap:6px;"><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportTabCSV(\''+sk+'\')">↓ Export</button></div></div>';
@@ -1065,7 +1066,7 @@ function renderPromoTab(sNum){
     return`<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg><p>No promotions yet — use the Promote button on a player</p></div>`;
   }
   const tabKey='promo'+sNum;
-  const sort=sortState[tabKey]||{col:null,dir:'asc'};
+  const sort=Array.isArray(sortState[tabKey])?sortState[tabKey]:[];
   const cols=['first_name','last_name','birthdate','from_level','to_level','promoted_on','promo_status','notes','parent1_name','parent1_email','parent1_phone'];
   const labels=['First','Last','Birthdate','From','To','Date','Status','Notes','P1 Name','P1 Email','P1 Phone'];
   const indexed=applySortRows(promos,sort);
@@ -2132,29 +2133,26 @@ function renderGroupTab(sNum,grp,rows){
   if(!rows||!rows.length)return'<div class="empty-state"><p>No '+grp.toUpperCase()+' athletes in Session '+sNum+'</p></div>';
   const pm={};(DB['promo'+sNum]||[]).forEach(p=>{pm[p.first_name+'|'+p.last_name+'|'+(p.birthdate||'')]=p.to_level;});
   const dates=getSessionDates(sNum),manSet=new Set((manualDates[sNum]||[]));
-  const tk=sk+'_'+grp,sort=sortState[tk]||{col:null,dir:'asc'};
+  const tk=sk+'_'+grp;
+  const stack=Array.isArray(sortState[tk])?sortState[tk]:[];
 
-  // Day filter state
+  // Day filter
   if(!window._grpDayFilter)window._grpDayFilter={};
   const dayFilterKey=tk+'_dayfilter';
   const dayFilter=window._grpDayFilter[dayFilterKey]||'all';
-  // Apply day filter first, then sort
   const filteredRows=dayFilter==='all'?rows:rows.filter(r=>normDay(r.day)===dayFilter);
-  const indexed=applySortRows(filteredRows,sort);
+  const indexed=applySortRows(filteredRows,stack);
 
-  function th(c,l){return thSort(c,l,sort,null,tk);}
+  function th(c,l){return thSort(c,l,stack,null,tk);}
 
-  // Secondary sort UI
-  const secCol=sort.secondary?sort.secondary.col:null;
-  const secDir=sort.secondary?sort.secondary.dir:'asc';
-  const secOptions=['first_name','last_name','birthdate','level'].map(c=>`<option value="${c}"${secCol===c?' selected':''}>${{first_name:'First',last_name:'Last',birthdate:'Born',level:'Level'}[c]}</option>`).join('');
+  // Sort controls — day filter + clear sort button
+  const stackDesc=stack.length?stack.map((s,i)=>'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:.5px;color:var(--gold);background:var(--gfaint);border:1px solid var(--gborder);border-radius:4px;padding:1px 7px;">'+(i+1)+' '+(s.col==='first_name'?'First':s.col==='last_name'?'Last':s.col==='birthdate'?'Born':s.col==='day'?'Day':s.col==='level'?'Level':s.col)+(s.dir==='asc'?' ▲':' ▼')+'</span>').join(' → '):'<span style="font-size:11px;color:var(--dim);">Click any column header to sort — click again to reverse — click a third time to remove it from the sort</span>';
   const sortControls='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:var(--surf3);border-radius:6px;border:1px solid var(--border);">'
-    +'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Filter Day:</span>'
+    +'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);flex-shrink:0;">Filter Day:</span>'
     +['all','W','S','SW'].map(d=>{const active=dayFilter===d;return'<button onclick="setGrpDayFilter(\''+dayFilterKey+'\',\''+d+'\','+sNum+',\''+grp+'\')" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;padding:2px 9px;border-radius:10px;border:1px solid '+(active?col:' var(--border)')+';background:'+(active?col+'22':'transparent')+';color:'+(active?col:'var(--dim)')+';cursor:pointer;">'+(d==='all'?'All':d)+'</button>';}).join('')
-    +'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-left:10px;">Then by:</span>'
-    +'<select onchange="setSecondarySort(\''+tk+'\',this.value,\'asc\')" style="background:var(--surf2);border:1px solid var(--border);border-radius:4px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:11px;padding:2px 6px;outline:none;"><option value="">— none —</option>'+secOptions+'</select>'
-    +(secCol?'<button onclick="clearSecondarySort(\''+tk+'\','+sNum+',\''+grp+'\')" style="font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--dim);cursor:pointer;">✕ clear</button>':'')
-    +'<span style="margin-left:auto;font-family:\'Barlow Condensed\',sans-serif;font-size:10px;color:var(--dim);">'+filteredRows.length+(dayFilter!=='all'?' of '+rows.length:'')+' athlete'+(filteredRows.length!==1?'s':'')+'</span>'
+    +'<span style="margin-left:8px;flex:1;">'+stackDesc+'</span>'
+    +(stack.length?'<button onclick="clearSortStack(\''+tk+'\','+sNum+',\''+grp+'\')" style="font-size:10px;padding:2px 9px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--dim);cursor:pointer;flex-shrink:0;">✕ Clear Sort</button>':'')
+    +'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;color:var(--dim);flex-shrink:0;">'+filteredRows.length+(dayFilter!=='all'?' of '+rows.length:'')+' athlete'+(filteredRows.length!==1?'s':'')+'</span>'
     +'</div>';
 
   const toolbar='<div class="toolbar"><div class="toolbar-left" style="color:'+col+';">'+lbl+' &middot; '+dates.length+' date'+(dates.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="attend-sync-btn" onclick="syncAndRerender('+sNum+',\''+grp+'\')">&#x21BB; Sync Dates</button><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportAttendCSV('+sNum+',\''+grp+'\')">&#x2193; Export</button></div></div>';
@@ -2421,7 +2419,7 @@ function syncMasterFromSessions(){
 }
 const PROMO_TRACK=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','InHouse','Travel'];
 function getMasterFilteredSorted(){
-  const rows=DB.master,sk='master',sort=sortState[sk]||{col:'last_name',dir:'asc'};
+  const rows=DB.master,sk='master',sort=Array.isArray(sortState[sk])?sortState[sk]:[{col:'last_name',dir:'asc'}];
   const mf=window._masterFilter||{q:'',status:'all'};
   if(mf.status===undefined)mf.status='all'; // guard against partial-init leaving status unset, which would silently match zero rows
   let disp=rows;
