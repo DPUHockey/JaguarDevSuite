@@ -412,7 +412,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V26</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V27</div>
 
 <nav>
   <div class="nav-left">
@@ -664,7 +664,7 @@ function saveAttendDataAndSync(){
   if(window._fbDb && window._fbRef && window._fbSet){
     try{
       window._fbLocalWrite=true;
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/attendance'),attendData)
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/attendance'),window.attendData)
         .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
         .catch(e=>{ window._fbLocalWrite=false; });
     }catch(e){ window._fbLocalWrite=false; }
@@ -676,7 +676,7 @@ function saveManualDatesAndSync(){
   if(window._fbDb && window._fbRef && window._fbSet){
     try{
       window._fbLocalWrite=true;
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/manualDates'),manualDates)
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/manualDates'),window.manualDates)
         .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
         .catch(e=>{ window._fbLocalWrite=false; });
     }catch(e){ window._fbLocalWrite=false; }
@@ -724,8 +724,8 @@ function _mergeFirebaseData(){
         }
       });
     }
-    if(window._DB_attend_fb) attendData = window._DB_attend_fb;
-    if(window._DB_manual_fb) manualDates = window._DB_manual_fb;
+    if(window._DB_attend_fb) window.attendData = window._DB_attend_fb;
+    if(window._DB_manual_fb) window.manualDates = window._DB_manual_fb;
     normalizeStoredDates();
   }catch(e){}
 }
@@ -799,7 +799,7 @@ function fullDataReset(){
   jagConfirm('FULL RESET \u2014 this wipes everything: Master File, all 6 session rosters, all promotions, and attendance check-ins. Nothing roster-related will be left. A complete backup downloads first. Coach Hours / Season Planning data (shared with the Coach Data Center app) is not touched. This cannot be undone except by re-importing the backup. Are you sure?',function(){
     try{
       const archive={app:'jaguar-db-full-archive',v:1,exported:new Date().toISOString(),
-        master:DB.master,attendance:attendData,manualDates:manualDates,sessions:{},promos:{}};
+        master:DB.master,attendance:window.attendData,window.manualDates:window.manualDates,sessions:{},promos:{}};
       for(let s=1;s<=6;s++){archive.sessions['session'+s]=DB['session'+s]||[];archive.promos['promo'+s]=DB['promo'+s]||[];}
       const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
       const a=document.createElement('a'),d=new Date();
@@ -811,8 +811,8 @@ function fullDataReset(){
     DB.master=[];
     for(let s=1;s<=6;s++){DB['session'+s]=[];DB['promo'+s]=[];}
     DB.lj=[];DB.ph=[];DB.lj1=[];DB.lj2=[];DB.lj3=[];DB.ph1=[];DB.ph2=[];DB.ph3=[];
-    attendData={};
-    manualDates={};
+    window.attendData={};
+    window.manualDates={};
     saveDB();
     saveAttendData();
     saveManualDates();
@@ -1872,14 +1872,15 @@ const ATTEND_KEY='jaguar_attendance_v1';
 const PLAN_KEY='jag_plan_data';
 const ACTIVE_DATES_KEY='jaguar_active_dates';
 const MANUAL_DATES_KEY='jaguar_manual_dates_v1';
-let attendData={}, manualDates={};
+window.attendData = window.attendData || {};
+window.manualDates = window.manualDates || {};
 
 function loadAttendData(){
-  try{const r=localStorage.getItem(ATTEND_KEY);if(r)attendData=JSON.parse(r);}catch(e){}
-  try{const r=localStorage.getItem(MANUAL_DATES_KEY);if(r)manualDates=JSON.parse(r);}catch(e){}
+  try{const r=localStorage.getItem(ATTEND_KEY);if(r)window.attendData=JSON.parse(r);}catch(e){}
+  try{const r=localStorage.getItem(MANUAL_DATES_KEY);if(r)window.manualDates=JSON.parse(r);}catch(e){}
 }
-function saveAttendData(){try{localStorage.setItem(ATTEND_KEY,JSON.stringify(attendData));}catch(e){}}
-function saveManualDates(){try{localStorage.setItem(MANUAL_DATES_KEY,JSON.stringify(manualDates));}catch(e){}}
+function saveAttendData(){try{localStorage.setItem(ATTEND_KEY,JSON.stringify(window.attendData));}catch(e){}}
+function saveManualDates(){try{localStorage.setItem(MANUAL_DATES_KEY,JSON.stringify(window.manualDates));}catch(e){}}
 function playerKey(r){return(r.first_name||'')+'|'+(r.last_name||'')+'|'+(r.birthdate||r.birth_year||'');}
 // Attendance % should only count a date once check-in has actually begun for it --
 // otherwise everyone shows as "missed" the instant the calendar flips to a class day,
@@ -1896,7 +1897,7 @@ function playerKey(r){return(r.first_name||'')+'|'+(r.last_name||'')+'|'+(r.birt
 // today started" logic -- just a straight count, same as the "2 of 6 filled = 33%"
 // you'd get from any checklist.
 function computeAttendStats(sNum,grp,pk,dates){
-  const pa=(attendData[sNum]&&attendData[sNum][grp]&&attendData[sNum][grp][pk])||{};
+  const pa=(window.attendData[sNum]&&window.attendData[sNum][grp]&&window.attendData[sNum][grp][pk])||{};
   const attended=dates.filter(d=>pa[d]).length;
   const total=dates.length;
   const pct=total?Math.round(attended/total*100):0;
@@ -2016,7 +2017,7 @@ function getSessionDatesFromPlanData(){
 function getSessionDates(sNum){
   const merged=new Set();
   // Always include manually added dates first
-  (manualDates[sNum]||[]).forEach(d=>merged.add(d));
+  (window.manualDates[sNum]||[]).forEach(d=>merged.add(d));
   // Merge in plan dates from Data Center
   const plan=getSessionDatesFromPlanData();
   if(plan&&plan[sNum]&&plan[sNum].length){
@@ -2035,20 +2036,20 @@ function getSessionDates(sNum){
     }
   }catch(e){}
   // Filter out any dates the user explicitly removed
-  const removed=(manualDates._removed&&manualDates._removed[sNum])||[];
+  const removed=(window.manualDates._removed&&window.manualDates._removed[sNum])||[];
   return Array.from(merged).filter(d=>!removed.includes(d)).sort();
 }
 
 function addManualDate(sNum,dateStr){
   if(!dateStr||!/^\d{4}-\d{2}-\d{2}$/.test(dateStr))return false;
-  if(!manualDates[sNum])manualDates[sNum]=[];
-  if(manualDates[sNum].includes(dateStr))return false;
-  manualDates[sNum].push(dateStr);
+  if(!window.manualDates[sNum])window.manualDates[sNum]=[];
+  if(window.manualDates[sNum].includes(dateStr))return false;
+  window.manualDates[sNum].push(dateStr);
   saveManualDatesAndSync();return true;
 }
 function removeManualDate(sNum,dateStr){
-  if(!manualDates[sNum])return;
-  manualDates[sNum]=manualDates[sNum].filter(d=>d!==dateStr);
+  if(!window.manualDates[sNum])return;
+  window.manualDates[sNum]=window.manualDates[sNum].filter(d=>d!==dateStr);
   saveManualDates();
 }
 
@@ -2091,7 +2092,7 @@ function renderLevelAttendTab(sNum, grp, rows){
   }
 
   // Show date chips strip — manual dates get an ✕ remove button
-  const manualSet=new Set((manualDates[sNum]||[]));
+  const manualSet=new Set((window.manualDates[sNum]||[]));
   const planDates=(getSessionDatesFromPlanData()||{})[sNum]||[];
   const dateChips=dates.map(d=>{
     const isManual=manualSet.has(d);
@@ -2118,7 +2119,7 @@ function renderLevelAttendTab(sNum, grp, rows){
     const safeKey=pk.replace(/[^a-z0-9]/gi,'_');
     const{attended,total,pct}=computeAttendStats(sNum,grp,pk,dates);
     const pctCls=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
-    const pa=attendData[sNum]?.[grp]?.[pk]||{};
+    const pa=window.attendData[sNum]?.[grp]?.[pk]||{};
     const cells=dates.map(d=>`<td><input type="checkbox" class="attend-cb" ${pa[d]?'checked':''} onchange="toggleAttend(${sNum},'${grp}','${pk}','${d}',this.checked)"></td>`).join('');
     return`<tr>
       <td class="name-cell">${r.first_name||''} ${r.last_name||''}</td>
@@ -2133,7 +2134,7 @@ function renderLevelAttendTab(sNum, grp, rows){
   const tfoot=`<tfoot><tr style="background:var(--surf2);">
     <td class="name-cell" colspan="3" style="font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Present</td>
     ${dates.map(d=>{
-      const cnt=rows.filter(r=>attendData[sNum]?.[grp]?.[playerKey(r)]?.[d]).length;
+      const cnt=rows.filter(r=>window.attendData[sNum]?.[grp]?.[playerKey(r)]?.[d]).length;
       const pct2=rows.length?Math.round(cnt/rows.length*100):0;
       return`<td style="text-align:center;font-size:11px;color:var(--dim);">${cnt}<br><span style="font-size:10px;opacity:.6;">${pct2}%</span></td>`;
     }).join('')}
@@ -2144,10 +2145,10 @@ function renderLevelAttendTab(sNum, grp, rows){
 }
 
 function toggleAttend(sNum,grp,pk,date,checked){
-  if(!attendData[sNum])attendData[sNum]={};
-  if(!attendData[sNum][grp])attendData[sNum][grp]={};
-  if(!attendData[sNum][grp][pk])attendData[sNum][grp][pk]={};
-  attendData[sNum][grp][pk][date]=checked;
+  if(!window.attendData[sNum])window.attendData[sNum]={};
+  if(!window.attendData[sNum][grp])window.attendData[sNum][grp]={};
+  if(!window.attendData[sNum][grp][pk])window.attendData[sNum][grp][pk]={};
+  window.attendData[sNum][grp][pk][date]=checked;
   saveAttendDataAndSync();
   const dates=getSessionDates(sNum);
   const{attended,total,pct}=computeAttendStats(sNum,grp,pk,dates);
@@ -2239,9 +2240,9 @@ function addManualDateUI(sNum,grp){
 function removeDateUI(sNum,grp,dateStr){
   removeManualDate(sNum,dateStr);
   // Also add to a per-session block list so synced dates can be hidden
-  if(!manualDates._removed) manualDates._removed={};
-  if(!manualDates._removed[sNum]) manualDates._removed[sNum]=[];
-  if(!manualDates._removed[sNum].includes(dateStr)) manualDates._removed[sNum].push(dateStr);
+  if(!window.manualDates._removed) window.manualDates._removed={};
+  if(!window.manualDates._removed[sNum]) window.manualDates._removed[sNum]=[];
+  if(!window.manualDates._removed[sNum].includes(dateStr)) window.manualDates._removed[sNum].push(dateStr);
   saveManualDatesAndSync();
   renderSessionPanel(sNum);
 }
@@ -2251,7 +2252,7 @@ function exportAttendCSV(sNum,grp){
   if(!rows.length||!dates.length){showAlert('No data to export','err');return;}
   const header=['First Name','Last Name','Birth Year','Level',...dates.map(fmtDate),'Total','Pct'].join(',');
   const body=rows.map(r=>{
-    const pa=attendData[sNum]?.[grp]?.[playerKey(r)]||{};
+    const pa=window.attendData[sNum]?.[grp]?.[playerKey(r)]||{};
     const vals=dates.map(d=>pa[d]?'1':'0');
     const tot=vals.filter(v=>v==='1').length;
     return[r.first_name||'',r.last_name||'',r.birth_year||'',r.level||'',...vals,tot,dates.length?Math.round(tot/dates.length*100)+'%':'0%'].join(',');
@@ -2264,7 +2265,7 @@ function exportAttendSummaryCSV(sNum){
   const lines=[];
   groups.forEach(grp=>{
     getGroupRows(sNum,grp).forEach(r=>{
-      const dates=getSessionDates(sNum);const pa=attendData[sNum]?.[grp]?.[playerKey(r)]||{};
+      const dates=getSessionDates(sNum);const pa=window.attendData[sNum]?.[grp]?.[playerKey(r)]||{};
       const att=dates.filter(d=>pa[d]).length;
       lines.push([grp.toUpperCase(),r.first_name||'',r.last_name||'',r.birth_year||'',r.level||'',att,dates.length,dates.length?Math.round(att/dates.length*100)+'%':'0%'].join(','));
     });
@@ -2291,7 +2292,7 @@ function renderGroupTab(sNum,grp,rows){
   const lbl=isLJ?'LJ - Little Jaguars':'PH - Pre Hockey';
   if(!rows||!rows.length)return'<div class="empty-state"><p>No '+grp.toUpperCase()+' athletes in Session '+sNum+'</p></div>';
   const pm={};(DB['promo'+sNum]||[]).forEach(p=>{pm[p.first_name+'|'+p.last_name+'|'+(p.birthdate||'')]=p.to_level;});
-  const dates=getSessionDates(sNum),manSet=new Set((manualDates[sNum]||[]));
+  const dates=getSessionDates(sNum),manSet=new Set((window.manualDates[sNum]||[]));
   const tk=sk+'_'+grp;
   const sort=sortState[tk]||{col:null,dir:'asc'};
 
@@ -2322,7 +2323,7 @@ function renderGroupTab(sNum,grp,rows){
     const sg=subLevel(r).toLowerCase()||grp+'1',pp=playerKey(r),sk2=pp.replace(/[^a-z0-9]/gi,'_');
     const{attended:att,total:attTotal,pct}=computeAttendStats(sNum,sg,pp,dates);
     const pcl=pct>=80?'pct-hi':pct>=50?'pct-mid':'pct-lo';
-    const pa=attendData[sNum]?.[sg]?.[pp]||{};
+    const pa=window.attendData[sNum]?.[sg]?.[pp]||{};
     const cells=dates.map(d=>'<td><input type="checkbox" class="attend-cb" '+(pa[d]?'checked':'')+' onchange="toggleAttend('+sNum+',\''+sg+'\',\''+pp+'\',\''+d+'\',this.checked)"></td>').join('');
     const by=r.birth_year||(r.birthdate?r.birthdate.split('-')[0]:'--');
     const dv=normDay(r.day);
@@ -2341,7 +2342,7 @@ function renderGroupTab(sNum,grp,rows){
   }).join('')+'</tbody>';
   const sgs2=isLJ?['lj1','lj2','lj3']:['ph1','ph2','ph3'];
   const _tfToday=todayISO();
-  const tf='<tfoot><tr style="background:var(--surf2);"><td colspan="7" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Present</td>'+dates.map(d=>{if(d>_tfToday)return'<td style="text-align:center;font-size:11px;color:var(--dim);opacity:.3;">—</td>';let cnt=0;sgs2.forEach(sg=>{if(attendData[sNum]?.[sg])cnt+=Object.values(attendData[sNum][sg]).filter(pa=>pa[d]).length;});const p2=filteredRows.length?Math.round(cnt/filteredRows.length*100):0;return'<td style="text-align:center;font-size:11px;color:var(--dim);">'+cnt+'<br><span style="font-size:10px;opacity:.6;">'+p2+'%</span></td>';}).join('')+'<td colspan="2"></td></tr></tfoot>';
+  const tf='<tfoot><tr style="background:var(--surf2);"><td colspan="7" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Present</td>'+dates.map(d=>{if(d>_tfToday)return'<td style="text-align:center;font-size:11px;color:var(--dim);opacity:.3;">—</td>';let cnt=0;sgs2.forEach(sg=>{if(window.attendData[sNum]?.[sg])cnt+=Object.values(window.attendData[sNum][sg]).filter(pa=>pa[d]).length;});const p2=filteredRows.length?Math.round(cnt/filteredRows.length*100):0;return'<td style="text-align:center;font-size:11px;color:var(--dim);">'+cnt+'<br><span style="font-size:10px;opacity:.6;">'+p2+'%</span></td>';}).join('')+'<td colspan="2"></td></tr></tfoot>';
   return toolbar+sortControls+strip+'<div class="attend-outer"><table class="attend-table">'+hd+bd+tf+'</table></div>';
 }
 
@@ -2537,11 +2538,11 @@ function updateSessionRowLevel(masterRow,newLevel){
 function migrateAttendOnPromo(sNum,pk,fromLevel,toLevel){
   const oldSg=(fromLevel||'').toLowerCase(),newSg=(toLevel||'').toLowerCase();
   if(!oldSg||!newSg||oldSg===newSg)return;
-  const oldRec=attendData[sNum]&&attendData[sNum][oldSg]&&attendData[sNum][oldSg][pk];
+  const oldRec=window.attendData[sNum]&&window.attendData[sNum][oldSg]&&window.attendData[sNum][oldSg][pk];
   if(!oldRec)return;
-  if(!attendData[sNum])attendData[sNum]={};
-  if(!attendData[sNum][newSg])attendData[sNum][newSg]={};
-  attendData[sNum][newSg][pk]=Object.assign({},oldRec,attendData[sNum][newSg][pk]||{});
+  if(!window.attendData[sNum])window.attendData[sNum]={};
+  if(!window.attendData[sNum][newSg])window.attendData[sNum][newSg]={};
+  window.attendData[sNum][newSg][pk]=Object.assign({},oldRec,window.attendData[sNum][newSg][pk]||{});
   saveAttendData();
 }
 function recordMasterPromo(row,from,to,date){
@@ -2679,7 +2680,7 @@ function renderDashboard(){
   const div=document.getElementById('panel-dashboard');if(!div)return;
   const all=DB.master,act=all.filter(r=>(r.status||'Active')==='Active').length,inact=all.filter(r=>r.status==='Inactive').length,lost=all.filter(r=>r.status==='Lost').length,wbad=all.filter(r=>r.waiver==='Missing').length,wok=all.filter(r=>r.waiver==='Received').length;
   const alerts=[];
-  [1,2,3,4,5,6].forEach(s=>{['lj1','lj2','lj3','ph1','ph2','ph3'].forEach(g=>{const rows=getGroupRows(s,g),dates=getSessionDates(s);if(!dates.length)return;rows.forEach(r=>{const pa=attendData[s]?.[g]?.[playerKey(r)]||{},att=dates.filter(d=>pa[d]).length,pct=Math.round(att/dates.length*100);if(pct<60&&dates.length>=3)alerts.push({name:(r.first_name||'')+' '+(r.last_name||''),pct,level:r.level,session:s,grp:g.toUpperCase()});});});});
+  [1,2,3,4,5,6].forEach(s=>{['lj1','lj2','lj3','ph1','ph2','ph3'].forEach(g=>{const rows=getGroupRows(s,g),dates=getSessionDates(s);if(!dates.length)return;rows.forEach(r=>{const pa=window.attendData[s]?.[g]?.[playerKey(r)]||{},att=dates.filter(d=>pa[d]).length,pct=Math.round(att/dates.length*100);if(pct<60&&dates.length>=3)alerts.push({name:(r.first_name||'')+' '+(r.last_name||''),pct,level:r.level,session:s,grp:g.toUpperCase()});});});});
   alerts.sort((a,b)=>a.pct-b.pct);
   const cards=[1,2,3,4,5,6].map(s=>{const rows=DB['session'+s]||[],pros=DB['promo'+s]||[],conf=pros.filter(p=>p.promo_status!=='Pending').length,pend=pros.filter(p=>p.promo_status==='Pending').length,lj=rows.filter(r=>isLJ(r)).length,ph=rows.filter(r=>isPH(r)).length,wm=rows.filter(r=>r.waiver==='Missing').length;return'<div class="dash-card" onclick="switchMainTab(\'session'+s+'\')">'+'<div class="dash-card-head">Session '+s+'</div>'+'<div class="dash-stat-row"><span class="dash-lbl">Athletes</span><span class="dash-val">'+rows.length+'</span></div>'+'<div class="dash-stat-row"><span class="dash-lbl" style="color:#5CCC88;">LJ</span><span class="dash-val">'+lj+'</span></div>'+'<div class="dash-stat-row"><span class="dash-lbl" style="color:#F07050;">PH</span><span class="dash-val">'+ph+'</span></div>'+'<div class="dash-stat-row"><span class="dash-lbl">Promos</span><span class="dash-val">'+conf+(pend?' <span style="color:var(--gold);font-size:10px;">(+'+pend+' pending)</span>':'')+' </span></div>'+(wm?'<div class="dash-stat-row"><span class="dash-lbl" style="color:#F07050;">! Waiver</span><span class="dash-val" style="color:#F07050;">'+wm+'</span></div>':'')+'</div>';}).join('');
   if(!document.getElementById('dash-css')){const s=document.createElement('style');s.id='dash-css';s.textContent='.dash-card{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .2s;}.dash-card:hover{border-color:var(--gold);}.dash-card-head{font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}.dash-stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;}.dash-lbl{color:var(--dim);}.dash-val{font-weight:600;}.dash-stat-big{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}.dash-big-num{font-family:\'Bebas Neue\',sans-serif;font-size:36px;letter-spacing:2px;line-height:1;}.dash-big-lbl{font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:4px;}';document.head.appendChild(s);}
@@ -2980,8 +2981,8 @@ function pushAllToFirebase(){
     const payload={
       master:DB.master,
       season,
-      attendance:attendData,
-      manualDates,
+      attendance:window.attendData,
+      window.manualDates,
     };
     // Push DB data
     const p1=window._fbSet(window._fbRef(window._fbDb,'jaguar_db'),payload);
@@ -3002,9 +3003,6 @@ function pushAllToFirebase(){
 }
 
 // ── INIT ──
-// Expose attendance globals for Firebase listener
-window.attendData = attendData;
-window.manualDates = manualDates;
 window.renderAll = renderAll;
 window.updateStats = updateStats;
 window.showAlert = showAlert;
@@ -3012,9 +3010,6 @@ window.showAlert = showAlert;
 function _startApp(){
   loadDB();
   loadAttendData();
-  // Re-expose after loadAttendData populates them
-  window.attendData = attendData;
-  window.manualDates = manualDates;
   renderAll();
   updateStats();
   window._appInitialized = true;
@@ -3024,7 +3019,6 @@ if(window._fbReady){
   _startApp();
 } else {
   document.addEventListener('fb-ready', _startApp, {once:true});
-  // Fallback: if Firebase takes > 3s, start anyway with local data
   setTimeout(()=>{ if(!window._appInitialized){ _startApp(); } }, 3000);
 }
 </script>
