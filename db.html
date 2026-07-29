@@ -100,7 +100,6 @@ onValue(rootRef, snapshot => {
       changed = true;
     }
   }
-
   if (changed) {
     // Show a subtle toast so users know data updated
     if (window.showAlert) window.showAlert('↻ Updated from another device', 'info');
@@ -109,6 +108,30 @@ onValue(rootRef, snapshot => {
   }
 }, error => {
   console.warn('Firebase listener error:', error);
+});
+
+// ── COACH + PLAN DATA LISTENERS ──
+// Write to localStorage so coach.html and attendance sync pick them up automatically
+onValue(ref(fbDb, 'jag_coaches'), snapshot => {
+  if (window._fbLocalWrite) return;
+  const data = snapshot.val();
+  if (!data) return;
+  try {
+    const incoming = JSON.stringify(data);
+    if (localStorage.getItem('jag_coaches') !== incoming)
+      localStorage.setItem('jag_coaches', incoming);
+  } catch(e) {}
+});
+
+onValue(ref(fbDb, 'jag_plan_data'), snapshot => {
+  if (window._fbLocalWrite) return;
+  const data = snapshot.val();
+  if (!data) return;
+  try {
+    const incoming = JSON.stringify(data);
+    if (localStorage.getItem('jag_plan_data') !== incoming)
+      localStorage.setItem('jag_plan_data', incoming);
+  } catch(e) {}
 });
 </script>
 <style>
@@ -389,7 +412,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V25</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V26</div>
 
 <nav>
   <div class="nav-left">
@@ -415,6 +438,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <button class="btn-confirm" style="padding:9px 20px;font-size:13px;" onclick="openAddModal()">&#43; Add Player</button>
       <button class="btn-sm gold" onclick="exportAllCSV()">&#x2193; Export All</button>
+      <button class="btn-sm" id="fb-push-btn" onclick="pushAllToFirebase()" style="border-color:#7EC8E3;color:#7EC8E3;" title="Push all local data to Firebase so other devices sync">&#x2191; Push to Cloud</button>
     </div>
     <div class="stat-pills" id="stat-pills">
       <div class="pill"><span id="stat-total">0</span> Total</div>
@@ -2936,6 +2960,45 @@ function exportEmailList(){
   rows.forEach(r=>lines.push([(r.first_name||'')+' '+(r.last_name||''),r.level||'',r.status||'Active',r.parent1_name||'',r.parent1_email||'',r.parent1_phone||'',r.parent2_name||'',r.parent2_email||'',r.parent2_phone||''].map(v=>v.includes(',')?'"'+v+'"':v).join(',')));
   downloadCSV(lines.join('\n'),'jaguar-email-list.csv');
   showAlert('Exported '+rows.length+' active players','ok');
+}
+
+// ── PUSH ALL LOCAL DATA TO FIREBASE ──
+// Use this once from the device that has the correct/complete data to seed Firebase.
+// After this runs, all other devices will pull the correct data on next load.
+function pushAllToFirebase(){
+  if(!window._fbDb||!window._fbRef||!window._fbSet){
+    showAlert('Firebase not connected yet — try again in a moment','err');return;
+  }
+  jagConfirm('Push ALL data from this device to Firebase? This overwrites what\'s on Firebase with your local data. Other devices will get this data on their next refresh. Use this on the device that has the correct/complete data.',function(){
+    const btn=document.getElementById('fb-push-btn');
+    if(btn){btn.textContent='Pushing…';btn.style.opacity='.5';}
+    const season={};SEASON_FIELDS.forEach(k=>season[k]=DB[k]);
+    // Also grab coach data and plan data from localStorage to push
+    let coachData=null,planData=null;
+    try{const r=localStorage.getItem('jag_coaches');if(r)coachData=JSON.parse(r);}catch(e){}
+    try{const r=localStorage.getItem('jag_plan_data');if(r)planData=JSON.parse(r);}catch(e){}
+    const payload={
+      master:DB.master,
+      season,
+      attendance:attendData,
+      manualDates,
+    };
+    // Push DB data
+    const p1=window._fbSet(window._fbRef(window._fbDb,'jaguar_db'),payload);
+    // Push coach + plan data to shared nodes other apps read
+    const promises=[p1];
+    if(coachData) promises.push(window._fbSet(window._fbRef(window._fbDb,'jag_coaches'),coachData));
+    if(planData) promises.push(window._fbSet(window._fbRef(window._fbDb,'jag_plan_data'),planData));
+    Promise.all(promises)
+      .then(()=>{
+        if(btn){btn.textContent='↑ Push to Cloud';btn.style.opacity='';}
+        showAlert('✓ All data pushed to Firebase — other devices will sync on refresh','ok');
+      })
+      .catch(e=>{
+        if(btn){btn.textContent='↑ Push to Cloud';btn.style.opacity='';}
+        showAlert('Firebase write error: '+e.message,'err');
+      });
+  });
 }
 
 // ── INIT ──
