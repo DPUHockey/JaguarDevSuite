@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V21</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V22</div>
 
 <nav>
   <div class="nav-left">
@@ -872,11 +872,12 @@ function compareValsMulti(a,b,sorts){
   return 0;
 }
 function applySortRows(rows,sort){
-  if(!sort||!sort.col)return rows.map((r,i)=>({r,i}));
   const indexed=rows.map((r,i)=>({r,i}));
-  // Build sort chain: primary + secondary (if set)
-  const chain=[sort];
-  if(sort.secondary)chain.push(sort.secondary);
+  // Build sort chain from whatever is set
+  const chain=[];
+  if(sort&&sort.col)chain.push(sort);
+  if(sort&&sort.secondary&&sort.secondary.col)chain.push(sort.secondary);
+  if(!chain.length)return indexed; // nothing to sort by
   indexed.sort((a,b)=>compareValsMulti(a,b,chain));
   return indexed;
 }
