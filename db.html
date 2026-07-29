@@ -8,6 +8,109 @@
 <meta name="theme-color" content="#0A0A0A"/>
 <title>Jaguar Development — Athlete Database</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script type="module">
+// ── FIREBASE SYNC ──
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",
+  authDomain: "jaguardevsuite.firebaseapp.com",
+  databaseURL: "https://jaguardevsuite-default-rtdb.firebaseio.com",
+  projectId: "jaguardevsuite",
+  storageBucket: "jaguardevsuite.firebasestorage.app",
+  messagingSenderId: "383805859949",
+  appId: "1:383805859949:web:e33d21ee74036e75b43764"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const fbDb = getDatabase(fbApp);
+
+// Expose to global scope so the rest of the app (non-module scripts) can call them
+window._fbDb = fbDb;
+window._fbRef = ref;
+window._fbSet = set;
+window._fbOnValue = onValue;
+window._fbGet = get;
+window._fbReady = false;
+
+// Flag so we don't re-trigger render from our own writes
+window._fbLocalWrite = false;
+
+// ── INITIAL LOAD FROM FIREBASE ──
+// Pull master + season data from Firebase once on load, then set up live listener
+const rootRef = ref(fbDb, 'jaguar_db');
+get(rootRef).then(snapshot => {
+  const data = snapshot.val();
+  if (data) {
+    // Merge Firebase data into DB
+    if (data.master) window._DB_master_fb = data.master;
+    if (data.season) window._DB_season_fb = data.season;
+    if (data.attendance) window._DB_attend_fb = data.attendance;
+    if (data.manualDates) window._DB_manual_fb = data.manualDates;
+  }
+  window._fbReady = true;
+  // Signal the main script that Firebase data is available
+  document.dispatchEvent(new Event('fb-ready'));
+}).catch(e => {
+  console.warn('Firebase initial load failed, using localStorage:', e);
+  window._fbReady = true;
+  document.dispatchEvent(new Event('fb-ready'));
+});
+
+// ── LIVE LISTENER — fires on ALL connected devices when data changes ──
+onValue(rootRef, snapshot => {
+  // Skip if this change came from our own write
+  if (window._fbLocalWrite) return;
+  const data = snapshot.val();
+  if (!data) return;
+
+  // Only update if app is fully initialized
+  if (!window._appInitialized) return;
+
+  let changed = false;
+
+  if (data.master) {
+    const newMaster = data.master;
+    if (JSON.stringify(newMaster) !== JSON.stringify(window.DB?.master)) {
+      if (window.DB) window.DB.master = newMaster;
+      changed = true;
+    }
+  }
+  if (data.season) {
+    const SFIELDS = window.SEASON_FIELDS_GLOBAL || [];
+    SFIELDS.forEach(k => {
+      if (data.season[k] && window.DB) {
+        if (JSON.stringify(data.season[k]) !== JSON.stringify(window.DB[k])) {
+          window.DB[k] = data.season[k];
+          changed = true;
+        }
+      }
+    });
+  }
+  if (data.attendance) {
+    if (JSON.stringify(data.attendance) !== JSON.stringify(window.attendData)) {
+      window.attendData = data.attendance;
+      changed = true;
+    }
+  }
+  if (data.manualDates) {
+    if (JSON.stringify(data.manualDates) !== JSON.stringify(window.manualDates)) {
+      window.manualDates = data.manualDates;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    // Show a subtle toast so users know data updated
+    if (window.showAlert) window.showAlert('↻ Updated from another device', 'info');
+    if (window.renderAll) window.renderAll();
+    if (window.updateStats) window.updateStats();
+  }
+}, error => {
+  console.warn('Firebase listener error:', error);
+});
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -286,7 +389,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V24</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V25</div>
 
 <nav>
   <div class="nav-left">
@@ -502,36 +605,104 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 //   SEASON_KEY  -- this year's sessions/promotions, safe to wipe each fall
 const MASTER_KEY = 'jaguar_master_v1';
 const SEASON_KEY = 'jaguar_season_v1';
-const LEGACY_STORE_KEY = 'jaguar_athlete_db_v1'; // old combined key -- read once for migration, then unused
+const LEGACY_STORE_KEY = 'jaguar_athlete_db_v1';
 const SEASON_FIELDS = ['session1','session2','session3','session4','session5','session6','lj1','lj2','lj3','ph1','ph2','ph3','lj','ph','promo1','promo2','promo3','promo4','promo5','promo6'];
 const DB = {session1:[],session2:[],session3:[],session4:[],session5:[],session6:[],master:[],lj1:[],lj2:[],lj3:[],ph1:[],ph2:[],ph3:[],lj:[],ph:[],promo1:[],promo2:[],promo3:[],promo4:[],promo5:[],promo6:[]};
 let pending = null, pendingName = '', selSess = null;
 
+// Expose globally so Firebase module script can access
+window.DB = DB;
+window.SEASON_FIELDS_GLOBAL = SEASON_FIELDS;
+window._appInitialized = false;
+
 function saveDB(){
+  // 1. Always save to localStorage as cache
   try{
     localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
     const season={};SEASON_FIELDS.forEach(k=>season[k]=DB[k]);
     localStorage.setItem(SEASON_KEY,JSON.stringify(season));
   }catch(e){}
+  // 2. Write to Firebase (non-blocking)
+  if(window._fbDb && window._fbRef && window._fbSet){
+    try{
+      const season={};SEASON_FIELDS.forEach(k=>season[k]=DB[k]);
+      const payload={master:DB.master,season};
+      window._fbLocalWrite=true;
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db'),payload)
+        .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
+        .catch(e=>{ window._fbLocalWrite=false; console.warn('Firebase write error:',e); });
+    }catch(e){ window._fbLocalWrite=false; }
+  }
 }
+
+function saveAttendDataAndSync(){
+  saveAttendData();
+  if(window._fbDb && window._fbRef && window._fbSet){
+    try{
+      window._fbLocalWrite=true;
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/attendance'),attendData)
+        .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
+        .catch(e=>{ window._fbLocalWrite=false; });
+    }catch(e){ window._fbLocalWrite=false; }
+  }
+}
+
+function saveManualDatesAndSync(){
+  saveManualDates();
+  if(window._fbDb && window._fbRef && window._fbSet){
+    try{
+      window._fbLocalWrite=true;
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/manualDates'),manualDates)
+        .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
+        .catch(e=>{ window._fbLocalWrite=false; });
+    }catch(e){ window._fbLocalWrite=false; }
+  }
+}
+
 function loadDB(){
+  // Try localStorage first for instant startup
   try{
     const mRaw=localStorage.getItem(MASTER_KEY),sRaw=localStorage.getItem(SEASON_KEY);
     if(mRaw||sRaw){
       if(mRaw){const m=JSON.parse(mRaw);if(m.master)DB.master=m.master;}
       if(sRaw){const s=JSON.parse(sRaw);SEASON_FIELDS.forEach(k=>{if(s[k])DB[k]=s[k];});}
       normalizeStoredDates();
-      saveDB();
-      return;
+    } else {
+      const legacy=localStorage.getItem(LEGACY_STORE_KEY);
+      if(legacy){
+        const saved=JSON.parse(legacy);
+        Object.keys(DB).forEach(k=>{if(saved[k])DB[k]=saved[k];});
+        normalizeStoredDates();
+        // resave in new format
+        const season={};SEASON_FIELDS.forEach(k=>season[k]=DB[k]);
+        localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
+        localStorage.setItem(SEASON_KEY,JSON.stringify(season));
+      }
     }
-    // one-time migration: old single-key format found, split it into the new keys
-    const legacy=localStorage.getItem(LEGACY_STORE_KEY);
-    if(legacy){
-      const saved=JSON.parse(legacy);
-      Object.keys(DB).forEach(k=>{if(saved[k])DB[k]=saved[k];});
-      normalizeStoredDates();
-      saveDB();
+  }catch(e){}
+
+  // Then merge Firebase data if it arrived before this ran
+  _mergeFirebaseData();
+}
+
+function _mergeFirebaseData(){
+  try{
+    if(window._DB_master_fb){
+      // Firebase wins if it has more records, otherwise keep local
+      if(window._DB_master_fb.length >= DB.master.length){
+        DB.master = window._DB_master_fb;
+      }
     }
+    if(window._DB_season_fb){
+      SEASON_FIELDS.forEach(k=>{
+        if(window._DB_season_fb[k] && window._DB_season_fb[k].length >= (DB[k]||[]).length){
+          DB[k]=window._DB_season_fb[k];
+        }
+      });
+    }
+    if(window._DB_attend_fb) attendData = window._DB_attend_fb;
+    if(window._DB_manual_fb) manualDates = window._DB_manual_fb;
+    normalizeStoredDates();
   }catch(e){}
 }
 // A player's Master File record and their session-tab row(s) are separate copies of
@@ -1849,7 +2020,7 @@ function addManualDate(sNum,dateStr){
   if(!manualDates[sNum])manualDates[sNum]=[];
   if(manualDates[sNum].includes(dateStr))return false;
   manualDates[sNum].push(dateStr);
-  saveManualDates();return true;
+  saveManualDatesAndSync();return true;
 }
 function removeManualDate(sNum,dateStr){
   if(!manualDates[sNum])return;
@@ -1953,7 +2124,7 @@ function toggleAttend(sNum,grp,pk,date,checked){
   if(!attendData[sNum][grp])attendData[sNum][grp]={};
   if(!attendData[sNum][grp][pk])attendData[sNum][grp][pk]={};
   attendData[sNum][grp][pk][date]=checked;
-  saveAttendData();
+  saveAttendDataAndSync();
   const dates=getSessionDates(sNum);
   const{attended,total,pct}=computeAttendStats(sNum,grp,pk,dates);
   const safeKey=pk.replace(/[^a-z0-9]/gi,'_');
@@ -2047,7 +2218,7 @@ function removeDateUI(sNum,grp,dateStr){
   if(!manualDates._removed) manualDates._removed={};
   if(!manualDates._removed[sNum]) manualDates._removed[sNum]=[];
   if(!manualDates._removed[sNum].includes(dateStr)) manualDates._removed[sNum].push(dateStr);
-  saveManualDates();
+  saveManualDatesAndSync();
   renderSessionPanel(sNum);
 }
 
@@ -2768,7 +2939,31 @@ function exportEmailList(){
 }
 
 // ── INIT ──
-loadDB();loadAttendData();renderAll();updateStats();
+// Expose attendance globals for Firebase listener
+window.attendData = attendData;
+window.manualDates = manualDates;
+window.renderAll = renderAll;
+window.updateStats = updateStats;
+window.showAlert = showAlert;
+
+function _startApp(){
+  loadDB();
+  loadAttendData();
+  // Re-expose after loadAttendData populates them
+  window.attendData = attendData;
+  window.manualDates = manualDates;
+  renderAll();
+  updateStats();
+  window._appInitialized = true;
+}
+
+if(window._fbReady){
+  _startApp();
+} else {
+  document.addEventListener('fb-ready', _startApp, {once:true});
+  // Fallback: if Firebase takes > 3s, start anyway with local data
+  setTimeout(()=>{ if(!window._appInitialized){ _startApp(); } }, 3000);
+}
 </script>
 
 <div id="gear-modal" style="display:none;">
