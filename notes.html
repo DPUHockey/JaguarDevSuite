@@ -174,11 +174,23 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
   .lv-badge { border: 1px solid #999 !important; color: #333 !important; background: #f5f5f5 !important; }
   a { color: #111 !important; }
   @page { margin: 0.75in; }
+
+  /* Full detail print modes */
+  body.print-actual-only .mega-divider.second,
+  body.print-actual-only .scenario-bar,
+  body.print-actual-only .proj-note,
+  body.print-actual-only .proj-summary-row,
+  body.print-actual-only .proj-program,
+  body.print-actual-only .panel:has(#proj-overall-costs),
+  body.print-actual-only .save-bar { display: none !important; }
+
+  body.print-projected-only #actual-budget-section,
+  body.print-projected-only .save-bar:first-of-type { display: none !important; }
 }
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V5</div>
+<div id="app-ver-badge">V6</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -212,10 +224,18 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 <div class="wrap">
 
   <!-- PRINT BUTTON BAR — hidden on print -->
-  <div class="print-btn-bar" style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:24px;padding:12px 0;border-bottom:1px solid var(--gray-border);">
-    <span style="font-family:'Barlow Condensed';font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);align-self:center;margin-right:auto;">Print Projected Budget:</span>
-    <button class="btn btn-outline" onclick="printFull()">&#128438; Full Detail</button>
-    <button class="btn btn-gold" onclick="printBoard()">&#128438; Board Summary</button>
+  <div class="print-btn-bar" style="display:flex;gap:10px;justify-content:flex-end;margin-bottom:24px;padding:12px 0;border-bottom:1px solid var(--gray-border);flex-wrap:wrap;">
+    <span style="font-family:'Barlow Condensed';font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);align-self:center;margin-right:auto;">Print:</span>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <span style="font-family:'Barlow Condensed';font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);">Full Detail:</span>
+      <button class="btn btn-outline" onclick="printFull('all')">&#128438; All</button>
+      <button class="btn btn-outline" onclick="printFull('actual')">&#128438; Season Summary</button>
+      <button class="btn btn-outline" onclick="printFull('projected')">&#128438; Projected</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:10px;">
+      <span style="font-family:'Barlow Condensed';font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--white-dim);">Board Summary:</span>
+      <button class="btn btn-gold" onclick="printBoard()">&#128438; Print</button>
+    </div>
   </div>
 
   <div id="actual-budget-section">
@@ -709,10 +729,15 @@ function buildBoardSummaryHTML(){
   `;
 }
 
-function printFull(){
-  document.body.classList.remove('board-print');
+function printFull(mode){
+  mode=mode||'all';
+  document.body.classList.remove('board-print','print-actual-only','print-projected-only','print-all');
   document.querySelector('.board-summary-section').style.display='none';
+  if(mode==='actual')document.body.classList.add('print-actual-only');
+  else if(mode==='projected')document.body.classList.add('print-projected-only');
+  else document.body.classList.add('print-all');
   window.print();
+  setTimeout(()=>{document.body.classList.remove('print-actual-only','print-projected-only','print-all');},1000);
 }
 
 function printBoard(){
