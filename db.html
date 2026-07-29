@@ -412,7 +412,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V27</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V28</div>
 
 <nav>
   <div class="nav-left">
@@ -799,7 +799,7 @@ function fullDataReset(){
   jagConfirm('FULL RESET \u2014 this wipes everything: Master File, all 6 session rosters, all promotions, and attendance check-ins. Nothing roster-related will be left. A complete backup downloads first. Coach Hours / Season Planning data (shared with the Coach Data Center app) is not touched. This cannot be undone except by re-importing the backup. Are you sure?',function(){
     try{
       const archive={app:'jaguar-db-full-archive',v:1,exported:new Date().toISOString(),
-        master:DB.master,attendance:window.attendData,window.manualDates:window.manualDates,sessions:{},promos:{}};
+        master:DB.master,attendance:window.attendData,manualDates:window.manualDates,sessions:{},promos:{}};
       for(let s=1;s<=6;s++){archive.sessions['session'+s]=DB['session'+s]||[];archive.promos['promo'+s]=DB['promo'+s]||[];}
       const blob=new Blob([JSON.stringify(archive,null,2)],{type:'application/json'});
       const a=document.createElement('a'),d=new Date();
@@ -2982,7 +2982,7 @@ function pushAllToFirebase(){
       master:DB.master,
       season,
       attendance:window.attendData,
-      window.manualDates,
+      manualDates:window.manualDates,
     };
     // Push DB data
     const p1=window._fbSet(window._fbRef(window._fbDb,'jaguar_db'),payload);
