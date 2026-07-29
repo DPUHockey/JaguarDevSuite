@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V20</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V21</div>
 
 <nav>
   <div class="nav-left">
@@ -891,9 +891,16 @@ function thSort(col, label, sort, _fn, tabKey){
 // Set a secondary sort key (e.g. after sorting by Day, also sort by first/last name within each day)
 function setSecondarySort(tabKey, col, dir){
   const cur=sortState[tabKey]||{col:null,dir:'asc'};
-  if(!col){sortState[tabKey]=Object.assign({},cur,{secondary:null});}
-  else if(cur.col!==col){sortState[tabKey]=Object.assign({},cur,{secondary:{col,dir:dir||'asc'}});}
-  // Re-render
+  if(!col){
+    sortState[tabKey]=Object.assign({},cur,{secondary:null});
+  } else {
+    // Always set secondary sort — even if no primary sort is active yet.
+    // If secondary col matches primary, secondary is effectively ignored in the
+    // sort chain (same field, same dir) which is fine — user can still click
+    // the header to establish a real primary first.
+    sortState[tabKey]=Object.assign({},cur,{secondary:{col,dir:dir||'asc'}});
+  }
+  // Re-render immediately
   const sm=tabKey.match(/^session(\d)(?:_(.+))?$/);
   if(sm){const sNum=parseInt(sm[1]);if(sm[2])activeSubTab['session'+sNum]=sm[2];renderSessionPanel(sNum);}
 }
