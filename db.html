@@ -286,7 +286,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V19</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V20</div>
 
 <nav>
   <div class="nav-left">
@@ -854,28 +854,69 @@ function compareVals(col,av,bv){
   const al=av.toLowerCase(),bl=bv.toLowerCase();
   return al<bl?-1:al>bl?1:0;
 }
+// Day sort order: W first, then S, then SW, then blank
+const DAY_ORDER={'W':0,'S':1,'SW':2,'':3};
+function compareValsMulti(a,b,sorts){
+  for(const s of sorts){
+    const av=a.r[s.col]||'',bv=b.r[s.col]||'';
+    let cmp;
+    if(s.col==='day'){
+      const ai=DAY_ORDER[av]!==undefined?DAY_ORDER[av]:3;
+      const bi=DAY_ORDER[bv]!==undefined?DAY_ORDER[bv]:3;
+      cmp=ai-bi;
+    }else{
+      cmp=compareVals(s.col,av,bv);
+    }
+    if(cmp!==0)return s.dir==='asc'?cmp:-cmp;
+  }
+  return 0;
+}
 function applySortRows(rows,sort){
   if(!sort||!sort.col)return rows.map((r,i)=>({r,i}));
   const indexed=rows.map((r,i)=>({r,i}));
-  indexed.sort((a,b)=>{
-    const av=a.r[sort.col]||'';
-    const bv=b.r[sort.col]||'';
-    const cmp=compareVals(sort.col,av,bv);
-    return sort.dir==='asc'?cmp:-cmp;
-  });
+  // Build sort chain: primary + secondary (if set)
+  const chain=[sort];
+  if(sort.secondary)chain.push(sort.secondary);
+  indexed.sort((a,b)=>compareValsMulti(a,b,chain));
   return indexed;
 }
 function thSort(col, label, sort, _fn, tabKey){
   const active=sort&&sort.col===col;
+  const isSecondary=sort&&sort.secondary&&sort.secondary.col===col;
   const arrow=active?(sort.dir==='asc'?' ▲':' ▼'):'';
-  const style=`cursor:pointer;user-select:none;${active?'color:var(--gold);':''}`;
-  return`<th style="${style}" onclick="sortTab('${tabKey}','${col}')">${label}${arrow}</th>`;
+  const secArrow=isSecondary?(sort.secondary.dir==='asc'?' ▲²':' ▼²'):'';
+  const style=`cursor:pointer;user-select:none;${active?'color:var(--gold);':isSecondary?'color:var(--gold2);opacity:.7;':''}`;
+  return`<th style="${style}" onclick="sortTab('${tabKey}','${col}')">${label}${arrow}${secArrow}</th>`;
+}
+// Set a secondary sort key (e.g. after sorting by Day, also sort by first/last name within each day)
+function setSecondarySort(tabKey, col, dir){
+  const cur=sortState[tabKey]||{col:null,dir:'asc'};
+  if(!col){sortState[tabKey]=Object.assign({},cur,{secondary:null});}
+  else if(cur.col!==col){sortState[tabKey]=Object.assign({},cur,{secondary:{col,dir:dir||'asc'}});}
+  // Re-render
+  const sm=tabKey.match(/^session(\d)(?:_(.+))?$/);
+  if(sm){const sNum=parseInt(sm[1]);if(sm[2])activeSubTab['session'+sNum]=sm[2];renderSessionPanel(sNum);}
+}
+function clearSecondarySort(tabKey,sNum,grp){
+  const cur=sortState[tabKey]||{col:null,dir:'asc'};
+  sortState[tabKey]=Object.assign({},cur,{secondary:null});
+  activeSubTab['session'+sNum]=grp;
+  renderSessionPanel(sNum);
+}
+function setGrpDayFilter(filterKey,day,sNum,grp){
+  if(!window._grpDayFilter)window._grpDayFilter={};
+  window._grpDayFilter[filterKey]=day;
+  activeSubTab['session'+sNum]=grp;
+  renderSessionPanel(sNum);
 }
 
 // Single global sort dispatcher for all tables
 function sortTab(tabKey, col){
   const cur=sortState[tabKey]||{col:null,dir:'asc'};
-  sortState[tabKey]={col,dir:cur.col===col&&cur.dir==='asc'?'desc':'asc'};
+  const newDir=cur.col===col&&cur.dir==='asc'?'desc':'asc';
+  // Preserve secondary sort when changing primary; clear secondary when clicking secondary col
+  const prevSecondary=cur.secondary&&cur.secondary.col!==col?cur.secondary:null;
+  sortState[tabKey]={col,dir:newDir,secondary:prevSecondary};
   // Re-render the right panel
   if(tabKey==='master'){renderMasterTab();} else {
     // tabKey patterns: 'session1', 'promo1', or 'session1_lj1' etc.
@@ -2072,19 +2113,47 @@ dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
 }
 
+function dayBadge(d){
+  if(!d)return'<span style="color:var(--dim);font-size:11px;">—</span>';
+  const c=d==='W'?'#7EC8E3':d==='S'?'#C9A84C':'#B0A0D8';
+  return'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:'+c+';border:1px solid '+c+'44;border-radius:4px;padding:1px 7px;">'+d+'</span>';
+}
 function renderGroupTab(sNum,grp,rows){
   const sk='session'+sNum,isLJ=grp==='lj',col=isLJ?'#5CCC88':'#F07050';
   const lbl=isLJ?'LJ - Little Jaguars':'PH - Pre Hockey';
   if(!rows||!rows.length)return'<div class="empty-state"><p>No '+grp.toUpperCase()+' athletes in Session '+sNum+'</p></div>';
   const pm={};(DB['promo'+sNum]||[]).forEach(p=>{pm[p.first_name+'|'+p.last_name+'|'+(p.birthdate||'')]=p.to_level;});
   const dates=getSessionDates(sNum),manSet=new Set((manualDates[sNum]||[]));
-  const tk=sk+'_'+grp,sort=sortState[tk]||{col:null,dir:'asc'},indexed=applySortRows(rows,sort);
+  const tk=sk+'_'+grp,sort=sortState[tk]||{col:null,dir:'asc'};
+
+  // Day filter state
+  if(!window._grpDayFilter)window._grpDayFilter={};
+  const dayFilterKey=tk+'_dayfilter';
+  const dayFilter=window._grpDayFilter[dayFilterKey]||'all';
+  // Apply day filter first, then sort
+  const filteredRows=dayFilter==='all'?rows:rows.filter(r=>normDay(r.day)===dayFilter);
+  const indexed=applySortRows(filteredRows,sort);
+
   function th(c,l){return thSort(c,l,sort,null,tk);}
-  const toolbar='<div class="toolbar"><div class="toolbar-left" style="color:'+col+';">'+lbl+' -- '+rows.length+' athlete'+(rows.length!==1?'s':'')+' &middot; '+dates.length+' date'+(dates.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="attend-sync-btn" onclick="syncAndRerender('+sNum+',\''+grp+'\')">&#x21BB; Sync Dates</button><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportAttendCSV('+sNum+',\''+grp+'\')">&#x2193; Export</button></div></div>';
+
+  // Secondary sort UI
+  const secCol=sort.secondary?sort.secondary.col:null;
+  const secDir=sort.secondary?sort.secondary.dir:'asc';
+  const secOptions=['first_name','last_name','birthdate','level'].map(c=>`<option value="${c}"${secCol===c?' selected':''}>${{first_name:'First',last_name:'Last',birthdate:'Born',level:'Level'}[c]}</option>`).join('');
+  const sortControls='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:var(--surf3);border-radius:6px;border:1px solid var(--border);">'
+    +'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Filter Day:</span>'
+    +['all','W','S','SW'].map(d=>{const active=dayFilter===d;return'<button onclick="setGrpDayFilter(\''+dayFilterKey+'\',\''+d+'\','+sNum+',\''+grp+'\')" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;padding:2px 9px;border-radius:10px;border:1px solid '+(active?col:' var(--border)')+';background:'+(active?col+'22':'transparent')+';color:'+(active?col:'var(--dim)')+';cursor:pointer;">'+(d==='all'?'All':d)+'</button>';}).join('')
+    +'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-left:10px;">Then by:</span>'
+    +'<select onchange="setSecondarySort(\''+tk+'\',this.value,\'asc\')" style="background:var(--surf2);border:1px solid var(--border);border-radius:4px;color:var(--wht);font-family:\'Barlow Condensed\',sans-serif;font-size:11px;padding:2px 6px;outline:none;"><option value="">— none —</option>'+secOptions+'</select>'
+    +(secCol?'<button onclick="clearSecondarySort(\''+tk+'\','+sNum+',\''+grp+'\')" style="font-size:10px;padding:2px 7px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--dim);cursor:pointer;">✕ clear</button>':'')
+    +'<span style="margin-left:auto;font-family:\'Barlow Condensed\',sans-serif;font-size:10px;color:var(--dim);">'+filteredRows.length+(dayFilter!=='all'?' of '+rows.length:'')+' athlete'+(filteredRows.length!==1?'s':'')+'</span>'
+    +'</div>';
+
+  const toolbar='<div class="toolbar"><div class="toolbar-left" style="color:'+col+';">'+lbl+' &middot; '+dates.length+' date'+(dates.length!==1?'s':'')+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="attend-sync-btn" onclick="syncAndRerender('+sNum+',\''+grp+'\')">&#x21BB; Sync Dates</button><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportAttendCSV('+sNum+',\''+grp+'\')">&#x2193; Export</button></div></div>';
   const chips=dates.map(d=>{const im=manSet.has(d);return im?'<span style="display:inline-flex;align-items:center;gap:4px;background:var(--gfaint);border:1px solid var(--gborder);border-radius:12px;padding:2px 8px;font-size:11px;color:var(--gold2);">'+fmtDate(d)+' <span onclick="removeDateUI('+sNum+',\''+grp+'\',\''+d+'\')" style="cursor:pointer;opacity:.6;font-size:10px;">x</span></span>':'<span style="display:inline-flex;align-items:center;gap:4px;background:var(--surf3);border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:11px;color:var(--dim);">'+fmtDate(d)+' <span onclick="removeDateUI('+sNum+',\''+grp+'\',\''+d+'\')" style="cursor:pointer;opacity:.4;font-size:10px;">x</span></span>';}).join('');
   const strip='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:var(--surf2);border-radius:8px;border:1px solid var(--border);"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);flex-shrink:0;">Session Dates:</span>'+chips+'<input type="date" id="manual-date-'+sNum+'-'+grp+'" style="background:var(--surf3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:12px;outline:none;margin-left:4px;" onkeydown="if(event.key===\'Enter\')addManualDateUI('+sNum+',\''+grp+'\')"><button class="attend-sync-btn" style="padding:3px 9px;font-size:11px;" onclick="addManualDateUI('+sNum+',\''+grp+'\')">+ Add</button></div>';
-  if(!dates.length)return toolbar+'<div class="no-dates-notice"><p>No dates for Session '+sNum+'</p><small>Sync from Data Center or add manually above.</small></div>';
-  const hd='<thead><tr>'+th('first_name','First')+th('last_name','Last')+th('birthdate','Born')+th('level','Lvl')+'<th style="min-width:28px;text-align:center;" title="Promoted">&#9733;</th><th style="min-width:60px;">Promo To</th>'+dates.map(d=>'<th style="min-width:28px;"><div class="date-th-inner" style="color:'+col+';">'+fmtDate(d)+'</div></th>').join('')+'<th class="total-col" style="min-width:44px;">Att%</th><th style="min-width:70px;">Actions</th></tr></thead>';
+  if(!dates.length)return toolbar+sortControls+'<div class="no-dates-notice"><p>No dates for Session '+sNum+'</p><small>Sync from Data Center or add manually above.</small></div>';
+  const hd='<thead><tr>'+th('first_name','First')+th('last_name','Last')+th('birthdate','Born')+th('day','Day')+th('level','Lvl')+'<th style="min-width:28px;text-align:center;" title="Promoted">&#9733;</th><th style="min-width:60px;">Promo To</th>'+dates.map(d=>'<th style="min-width:28px;"><div class="date-th-inner" style="color:'+col+';">'+fmtDate(d)+'</div></th>').join('')+'<th class="total-col" style="min-width:44px;">Att%</th><th style="min-width:70px;">Actions</th></tr></thead>';
   const bd='<tbody>'+indexed.map(({r})=>{
     const fi=r._origIdx!==undefined?r._origIdx:DB[sk].indexOf(r);
     const pk=r.first_name+'|'+r.last_name+'|'+(r.birthdate||''),pt=pm[pk]||null;
@@ -2094,10 +2163,12 @@ function renderGroupTab(sNum,grp,rows){
     const pa=attendData[sNum]?.[sg]?.[pp]||{};
     const cells=dates.map(d=>'<td><input type="checkbox" class="attend-cb" '+(pa[d]?'checked':'')+' onchange="toggleAttend('+sNum+',\''+sg+'\',\''+pp+'\',\''+d+'\',this.checked)"></td>').join('');
     const by=r.birth_year||(r.birthdate?r.birthdate.split('-')[0]:'--');
+    const dv=normDay(r.day);
     return'<tr'+(pt?' style="background:rgba(255,200,50,.06);"':'')+'>'+
       '<td class="name-cell" style="font-size:12px;color:var(--wht);'+(pt?'background:rgba(255,200,50,.06);':'')+';">'+(r.first_name||'')+'</td>'+
       '<td class="name-cell" style="font-size:12px;color:var(--wht);cursor:pointer;text-decoration:underline dotted;'+(pt?'background:rgba(255,200,50,.06);':'')+';" onclick="openAddModal(\''+sk+'\','+fi+')" title="Click to edit">'+(r.last_name||'')+'</td>'+
       '<td style="text-align:center;color:var(--dim);font-size:11px;padding:4px 3px;">'+by+'</td>'+
+      '<td style="text-align:center;padding:3px 3px;">'+dayBadge(dv)+'</td>'+
       '<td style="padding:4px 3px;">'+lvBadge(r.level)+'</td>'+
       (pt?'<td style="text-align:center;"><span title="Promoted to '+pt+'" style="color:var(--gold);font-size:14px;">&#9733;</span></td>':'<td></td>')+
       (pt?'<td style="padding:3px 4px;">'+lvBadge(pt)+'</td>':'<td></td>')+
@@ -2108,8 +2179,8 @@ function renderGroupTab(sNum,grp,rows){
   }).join('')+'</tbody>';
   const sgs2=isLJ?['lj1','lj2','lj3']:['ph1','ph2','ph3'];
   const _tfToday=todayISO();
-  const tf='<tfoot><tr style="background:var(--surf2);"><td colspan="6" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Present</td>'+dates.map(d=>{if(d>_tfToday)return'<td style="text-align:center;font-size:11px;color:var(--dim);opacity:.3;">—</td>';let cnt=0;sgs2.forEach(sg=>{if(attendData[sNum]?.[sg])cnt+=Object.values(attendData[sNum][sg]).filter(pa=>pa[d]).length;});const p2=rows.length?Math.round(cnt/rows.length*100):0;return'<td style="text-align:center;font-size:11px;color:var(--dim);">'+cnt+'<br><span style="font-size:10px;opacity:.6;">'+p2+'%</span></td>';}).join('')+'<td colspan="2"></td></tr></tfoot>';
-  return toolbar+strip+'<div class="attend-outer"><table class="attend-table">'+hd+bd+tf+'</table></div>';
+  const tf='<tfoot><tr style="background:var(--surf2);"><td colspan="7" style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);">Present</td>'+dates.map(d=>{if(d>_tfToday)return'<td style="text-align:center;font-size:11px;color:var(--dim);opacity:.3;">—</td>';let cnt=0;sgs2.forEach(sg=>{if(attendData[sNum]?.[sg])cnt+=Object.values(attendData[sNum][sg]).filter(pa=>pa[d]).length;});const p2=filteredRows.length?Math.round(cnt/filteredRows.length*100):0;return'<td style="text-align:center;font-size:11px;color:var(--dim);">'+cnt+'<br><span style="font-size:10px;opacity:.6;">'+p2+'%</span></td>';}).join('')+'<td colspan="2"></td></tr></tfoot>';
+  return toolbar+sortControls+strip+'<div class="attend-outer"><table class="attend-table">'+hd+bd+tf+'</table></div>';
 }
 
 function masterKey(r){return(r.first_name||'').toLowerCase().trim()+'|'+(r.last_name||'').toLowerCase().trim()+'|'+(r.birthdate||r.birth_year||'').trim();}
