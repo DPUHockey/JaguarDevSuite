@@ -413,7 +413,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V35</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V36</div>
 
 <nav>
   <div class="nav-left">
@@ -1304,8 +1304,10 @@ function renderEmailListsTab(sNum){
     if(!lv)return;
     var mk=masterKey(p);
     var masterRec=DB.master.find(function(m){return masterKey(m)===mk;})||{};
-    var email=masterRec.parent1_email||masterRec.parent2_email||p.parent1_email||p.parent2_email||'';
-    var email2=masterRec.parent2_email||p.parent2_email||'';
+    // Also check session roster for freshest data
+    var sessRec=(DB['session'+sNum]||[]).find(function(r){return masterKey(r)===mk;})||{};
+    var email=masterRec.parent1_email||sessRec.parent1_email||p.parent1_email||masterRec.parent2_email||sessRec.parent2_email||p.parent2_email||'';
+    var email2=masterRec.parent2_email||sessRec.parent2_email||p.parent2_email||'';
     if(email2===email)email2='';
     var status=p.promo_status||'Confirmed';
     var enriched=Object.assign({},p,{_email:email,_email2:email2,_status:status});
