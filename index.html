@@ -438,7 +438,7 @@
     const val = input.value.trim();
 
     if (val === getPin()) {
-      localStorage.setItem(SESSION_KEY, '1');
+      sessionStorage.setItem(SESSION_KEY, '1');
       document.getElementById('gate').style.display = 'none';
       document.getElementById('suite').style.display = 'block';
       err.textContent = '';
@@ -452,7 +452,7 @@
   }
 
   function logout() {
-    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
     document.getElementById('suite').style.display = 'none';
     document.getElementById('gate').style.display = 'flex';
     document.getElementById('pin-input').value = '';
@@ -465,7 +465,7 @@
   });
 
   // Check session on load
-  if (localStorage.getItem(SESSION_KEY) === '1') {
+  if (sessionStorage.getItem(SESSION_KEY) === '1') {
     document.getElementById('gate').style.display = 'none';
     document.getElementById('suite').style.display = 'block';
   }
