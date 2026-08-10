@@ -627,7 +627,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </div>
 
 <script>
-if(!sessionStorage.getItem("jds_auth")){window.location.href="index.html";}
+if(!localStorage.getItem("jds_auth")){window.location.href="index.html";}
 // ── DATA STORE ──
 // Split into two keys so a season reset can wipe check-in/session data without
 // touching Master File (career-spanning) history:
