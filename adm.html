@@ -1674,9 +1674,7 @@ function confirmCSVImport(){
     const seasonSlot=SEASONS[targetSeason];
     document.getElementById('csvSeasonModal').classList.add('hidden');
 
-    const lines = pendingCsvText.split(/
-||
-/).filter(l=>l.trim());
+    const lines = pendingCsvText.split(/\n/).filter(l=>l.trim());
     if(lines.length < 2){ showCSVResult('err','File appears empty or has no data rows.'); return; }
     // parse header -- required column MEANING (any labels work): First, Last,
     // Birthdate, Level, then a parent Name/Email/Phone group (twice, for two
