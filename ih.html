@@ -998,6 +998,7 @@ body.display-mode .rlast{font-size:22px;}
 
 <script type="application/json" id="embedded-data">null</script>
 <script>
+if(!sessionStorage.getItem("jds_auth")){window.location.href="index.html";}
 // ===================== STATE =====================
 // Embedded data (baked in on export — takes priority over localStorage)
 const EMBEDDED = (()=>{
@@ -1654,7 +1655,9 @@ function ihConfirmCSVImport(){
     const seasonSlot=IH_SEASONS[targetSeason];
     document.getElementById('ihCsvSeasonModal').classList.add('hidden');
 
-    const lines = ihPendingCsvText.split(/\r\n|\r|\n/).filter(l=>l.trim());
+    const lines = ihPendingCsvText.split(/
+||
+/).filter(l=>l.trim());
     if(lines.length < 2){ ihShowCSVResult('err','File appears empty or has no data rows.'); return; }
     // No Level column for InHouse -- just First, Last, Birthdate, then a parent
     // Name/Email/Phone group (twice, for two parents), then Address/City/State/Zip.
@@ -1923,9 +1926,13 @@ function ihArchiveSeason(){
   const travel=ihMasterList.filter(m=>m.promotionDecision==='travel').length;
   const undecided=total-staying-travel;
   const seasonLabel=ihCurrentSeason.charAt(0).toUpperCase()+ihCurrentSeason.slice(1);
-  let msg=`Archive and close out ${seasonLabel}?\n\n${total} players total \u2014 ${staying} staying InHouse, ${travel} suggested for Travel`;
+  let msg=`Archive and close out ${seasonLabel}?
+
+${total} players total \u2014 ${staying} staying InHouse, ${travel} suggested for Travel`;
   if(undecided)msg+=`, ${undecided} still undecided`;
-  msg+=`.\n\nThis downloads a full backup, saves a browsable summary in-app, and RESETS ${seasonLabel} completely so it's ready to reuse next year. This can only be undone by re-importing the backup.`;
+  msg+=`.
+
+This downloads a full backup, saves a browsable summary in-app, and RESETS ${seasonLabel} completely so it's ready to reuse next year. This can only be undone by re-importing the backup.`;
   if(!confirm(msg))return;
 
   const archiveRecord={
@@ -2164,7 +2171,7 @@ function save(){
   localStorage.setItem('rm_gamedate', gameDate);
 }
 function gv(id){ return (document.getElementById(id)||{}).value?.trim()||''; }
-function capitalize(s){ return s.replace(/\b\w/g,c=>c.toUpperCase()); }
+function capitalize(s){ return s.replace(/\w/g,c=>c.toUpperCase()); }
 function enabledTeams(){ return ihGetActiveTeams(); }
 function teamById(id){ return ihTeamIdentity.find(t=>t.id===id); }
 function playersForTeam(id){ return players.filter(p=>p.teamId===id); }
@@ -3119,7 +3126,8 @@ function handleCSVFile(file){
   reader.onload = function(e){
     try {
       let text = e.target.result.replace(/^\uFEFF/,'');
-      const lines = text.split(/\r?\n/).filter(l=>l.trim());
+      const lines = text.split(/?
+/).filter(l=>l.trim());
 
       if(lines.length<1){ showCSVResult('err','File is empty.'); return; }
       if(lines.length<2){ showCSVResult('err','File has a header but no data rows.'); return; }
