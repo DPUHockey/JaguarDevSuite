@@ -211,6 +211,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .sub-tab-btn.st-ph.active{color:#F07050;border-color:var(--phborder);}
 .sub-tab-btn.st-promo.active{color:var(--gold2);border-color:var(--gborder);}
 .sub-tab-btn.st-attend.active{color:#7EC8E3;border-color:rgba(126,200,227,0.4);}
+.sub-tab-btn.st-email.active{color:#C9A84C;border-color:rgba(201,168,76,0.4);}
 /* ── ATTENDANCE ── */
 .attend-outer{overflow:auto;border:1px solid var(--border);border-radius:10px;max-height:420px;background:var(--blk);}
 .attend-table td.name-cell,.attend-table th:first-child,.attend-table th:nth-child(2){max-width:80px;min-width:60px;}
@@ -412,7 +413,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V33</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V35</div>
 
 <nav>
   <div class="nav-left">
@@ -1182,6 +1183,7 @@ function renderSessionPanel(sNum){
     {key:'ph',label:'PH',cls:'st-ph',cnt:phCnt},
     {key:'promo',label:'Promotions',cls:'st-promo',cnt:promos.length},
   ];
+  subTabs.push({key:'email',label:'Email Lists',cls:'st-email',cnt:null});
 
   const cur=activeSubTab[sk]||'all';
   const barHtml=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;">
@@ -1193,6 +1195,7 @@ function renderSessionPanel(sNum){
   if(cur==='promo'){content=renderPromoTab(sNum);}
   else if(cur==='all'){content=renderAllSubTab(sNum);}
   else if(cur==='lj'){content=renderGroupTab(sNum,'lj',[...sub.lj1,...sub.lj2,...sub.lj3]);}
+  else if(cur==='email'){content=renderEmailListsTab(sNum);}
   else if(cur==='ph'){content=renderGroupTab(sNum,'ph',[...sub.ph1,...sub.ph2,...sub.ph3]);}
   else{content='<div class="empty-state"><p>Unknown tab</p></div>';}
 
@@ -1280,62 +1283,75 @@ function renderPromoTab(sNum){
     <td style="font-size:11px;">${p.parent1_phone||'—'}</td>
   </tr>`;}).join('')}</tbody>`;
   const table=`<div class="table-outer"><table class="data-table">${thead}${tbody}</table></div>`;
-  // ── Email-by-level section (shown when complete) ──
-  let emailSection='';
-  if(isComplete){
-    // Group by to_level — look up master for live email data
-    const groups={};
-    promos.forEach(p=>{
-      const lv=(p.to_level||'').trim().toUpperCase().replace(/\s/g,'');
-      if(!lv)return;
-      // Look up master record for freshest contact info
-      const mk=masterKey(p);
-      const masterRec=DB.master.find(m=>masterKey(m)===mk)||{};
-      const email=masterRec.parent1_email||masterRec.parent2_email||p.parent1_email||p.parent2_email||'';
-      const email2=masterRec.parent2_email||p.parent2_email||'';
-      const p1name=masterRec.parent1_name||p.parent1_name||'';
-      const enriched=Object.assign({},p,{_email:email,_email2:email2,_p1name:p1name});
-      if(!groups[lv])groups[lv]=[];
-      groups[lv].push(enriched);
-    });
-    const lvOrder=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','INHOUSE'];
-    const allLvs=[...lvOrder.filter(l=>groups[l]),...Object.keys(groups).filter(l=>!lvOrder.includes(l)).sort()];
-    const lvColors={'LJ1':'#5CCC88','LJ2':'#5CCC88','LJ3':'#5CCC88','PH1':'#F07050','PH2':'#F07050','PH3':'#F07050','ADM':'#C9A84C','INHOUSE':'#7EC8E3'};
-    const cards=allLvs.map(function(lv){
-      const ps=groups[lv];
-      const color=lvColors[lv]||'#8FA3C0';
-      const emailSet=new Set();
-      ps.forEach(function(p){if(p._email)emailSet.add(p._email);if(p._email2)emailSet.add(p._email2);});
-      const emails=Array.from(emailSet);
-      const mailtoHref=emails.length?'mailto:?bcc='+encodeURIComponent(emails.join(',')):'#';
-      if(!window._emailRegistry)window._emailRegistry={};
-      const regKey='elv_'+sNum+'_'+lv;
-      window._emailRegistry[regKey]=emails.join(', ');
-      const rows=ps.map(function(p){
-        const ed=p._email||'';
-        const ed2=(p._email2&&p._email2!==p._email)?' / '+p._email2:'';
-        const emailCell=ed?(ed+ed2):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
-        return '<tr><td style="font-size:12px;padding:5px 10px;">'+(p.first_name||'')+' '+(p.last_name||'')+'</td><td style="font-size:12px;padding:5px 10px;color:var(--dim);">'+emailCell+'</td></tr>';
-      }).join('');
-      var bcsans="'Barlow Condensed',sans-serif";
-      var bbn="'Bebas Neue',sans-serif";
-      var html='<div style="margin-bottom:18px;background:var(--surf2);border:1px solid '+color+'44;border-radius:10px;overflow:hidden;">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:'+color+'18;border-bottom:1px solid '+color+'33;">';
-      html+='<div style="font-family:'+bbn+';font-size:18px;letter-spacing:2px;color:'+color+';">'+lv;
-      html+=' <span style="font-family:'+bcsans+';font-size:12px;letter-spacing:1px;color:var(--dim);">'+ps.length+' athlete'+(ps.length!==1?'s':'')+'</span></div>';
-      html+='<div style="display:flex;gap:6px;">';
-      html+='<button class="btn-sm" style="font-size:10px;" onclick="copyEmailList(this)" data-regkey="'+regKey+'">&#x2398; Copy Emails</button>';
-      if(emails.length) html+='<a href="'+mailtoHref+'" style="font-family:'+bcsans+';font-size:10px;letter-spacing:1px;padding:3px 9px;border:1px solid var(--gborder);border-radius:4px;background:var(--gfaint);color:var(--gold);text-decoration:none;white-space:nowrap;">&#x2709; Open in Email</a>';
-      html+='</div></div>';
-      html+='<table style="width:100%;border-collapse:collapse;"><thead><tr>';
-      html+='<th style="padding:5px 10px;text-align:left;font-family:'+bcsans+';font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Player</th>';
-      html+='<th style="padding:5px 10px;text-align:left;font-family:'+bcsans+';font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Parent Email</th>';
-      html+='</tr></thead><tbody>'+rows+'</tbody></table></div>';
-      return html;
-    });
-      +cards.join('')+'</div>';
+  return toolbar+table;
+}
+function renderEmailListsTab(sNum){
+  var promos=DB['promo'+sNum]||[];
+  var isComplete=promoComplete[sNum]===true;
+  var bcsans="'Barlow Condensed',sans-serif";
+  var bbn="'Bebas Neue',sans-serif";
+  // Banner if not yet marked complete
+  var banner='';
+  if(!isComplete){
+    banner='<div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.35);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-family:'+bcsans+';font-size:12px;letter-spacing:.5px;color:var(--gold2);">&#9888; Session not yet marked complete &mdash; includes all pending and confirmed promotions so far. Hit <strong>Promotions Complete</strong> on the Promotions tab when done.</div>';
   }
-  return toolbar+table+emailSection;
+  if(!promos.length){
+    return banner+'<div class="empty-state"><p>No promotions recorded yet &mdash; use the Promote button on the All tab.</p></div>';
+  }
+  var groups={};
+  promos.forEach(function(p){
+    var lv=(p.to_level||'').trim().toUpperCase().replace(/\s/g,'');
+    if(!lv)return;
+    var mk=masterKey(p);
+    var masterRec=DB.master.find(function(m){return masterKey(m)===mk;})||{};
+    var email=masterRec.parent1_email||masterRec.parent2_email||p.parent1_email||p.parent2_email||'';
+    var email2=masterRec.parent2_email||p.parent2_email||'';
+    if(email2===email)email2='';
+    var status=p.promo_status||'Confirmed';
+    var enriched=Object.assign({},p,{_email:email,_email2:email2,_status:status});
+    if(!groups[lv])groups[lv]=[];
+    groups[lv].push(enriched);
+  });
+  var lvOrder=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','INHOUSE'];
+  var allLvs=lvOrder.filter(function(l){return groups[l];}).concat(Object.keys(groups).filter(function(l){return lvOrder.indexOf(l)<0;}).sort());
+  var lvColors={'LJ1':'#5CCC88','LJ2':'#5CCC88','LJ3':'#5CCC88','PH1':'#F07050','PH2':'#F07050','PH3':'#F07050','ADM':'#C9A84C','INHOUSE':'#7EC8E3'};
+  if(!window._emailRegistry)window._emailRegistry={};
+  var cards=allLvs.map(function(lv){
+    var ps=groups[lv];
+    var color=lvColors[lv]||'#8FA3C0';
+    var emailSet=[];
+    ps.forEach(function(p){
+      if(p._email && emailSet.indexOf(p._email)<0)emailSet.push(p._email);
+      if(p._email2 && emailSet.indexOf(p._email2)<0)emailSet.push(p._email2);
+    });
+    var mailtoHref=emailSet.length?'mailto:?bcc='+encodeURIComponent(emailSet.join(',')):'#';
+    var regKey='elv_'+sNum+'_'+lv;
+    window._emailRegistry[regKey]=emailSet.join(', ');
+    var rows=ps.map(function(p){
+      var ed=p._email||'';
+      var ed2=p._email2?' / '+p._email2:'';
+      var emailCell=ed?(ed+ed2):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
+      var statusBadge=p._status==='Pending'
+        ?'<span style="font-family:'+bcsans+';font-size:9px;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 4px;margin-left:5px;">PENDING</span>'
+        :'';
+      return '<tr><td style="font-size:12px;padding:6px 12px;">'+(p.first_name||'')+' '+(p.last_name||'')+statusBadge+'</td><td style="font-size:12px;padding:6px 12px;color:var(--dim);">'+emailCell+'</td></tr>';
+    }).join('');
+    var h='<div style="margin-bottom:18px;background:var(--surf2);border:1px solid '+color+'44;border-radius:10px;overflow:hidden;">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:'+color+'18;border-bottom:1px solid '+color+'33;">';
+    h+='<div style="font-family:'+bbn+';font-size:20px;letter-spacing:2px;color:'+color+';">'+lv+' <span style="font-family:'+bcsans+';font-size:12px;letter-spacing:1px;color:var(--dim);">'+ps.length+' athlete'+(ps.length!==1?'s':'')+'</span></div>';
+    h+='<div style="display:flex;gap:6px;">';
+    h+='<button class="btn-sm" style="font-size:10px;" onclick="copyEmailList(this)" data-regkey="'+regKey+'">&#x2398; Copy Emails</button>';
+    if(emailSet.length)h+='<a href="'+mailtoHref+'" style="font-family:'+bcsans+';font-size:10px;letter-spacing:1px;padding:3px 9px;border:1px solid var(--gborder);border-radius:4px;background:var(--gfaint);color:var(--gold);text-decoration:none;white-space:nowrap;">&#x2709; Open in Email</a>';
+    h+='</div></div>';
+    h+='<table style="width:100%;border-collapse:collapse;"><thead><tr>';
+    h+='<th style="padding:6px 12px;text-align:left;font-family:'+bcsans+';font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Player</th>';
+    h+='<th style="padding:6px 12px;text-align:left;font-family:'+bcsans+';font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Parent Email</th>';
+    h+='</tr></thead><tbody>'+rows+'</tbody></table></div>';
+    return h;
+  });
+  var header='<div style="font-family:'+bbn+';font-size:22px;letter-spacing:3px;color:var(--gold);margin-bottom:4px;">&#x2709; Email Promotions List</div>';
+  header+='<div style="font-family:'+bcsans+';font-size:12px;color:var(--dim);margin-bottom:16px;letter-spacing:.5px;">Athletes grouped by next level. Copy or open in email to send registration info.</div>';
+  return banner+header+cards.join('');
 }
 function copyEmailList(btn){
   const regKey=btn.getAttribute('data-regkey');
