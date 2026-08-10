@@ -37,7 +37,7 @@ nav{display:flex;align-items:center;gap:18px;padding:12px 24px;background:var(--
 .nav-btn{background:transparent;border:1px solid var(--gray-border);color:var(--white-dim);padding:7px 13px;border-radius:5px;cursor:pointer;font-family:'Barlow Condensed';font-size:12px;letter-spacing:.5px;transition:all .15s;}
 .nav-btn:hover{border-color:var(--gold-dark);color:var(--gold-light);}
 
-/* login (matches Coach Data Center / Budget) */
+/* login */
 #loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
 .login-box{width:100%;max-width:400px;}
 .login-logo{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
@@ -75,15 +75,25 @@ table.users select{background:var(--gray-mid);border:1px solid var(--gray-border
 .active-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
 .active-dot.on{background:var(--green);}
 .active-dot.off{background:var(--gray-light);}
-
 .save-note{font-size:12px;color:var(--green);}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+
+/* ── ACCESS CODE PANEL ── */
+.access-panel{background:var(--gray-dark);border:1px solid var(--gold-dark);border-radius:10px;padding:24px;margin-bottom:32px;}
+.access-panel-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--gold);margin-bottom:4px;}
+.access-panel-note{font-size:12px;color:var(--white-dim);margin-bottom:18px;line-height:1.5;}
+.access-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.access-row .fg{margin-bottom:0;flex:1;min-width:140px;max-width:220px;}
+.access-status{font-size:12px;font-weight:600;letter-spacing:.05em;padding:4px 0;}
+.access-status.ok{color:var(--green);}
+.access-status.err{color:var(--red);}
+.current-code-display{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.3em;color:var(--gold);background:var(--gray-mid);border:1px solid var(--gray-border);border-radius:6px;padding:6px 14px;display:inline-block;min-width:80px;text-align:center;}
 
 #app-ver-badge{position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;}
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V1</div>
+<div id="app-ver-badge">V2.2.0</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -92,7 +102,7 @@ table.users select{background:var(--gray-mid);border:1px solid var(--gray-border
       <div><h1>Admin Center</h1><div class="subtitle">Sign In Required</div></div>
     </div>
     <div class="login-card">
-      <div class="login-note">Manages login accounts and passwords shared across the Jaguar Dev Suite. Admin role required.</div>
+      <div class="login-note">Manages login accounts, passwords, and suite access codes. Admin role required.</div>
       <div class="fg"><span class="fl">Username</span><input class="fi" id="loginUser" type="text" placeholder="Enter username" autocomplete="username"/></div>
       <div class="fg" style="margin-bottom:20px;"><span class="fl">Password</span><input class="fi" id="loginPass" type="password" placeholder="Enter password"/></div>
       <button class="btn btn-gold" style="width:100%;justify-content:center;" onclick="doLogin()">Sign In</button>
@@ -116,6 +126,46 @@ table.users select{background:var(--gray-mid);border:1px solid var(--gray-border
 </nav>
 
 <div class="wrap">
+
+  <!-- ── SUITE ACCESS CODE ── -->
+  <div class="section-hdr" style="margin-bottom:12px;">
+    <div>
+      <div class="section-title">Suite Access Code</div>
+      <div class="section-note">Controls the entry code required to unlock the Jaguar Dev Suite home page.</div>
+    </div>
+  </div>
+
+  <div class="access-panel">
+    <div class="access-panel-title">Change Access Code</div>
+    <div class="access-panel-note">
+      The suite entry code gates <strong>index.html</strong> for all users on this device. 
+      Changing it here takes effect immediately — anyone who hasn't unlocked the suite yet will need the new code.
+      The current code is shown below for reference.
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <span class="fl" style="margin-bottom:6px;">Current Code</span>
+      <div class="current-code-display" id="current-code-display">····</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="toggleShowCode()" id="show-code-btn">Show Code</button>
+    </div>
+
+    <div class="access-row">
+      <div class="fg">
+        <span class="fl">New Code</span>
+        <input class="fi" id="new-code-input" type="text" maxlength="6" placeholder="e.g. A3X9" autocomplete="off" style="letter-spacing:.2em;font-family:'Bebas Neue',sans-serif;font-size:1.2rem;"/>
+      </div>
+      <div class="fg">
+        <span class="fl">Confirm Code</span>
+        <input class="fi" id="confirm-code-input" type="text" maxlength="6" placeholder="Repeat code" autocomplete="off" style="letter-spacing:.2em;font-family:'Bebas Neue',sans-serif;font-size:1.2rem;"/>
+      </div>
+      <div>
+        <button class="btn btn-gold" onclick="changeAccessCode()">Update Code</button>
+      </div>
+    </div>
+    <div class="access-status" id="access-code-status" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ── SUITE USERS ── -->
   <div class="section-hdr">
     <div>
       <div class="section-title">Suite Users</div>
@@ -137,20 +187,18 @@ table.users select{background:var(--gray-mid);border:1px solid var(--gray-border
 </div>
 
 <script>
-// ── QUICK LAUNCH (jump between Jaguar Suite tabs opened via Jaguar Master) ──
+// ── QUICK LAUNCH ──
 const JAG_SELF_KEY='admin';
 window.__jagApp=JAG_SELF_KEY;
 window.name='jag_'+JAG_SELF_KEY;
 const JAG_URLS={home:'index.html',db:'db.html',coach:'coach.html',adm:'adm.html',ih:'ih.html',drills:'drills.html',schedule:'schedule.html',stats:'stats.html',notes:'notes.html',admin:'admin.html'};
 function jagLaunch(key){
   if(key===JAG_SELF_KEY)return;
-  const url=JAG_URLS[key];
-  if(!url)return;
+  const url=JAG_URLS[key];if(!url)return;
   const w=window.open('','jag_'+key);
   if(!w){alert('Popup blocked! Allow popups then try again.');return;}
   if(w.__jagApp===key){try{w.focus();}catch(e){}return;}
-  w.location.href=url;
-  try{w.focus();}catch(e){}
+  w.location.href=url;try{w.focus();}catch(e){}
 }
 function jagHome(){
   const w=window.open('','jag_home');
@@ -159,7 +207,49 @@ function jagHome(){
   try{w.focus();}catch(e){}
 }
 
-// ── SHARED USER LIST (same 'jag_users' key as Coach Data Center and Budget) ──
+// ── ACCESS CODE ──
+const PIN_KEY='jds_pin';
+const DEFAULT_PIN='9451';
+let codeVisible=false;
+
+function getStoredPin(){ return localStorage.getItem(PIN_KEY)||DEFAULT_PIN; }
+
+function renderCurrentCode(){
+  const el=document.getElementById('current-code-display');
+  el.textContent=codeVisible ? getStoredPin() : '····';
+}
+
+function toggleShowCode(){
+  codeVisible=!codeVisible;
+  renderCurrentCode();
+  document.getElementById('show-code-btn').textContent=codeVisible?'Hide Code':'Show Code';
+}
+
+function changeAccessCode(){
+  const newCode=document.getElementById('new-code-input').value.trim();
+  const confirm=document.getElementById('confirm-code-input').value.trim();
+  const status=document.getElementById('access-code-status');
+
+  if(!newCode){
+    status.className='access-status err';status.textContent='Enter a new code.';return;
+  }
+  if(newCode.length<2){
+    status.className='access-status err';status.textContent='Code must be at least 2 characters.';return;
+  }
+  if(newCode!==confirm){
+    status.className='access-status err';status.textContent='Codes do not match — try again.';return;
+  }
+
+  localStorage.setItem(PIN_KEY, newCode);
+  document.getElementById('new-code-input').value='';
+  document.getElementById('confirm-code-input').value='';
+  status.className='access-status ok';
+  status.textContent='✓ Access code updated to "'+newCode+'" — takes effect immediately.';
+  renderCurrentCode();
+  setTimeout(()=>{ if(status.className.includes('ok')) status.textContent=''; },4000);
+}
+
+// ── SHARED USER LIST ──
 const ROLES=['admin','editor','accountant','viewer'];
 function defaultUsers(){
   return[
@@ -170,16 +260,13 @@ function defaultUsers(){
   ];
 }
 function loadUsers(){
-  try{
-    const s=localStorage.getItem('jag_users');
-    if(s){const p=JSON.parse(s);if(Array.isArray(p)&&p.length)return p;}
-  }catch(e){}
+  try{const s=localStorage.getItem('jag_users');if(s){const p=JSON.parse(s);if(Array.isArray(p)&&p.length)return p;}}catch(e){}
   return defaultUsers();
 }
-function saveUsersData(){ localStorage.setItem('jag_users', JSON.stringify(users)); }
+function saveUsersData(){ localStorage.setItem('jag_users',JSON.stringify(users)); }
 let users=loadUsers();
 
-// ── AUTH (admin role only) ──
+// ── AUTH ──
 let currentUser=null;
 function doLogin(){
   const u=document.getElementById('loginUser').value.trim();
@@ -188,8 +275,7 @@ function doLogin(){
   const el=document.getElementById('loginError');
   if(!found){el.textContent='Invalid username or password.';el.classList.remove('hidden');return;}
   if(found.role!=='admin'){el.textContent='Admin role required to access Admin Center.';el.classList.remove('hidden');return;}
-  currentUser=found;
-  startApp();
+  currentUser=found;startApp();
 }
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 function doLogout(){
@@ -203,7 +289,8 @@ function doLogout(){
 function startApp(){
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appShell').classList.remove('hidden');
-  users=loadUsers(); // re-read in case another tab changed it since page load
+  users=loadUsers();
+  renderCurrentCode();
   renderUsers();
 }
 
@@ -222,41 +309,30 @@ function addUser(){
   commit();
 }
 function updateField(id,field,value){
-  const u=users.find(x=>x.id===id);
-  if(!u)return;
+  const u=users.find(x=>x.id===id);if(!u)return;
   if(field==='role'&&u.role==='admin'&&value!=='admin'&&activeAdminCount()<=1){
     alert('At least one active Admin account must remain. Promote another user to Admin before changing this one.');
-    renderUsers();
-    return;
+    renderUsers();return;
   }
-  u[field]=value;
-  saveUsersData();
-  flashSaved();
+  u[field]=value;saveUsersData();flashSaved();
 }
 function toggleActive(id){
-  const u=users.find(x=>x.id===id);
-  if(!u)return;
+  const u=users.find(x=>x.id===id);if(!u)return;
   if(u.role==='admin'&&u.active&&activeAdminCount()<=1){
-    alert('At least one active Admin account must remain. Activate another Admin before deactivating this one.');
-    return;
+    alert('At least one active Admin account must remain. Activate another Admin before deactivating this one.');return;
   }
-  u.active=!u.active;
-  commit();
+  u.active=!u.active;commit();
 }
 function deleteUser(id){
-  const u=users.find(x=>x.id===id);
-  if(!u)return;
+  const u=users.find(x=>x.id===id);if(!u)return;
   if(u.role==='admin'&&activeAdminCount()<=1){
-    alert('At least one active Admin account must remain. You cannot delete the last Admin.');
-    return;
+    alert('At least one active Admin account must remain. You cannot delete the last Admin.');return;
   }
   if(!confirm('Delete user "'+u.name+'" ('+u.username+')? This cannot be undone.'))return;
-  users=users.filter(x=>x.id!==id);
-  commit();
+  users=users.filter(x=>x.id!==id);commit();
 }
 function togglePwVisible(id){
-  const inp=document.getElementById('pw-'+id);
-  if(!inp)return;
+  const inp=document.getElementById('pw-'+id);if(!inp)return;
   inp.type=inp.type==='password'?'text':'password';
 }
 
@@ -289,7 +365,7 @@ function renderUsers(){
     </tbody>
   `;
   table.querySelectorAll('input[data-f], select[data-f]').forEach(el=>{
-    el.addEventListener('change', ()=>{ updateField(el.dataset.id, el.dataset.f, el.value); });
+    el.addEventListener('change',()=>{ updateField(el.dataset.id,el.dataset.f,el.value); });
   });
 }
 </script>
