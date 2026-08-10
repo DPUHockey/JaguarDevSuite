@@ -413,7 +413,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V37</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V38</div>
 
 <nav>
   <div class="nav-left">
@@ -1279,7 +1279,7 @@ function renderPromoTab(sNum){
     <td>${statusCell}</td>
     <td style="font-size:11px;color:var(--dim);max-width:180px;white-space:normal;">${p.notes||'—'}</td>
     <td style="font-size:11px;">${p.parent1_name||'—'}</td>
-    <td style="font-size:11px;">${p.parent1_email||'—'}</td>
+    <td style="font-size:11px;">${p.parent1_email?`<a href="mailto:${p.parent1_email}" style="color:var(--gold2);text-decoration:underline dotted;">${p.parent1_email}</a>`:'—'}</td>
     <td style="font-size:11px;">${p.parent1_phone||'—'}</td>
   </tr>`;}).join('')}</tbody>`;
   const table=`<div class="table-outer"><table class="data-table">${thead}${tbody}</table></div>`;
@@ -1332,7 +1332,7 @@ function renderEmailListsTab(sNum){
     var rows=ps.map(function(p){
       var ed=p._email||'';
       var ed2=p._email2?' / '+p._email2:'';
-      var emailCell=ed?(ed+ed2):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
+      var emailCell=ed?('<a href="mailto:'+ed+'" style="color:var(--gold2);text-decoration:underline dotted;">'+ed+'</a>'+(ed2?' / <a href="mailto:'+p._email2+'" style="color:var(--gold2);text-decoration:underline dotted;">'+p._email2+'</a>':'')):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
       var statusBadge=p._status==='Pending'
         ?'<span style="font-family:'+bcsans+';font-size:9px;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 4px;margin-left:5px;">PENDING</span>'
         :'';
