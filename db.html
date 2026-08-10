@@ -415,7 +415,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V46</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V47</div>
 
 <nav>
   <div class="nav-left">
@@ -2960,15 +2960,10 @@ function renderSummary(){
   var all=DB.master||[];
   if(!document.getElementById('sum-css')){
     var s=document.createElement('style');s.id='sum-css';
-    s.textContent='.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px;padding:4px 0 28px}'
-      +'.sum-card{background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:16px}'
-      +'.sum-ttl{font-family:"Barlow Condensed",sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}'
-      +'.sum-body{display:flex;gap:14px;align-items:flex-start}'
-      +'.sum-labels{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}'
-      +'.sum-row{display:flex;align-items:center;gap:6px;font-size:12px}'
-      +'.sum-arrow{font-size:10px;flex-shrink:0}'
-      +'.sum-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wht)}'
-      +'.sum-cnt{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:13px;color:var(--gold);flex-shrink:0}';
+    s.textContent=
+      '.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(500px,1fr));gap:24px;padding:4px 0 28px}'
+      +'.sum-card{background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:20px}'
+      +'.sum-ttl{font-family:"Barlow Condensed",sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}';
     document.head.appendChild(s);
   }
   var P=['#C9A84C','#5CCC88','#F07050','#7EC8E3','#A07FD0','#E8C97A','#3A9BD5','#F4A261','#90C9A0','#D4678A','#66B2B2','#E2B96F','#8BB8E8','#C4886F','#AAD87A','#B07AC9'];
@@ -2979,43 +2974,79 @@ function renderSummary(){
     out.sort(function(a,b){return b.count-a.count;});
     return out;
   }
-  function drawPie(id,data){
-    var canvas=document.getElementById(id);if(!canvas)return;
+  function drawPieWithLabels(id,data){
+    var canvas=document.getElementById(id);
+    if(!canvas)return;
     var ctx=canvas.getContext('2d');
-    var cx=canvas.width/2,cy=canvas.height/2,R=cx-4,IR=R*0.48;
-    var total=0;for(var i=0;i<data.length;i++)total+=data[i].count;
-    if(!total){ctx.fillStyle='#333';ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();return;}
+    var W=canvas.width,H=canvas.height;
+    var cx=W/2,cy=H/2;
+    var R=Math.min(W,H)*0.30;  /* pie radius — leaves room for labels */
+    var IR=R*0.45;             /* donut hole */
+    var LR=R*1.25;             /* leader line start (just outside pie) */
+    var ER=R*1.65;             /* leader line elbow */
+    var top=data.slice(0,12);
+    var total=0;
+    for(var i=0;i<top.length;i++)total+=top[i].count;
+    if(!total)return;
+    /* Draw slices */
     var angle=-Math.PI/2;
-    for(var i=0;i<data.length;i++){
-      var slice=(data[i].count/total)*Math.PI*2;
+    var angles=[];
+    for(var i=0;i<top.length;i++){
+      var slice=(top[i].count/total)*Math.PI*2;
       ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,angle,angle+slice);ctx.closePath();
       ctx.fillStyle=P[i%P.length];ctx.fill();
       ctx.strokeStyle='rgba(10,10,10,0.5)';ctx.lineWidth=1.5;ctx.stroke();
+      angles.push(angle+slice/2); /* midpoint angle of slice */
       angle+=slice;
     }
-    ctx.beginPath();ctx.arc(cx,cy,IR,0,Math.PI*2);ctx.fillStyle='#1e1e1e';ctx.fill();
-    ctx.fillStyle='#f5f0e8';ctx.font="bold 15px 'Bebas Neue',sans-serif";
+    /* Donut hole */
+    ctx.beginPath();ctx.arc(cx,cy,IR,0,Math.PI*2);
+    ctx.fillStyle='#1e1e1e';ctx.fill();
+    /* Center total */
+    ctx.fillStyle='#f5f0e8';ctx.font="bold 22px 'Bebas Neue',sans-serif";
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(total,cx,cy-5);
-    ctx.font="8px 'Barlow Condensed',sans-serif";ctx.fillStyle='#888';
-    ctx.fillText('ATHLETES',cx,cy+8);
+    ctx.fillText(total,cx,cy-6);
+    ctx.font="9px 'Barlow Condensed',sans-serif";ctx.fillStyle='#888';
+    ctx.fillText('ATHLETES',cx,cy+10);
+    /* Leader lines + labels */
+    ctx.font="bold 11px 'Barlow',sans-serif";
+    for(var i=0;i<top.length;i++){
+      var a=angles[i];
+      var color=P[i%P.length];
+      /* start point on pie edge */
+      var sx=cx+Math.cos(a)*LR;
+      var sy=cy+Math.sin(a)*LR;
+      /* elbow point */
+      var ex=cx+Math.cos(a)*ER;
+      var ey=cy+Math.sin(a)*ER;
+      /* horizontal end point */
+      var isRight=Math.cos(a)>=0;
+      var hx=isRight?ex+14:ex-14;
+      var hy=ey;
+      /* draw line */
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.lineTo(ex,ey);
+      ctx.lineTo(hx,hy);
+      ctx.strokeStyle=color;
+      ctx.lineWidth=1.2;
+      ctx.stroke();
+      /* dot at elbow */
+      ctx.beginPath();ctx.arc(sx,sy,2.5,0,Math.PI*2);
+      ctx.fillStyle=color;ctx.fill();
+      /* label text */
+      ctx.fillStyle='#f0f0f0';
+      ctx.textAlign=isRight?'left':'right';
+      ctx.textBaseline='middle';
+      var label=top[i].label+' ('+top[i].count+')';
+      ctx.fillText(label,isRight?hx+4:hx-4,hy);
+    }
   }
   function buildCard(title,data,cid){
-    var top=data.slice(0,12);
-    var rows='';
-    for(var i=0;i<top.length;i++){
-      rows+='<div class="sum-row">'
-        +'<span class="sum-arrow" style="color:'+P[i%P.length]+'">&#9658;</span>'
-        +'<span class="sum-name">'+top[i].label+'</span>'
-        +'<span class="sum-cnt">'+top[i].count+'</span>'
-        +'</div>';
-    }
     return '<div class="sum-card">'
       +'<div class="sum-ttl">'+title+'</div>'
-      +'<div class="sum-body">'
-      +'<canvas id="'+cid+'" width="150" height="150" style="flex-shrink:0"></canvas>'
-      +'<div class="sum-labels">'+rows+'</div>'
-      +'</div></div>';
+      +'<canvas id="'+cid+'" width="520" height="400" style="width:100%;height:auto"></canvas>'
+      +'</div>';
   }
   function getYear(r){
     var b=r.birthdate||'';
@@ -3038,10 +3069,10 @@ function renderSummary(){
     +buildCard('By Status',byStatus,'sum-pie-status')
     +'</div></div>';
   setTimeout(function(){
-    drawPie('sum-pie-level',byLevel.slice(0,12));
-    drawPie('sum-pie-year',byYear.slice(0,12));
-    drawPie('sum-pie-city',byCity.slice(0,12));
-    drawPie('sum-pie-status',byStatus.slice(0,12));
+    drawPieWithLabels('sum-pie-level',byLevel);
+    drawPieWithLabels('sum-pie-year',byYear);
+    drawPieWithLabels('sum-pie-city',byCity);
+    drawPieWithLabels('sum-pie-status',byStatus);
   },50);
 }
 function renderDashboard(){
