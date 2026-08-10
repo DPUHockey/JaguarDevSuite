@@ -412,7 +412,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V28</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V29</div>
 
 <nav>
   <div class="nav-left">
@@ -1197,6 +1197,8 @@ function renderAllSubTab(sNum){
   const sort=sortState[sk]||{col:null,dir:'asc'},indexed=applySortRows(rawRows,sort);
   function th(c,l){return thSort(c,l,sort,null,sk);}
   const promoSet=new Set((DB['promo'+sNum]||[]).map(p=>p.first_name+'|'+p.last_name+'|'+(p.birthdate||'')));
+  // Build a map of pk -> promo record for status display
+  const promoMap={};(DB['promo'+sNum]||[]).forEach(p=>{const k=p.first_name+'|'+p.last_name+'|'+(p.birthdate||'');if(!promoMap[k])promoMap[k]=p;});
   const tb='<div class="toolbar"><div class="toolbar-left">'+rawRows.length+' record'+(rawRows.length!==1?'s':'')+' </div><div style="display:flex;gap:6px;"><button class="btn-sm gold" onclick="openAddModal()">+ Add Player</button><button class="btn-sm" onclick="exportTabCSV(\''+sk+'\')">↓ Export</button></div></div>';
   const ljR=indexed.filter(({r})=>getLevel(r).startsWith('LJ'));
   const phR=indexed.filter(({r})=>getLevel(r).startsWith('PH'));
@@ -1212,7 +1214,18 @@ function renderAllSubTab(sNum){
         ?'<td style="text-align:center;"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--gold2);border:1px solid var(--gborder);border-radius:4px;padding:1px 7px;">'+dv+'</span></td>'
         :'<td style="text-align:center;"><select onchange="setDayVal(\''+sk+'\','+i+',this.value)" style="background:var(--surf3);border:1px solid var(--border);border-radius:4px;color:var(--wht);font-family:\'Barlow\',sans-serif;font-size:11px;padding:2px 4px;outline:none;cursor:pointer;"><option value="">--</option><option>W</option><option>S</option><option>SW</option></select></td>';
       const nc='<td style="white-space:nowrap;"><select class="promo-select" id="nl-'+sk+'-'+i+'" style="max-width:68px;"><option value="">--</option>'+LEVEL_ORDER.map(l=>'<option value="'+l+'"'+(l===nl?' selected':'')+'>'+l+'</option>').join('')+'</select><button class="btn-promote" onclick="openPromoModal('+sNum+','+i+',document.getElementById(\'nl-'+sk+'-'+i+'\').value)">&rarr;</button></td>';
-      return'<tr'+(promo?' style="background:rgba(255,200,50,.06);"':'')+'><td>'+(r.first_name||'')+'</td><td style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\''+sk+'\','+i+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);">'+(r.birthdate||'')+'</td><td>'+lvBadge(r.level)+'</td><td style="text-align:center;">'+(promo?'<span style="color:var(--gold);">★</span>':'')+' </td>'+nc+'<td style="text-align:center;">'+(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO'?'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Edit gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:4px;padding:1px 6px;cursor:pointer;">YES — '+r.gear+'</span>':'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Issue gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;">NO</span>')+'</td>'+'<td style="text-align:center;">'+(r.gear_returned&&r.gear_returned.match(/\d/)?'<span onclick="gearReturnOpen(null,\''+sk+'\','+i+')" title="Click to view/edit return" style="font-size:11px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">'+r.gear_returned+'</span>':'<input type="checkbox" onclick="gearReturnOpen(this,\''+sk+'\','+i+')" style="cursor:pointer;accent-color:#5CCC88;width:14px;height:14px;">')+'</td>'+'</td><td style="font-size:11px;">'+(r.class_registered||'')+'</td>'+dayCell+'<td style="font-size:11px;">'+(r.address||'')+'</td><td style="font-size:11px;">'+(r.city||'')+'</td><td style="font-size:11px;">'+(r.state||'')+'</td><td style="font-size:11px;">'+(r.zip||'')+'</td><td style="font-size:11px;">'+(r.parent1_name||'')+'</td><td style="font-size:11px;">'+(r.parent1_email||'')+'</td><td style="font-size:11px;">'+(r.parent1_phone||'')+'</td><td style="font-size:11px;">'+(r.parent2_name||'')+'</td><td style="font-size:11px;">'+(r.parent2_email||'')+'</td><td style="font-size:11px;">'+(r.parent2_phone||'')+'</td><td><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+i+')">Del</button></td></tr>';
+      const promoRec=promoMap[pk];
+      const promoStatus=promoRec?promoRec.promo_status:'';
+      const isPending=promoStatus==='Pending';
+      const isConfirmed=promoStatus==='Confirmed';
+      const promoToLvl=promoRec?promoRec.to_level:'';
+      const promoBadge=isPending
+        ?`<span title="Pending promotion to ${promoToLvl}" style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 4px;cursor:pointer;" onclick="confirmPromoFromTab(${sNum},${DB['promo'+sNum].indexOf(promoRec)})">⏳ ${promoToLvl}</span>`
+        :isConfirmed
+        ?`<span title="Confirmed promotion to ${promoToLvl}" style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:3px;padding:1px 4px;">✓ ${promoToLvl}</span>`
+        :'';
+      const rowBg=isPending?' style="background:rgba(255,200,50,.06);"':isConfirmed?' style="background:rgba(92,204,136,.04);"':'';
+      return'<tr'+rowBg+'><td>'+(r.first_name||'')+'</td><td style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\''+sk+'\','+i+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);">'+(r.birthdate||'')+'</td><td>'+lvBadge(r.level)+'</td><td style="text-align:center;">'+promoBadge+'</td>'+nc+'<td style="text-align:center;">'+(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO'?'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Edit gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:4px;padding:1px 6px;cursor:pointer;">YES — '+r.gear+'</span>':'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Issue gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;">NO</span>')+'</td>'+'<td style="text-align:center;">'+(r.gear_returned&&r.gear_returned.match(/\d/)?'<span onclick="gearReturnOpen(null,\''+sk+'\','+i+')" title="Click to view/edit return" style="font-size:11px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">'+r.gear_returned+'</span>':'<input type="checkbox" onclick="gearReturnOpen(this,\''+sk+'\','+i+')" style="cursor:pointer;accent-color:#5CCC88;width:14px;height:14px;">')+'</td>'+'</td><td style="font-size:11px;">'+(r.class_registered||'')+'</td>'+dayCell+'<td style="font-size:11px;">'+(r.address||'')+'</td><td style="font-size:11px;">'+(r.city||'')+'</td><td style="font-size:11px;">'+(r.state||'')+'</td><td style="font-size:11px;">'+(r.zip||'')+'</td><td style="font-size:11px;">'+(r.parent1_name||'')+'</td><td style="font-size:11px;">'+(r.parent1_email||'')+'</td><td style="font-size:11px;">'+(r.parent1_phone||'')+'</td><td style="font-size:11px;">'+(r.parent2_name||'')+'</td><td style="font-size:11px;">'+(r.parent2_email||'')+'</td><td style="font-size:11px;">'+(r.parent2_phone||'')+'</td><td><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+i+')">Del</button></td></tr>';
     }).join('')+'</tbody>';
     return'<div style="margin-bottom:28px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:'+color+';margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid '+color+'33;">'+label+' -- '+gRows.length+' athlete'+(gRows.length!==1?'s':'')+'</div><div class="table-outer"><table class="data-table">'+hd+bd+'</table></div></div>';
   }
@@ -1474,8 +1487,7 @@ function confirmPromo(){
     window._promoModalOverride=undefined;
   }
   saveDB();closePromoModal();
-  // switch to promotions sub-tab
-  activeSubTab['session'+sNum]='promo';
+  // Stay on the current sub-tab (ALL) so bulk promotions don't require navigation
   renderSessionPanel(sNum);updateStats();
   if(isAdmOrIH&&timing==='immediate'){
     const admLevelEl=document.getElementById('promo-adm-level');
@@ -2842,7 +2854,6 @@ function stayPendingPromo(){
   recordMasterPromo(row,fromLevel,toLevel,promoRecord.promoted_on);
   if(window._promoModalOverride!==undefined)window._promoModalOverride=undefined;
   saveDB();closePromoModal();
-  activeSubTab['session'+sNum]='promo';
   renderSessionPanel(sNum);updateStats();
   showAlert(row.first_name+' '+row.last_name+' kept as Pending → '+toLevel,'ok');
 }
