@@ -413,7 +413,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V42</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V43</div>
 
 <nav>
   <div class="nav-left">
@@ -1335,7 +1335,7 @@ function renderEmailListsTab(sNum){
     var rows=ps.map(function(p){
       var ed=p._email||'';
       var ed2=p._email2?' / '+p._email2:'';
-      var emailCell=ed?('<span onclick="openMailTo(\'' +ed+ '\')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">'+ed+'</span>'+(ed2?' / <span onclick="openMailTo(\'' +p._email2+ '\')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">'+p._email2+'</span>':'')):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
+      var emailCell=ed?('<span onclick="openMailTo(\'' +ed+ '\')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">'+ed+'</span>'+(ed2?' / <span onclick="openMailTo(\'' +p._email2+ '\')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">'+p._email2+'</span>':'')):'<span onclick="inlineAddEmail(this,\''+masterKey(p)+'\',' +sNum+ ')" style="color:var(--dim);font-style:italic;font-size:11px;cursor:pointer;text-decoration:underline dotted;" title="Click to add email">+ add email</span>';
       var statusBadge=p._status==='Pending'
         ?'<span style="font-family:'+bcsans+';font-size:9px;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 4px;margin-left:5px;">PENDING</span>'
         :'';
@@ -1357,6 +1357,39 @@ function renderEmailListsTab(sNum){
   var header='<div style="font-family:'+bbn+';font-size:22px;letter-spacing:3px;color:var(--gold);margin-bottom:4px;">&#x2709; Email Promotions List</div>';
   header+='<div style="font-family:'+bcsans+';font-size:12px;color:var(--dim);margin-bottom:16px;letter-spacing:.5px;">Athletes grouped by next level. Copy or open in email to send registration info.</div>';
   return banner+header+cards.join('');
+}
+function inlineAddEmail(span, mk, sNum){
+  // Replace the span with an input field
+  var td = span.parentNode;
+  var input = document.createElement('input');
+  input.type = 'email';
+  input.placeholder = 'parent@email.com';
+  input.style.cssText = 'background:var(--surf3);border:1px solid var(--gborder);border-radius:4px;color:var(--wht);font-size:12px;padding:3px 8px;outline:none;width:220px;';
+  td.innerHTML = '';
+  td.appendChild(input);
+  input.focus();
+  function save(){
+    var val = input.value.trim();
+    if(!val){ td.innerHTML='<span onclick="inlineAddEmail(this,\''+mk+'\','+sNum+')" style="color:var(--dim);font-style:italic;font-size:11px;cursor:pointer;text-decoration:underline dotted;" title="Click to add email">+ add email</span>'; return; }
+    // Save to master
+    var masterRec = DB.master.find(function(m){return masterKey(m)===mk;});
+    if(masterRec){ masterRec.parent1_email = val; }
+    // Save to session roster
+    var sessRec = (DB['session'+sNum]||[]).find(function(r){return masterKey(r)===mk;});
+    if(sessRec){ sessRec.parent1_email = val; }
+    // Save to promo records
+    (DB['promo'+sNum]||[]).forEach(function(p){ if(masterKey(p)===mk) p.parent1_email=val; });
+    saveDB();
+    // Re-render the email tab
+    var cur = activeSubTab['session'+sNum];
+    activeSubTab['session'+sNum] = 'email';
+    renderSessionPanel(sNum);
+  }
+  input.addEventListener('keydown', function(e){
+    if(e.key==='Enter') save();
+    if(e.key==='Escape'){ td.innerHTML='<span onclick="inlineAddEmail(this,\''+mk+'\','+sNum+')" style="color:var(--dim);font-style:italic;font-size:11px;cursor:pointer;text-decoration:underline dotted;" title="Click to add email">+ add email</span>'; }
+  });
+  input.addEventListener('blur', function(){ setTimeout(save, 150); });
 }
 function openMailTo(email){
   window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email),'_blank');
