@@ -413,7 +413,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V38</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V39</div>
 
 <nav>
   <div class="nav-left">
@@ -1279,7 +1279,7 @@ function renderPromoTab(sNum){
     <td>${statusCell}</td>
     <td style="font-size:11px;color:var(--dim);max-width:180px;white-space:normal;">${p.notes||'—'}</td>
     <td style="font-size:11px;">${p.parent1_name||'—'}</td>
-    <td style="font-size:11px;">${p.parent1_email?`<a href="mailto:${p.parent1_email}" style="color:var(--gold2);text-decoration:underline dotted;">${p.parent1_email}</a>`:'—'}</td>
+    <td style="font-size:11px;">${p.parent1_email?`<span onclick="openMailTo('${p.parent1_email}')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">${p.parent1_email}</span>`:'—'}</td>
     <td style="font-size:11px;">${p.parent1_phone||'—'}</td>
   </tr>`;}).join('')}</tbody>`;
   const table=`<div class="table-outer"><table class="data-table">${thead}${tbody}</table></div>`;
@@ -1332,7 +1332,7 @@ function renderEmailListsTab(sNum){
     var rows=ps.map(function(p){
       var ed=p._email||'';
       var ed2=p._email2?' / '+p._email2:'';
-      var emailCell=ed?('<a href="mailto:'+ed+'" style="color:var(--gold2);text-decoration:underline dotted;">'+ed+'</a>'+(ed2?' / <a href="mailto:'+p._email2+'" style="color:var(--gold2);text-decoration:underline dotted;">'+p._email2+'</a>':'')):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
+      var emailCell=ed?('<span onclick="openMailTo(\'' +ed+ '\')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">'+ed+'</span>'+(ed2?' / <span onclick="openMailTo(\'' +p._email2+ '\')" style="color:var(--gold2);text-decoration:underline dotted;cursor:pointer;">'+p._email2+'</span>':'')):'<span style="color:var(--dim);font-style:italic;font-size:11px;">no email on file</span>';
       var statusBadge=p._status==='Pending'
         ?'<span style="font-family:'+bcsans+';font-size:9px;letter-spacing:1px;color:var(--gold);border:1px solid var(--gold);border-radius:3px;padding:1px 4px;margin-left:5px;">PENDING</span>'
         :'';
@@ -1343,7 +1343,7 @@ function renderEmailListsTab(sNum){
     h+='<div style="font-family:'+bbn+';font-size:20px;letter-spacing:2px;color:'+color+';">'+lv+' <span style="font-family:'+bcsans+';font-size:12px;letter-spacing:1px;color:var(--dim);">'+ps.length+' athlete'+(ps.length!==1?'s':'')+'</span></div>';
     h+='<div style="display:flex;gap:6px;">';
     h+='<button class="btn-sm" style="font-size:10px;" onclick="copyEmailList(this)" data-regkey="'+regKey+'">&#x2398; Copy Emails</button>';
-    if(emailSet.length)h+='<a href="'+mailtoHref+'" style="font-family:'+bcsans+';font-size:10px;letter-spacing:1px;padding:3px 9px;border:1px solid var(--gborder);border-radius:4px;background:var(--gfaint);color:var(--gold);text-decoration:none;white-space:nowrap;">&#x2709; Open in Email</a>';
+    if(emailSet.length)h+='<button class="btn-sm" style="font-size:10px;" onclick="openGmailGroup(this)" data-regkey="'+regKey+'">&#x2709; Gmail</button>';
     h+='</div></div>';
     h+='<table style="width:100%;border-collapse:collapse;"><thead><tr>';
     h+='<th style="padding:6px 12px;text-align:left;font-family:'+bcsans+';font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Player</th>';
@@ -1354,6 +1354,19 @@ function renderEmailListsTab(sNum){
   var header='<div style="font-family:'+bbn+';font-size:22px;letter-spacing:3px;color:var(--gold);margin-bottom:4px;">&#x2709; Email Promotions List</div>';
   header+='<div style="font-family:'+bcsans+';font-size:12px;color:var(--dim);margin-bottom:16px;letter-spacing:.5px;">Athletes grouped by next level. Copy or open in email to send registration info.</div>';
   return banner+header+cards.join('');
+}
+function openMailTo(email){
+  window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email),'_blank');
+}
+function openGmailGroup(btn){
+  var regKey=btn.getAttribute('data-regkey');
+  var emails=(window._emailRegistry&&window._emailRegistry[regKey])||'';
+  if(!emails){showAlert('No emails for this group','err');return;}
+  window.open('https://mail.google.com/mail/?view=cm&bcc='+encodeURIComponent(emails),'_blank');
+}
+function openMailTo(email){
+  // Try Gmail compose first — works in any browser without a mail client
+  window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(email),'_blank');
 }
 function copyEmailList(btn){
   const regKey=btn.getAttribute('data-regkey');
