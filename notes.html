@@ -190,7 +190,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V6</div>
+<div id="app-ver-badge">V7</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -439,7 +439,6 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 
 <script>
 if(!sessionStorage.getItem("jds_auth")){window.location.href="index.html";}
-
 // ── QUICK LAUNCH ──
 const JAG_SELF_KEY='notes';
 window.__jagApp=JAG_SELF_KEY;
@@ -561,7 +560,9 @@ const SCENARIOS_KEY='jag_budget_scenarios';
 const LEGACY_PROJ_KEY='jag_budget_projected';
 const ADM_IH_SEASONS=['fall','winter','spring','summer'];
 const ADM_IH_SEASON_LABELS={fall:'Fall',winter:'Winter',spring:'Spring',summer:'Summer'};
-const DEV_SESSIONS=[1,2,3,4,5,6];
+const DEV_SESSION_NUMS=[1,2,3,4,5,6];
+const DEV_FREQ=["1x","2x"];
+const DEV_SESSIONS=DEV_SESSION_NUMS.flatMap(s=>DEV_FREQ.map(f=>s+"_"+f));
 
 function defaultSeasonRow(){return{hours:0,iceRate:0,coach15:0,coach25:0,players:0,priceHr:0};}
 function defaultDevRow(){return{hours:0,iceRate:0,coach15:0,coach25:0,ljPlayers:0,ljPriceHr:0,phPlayers:0,phPriceHr:0};}
@@ -569,13 +570,13 @@ function costRow(name){return{name:name||'',amount:0};}
 function defaultProjected(){
   const adm={};ADM_IH_SEASONS.forEach(s=>adm[s]=defaultSeasonRow());
   const ih={};ADM_IH_SEASONS.forEach(s=>ih[s]=defaultSeasonRow());
-  const dev={};DEV_SESSIONS.forEach(s=>dev[s]=defaultDevRow());
+  const dev={};DEV_SESSION_NUMS.forEach(s=>DEV_FREQ.forEach(f=>{dev[s+"_"+f]=defaultDevRow();}));
   return{adm:{seasons:adm,costs:[costRow('ADM Jerseys')]},ih:{seasons:ih,costs:[costRow('InHouse Jerseys')]},dev:{sessions:dev,costs:[costRow('Dev Sticks'),costRow('Dev LJ/PH Jerseys')]},overallCosts:[costRow('Monthly Overhead'),costRow('Pucks'),costRow(''),costRow(''),costRow(''),costRow(''),costRow('')]};
 }
 function normalizeProjectedData(p){
   const d=defaultProjected();p=p||{};
   ['adm','ih'].forEach(k=>{if(p[k]&&p[k].seasons)ADM_IH_SEASONS.forEach(sk=>Object.assign(d[k].seasons[sk],p[k].seasons[sk]||{}));if(p[k]&&Array.isArray(p[k].costs)&&p[k].costs.length)d[k].costs=p[k].costs;});
-  if(p.dev&&p.dev.sessions)DEV_SESSIONS.forEach(sk=>Object.assign(d.dev.sessions[sk],p.dev.sessions[sk]||{}));
+  if(p.dev&&p.dev.sessions){DEV_SESSION_NUMS.forEach(s=>DEV_FREQ.forEach(f=>{const k=s+"_"+f;if(p.dev.sessions[k])Object.assign(d.dev.sessions[k],p.dev.sessions[k]);}));}
   if(p.dev&&Array.isArray(p.dev.costs)&&p.dev.costs.length)d.dev.costs=p.dev.costs;
   if(Array.isArray(p.overallCosts)&&p.overallCosts.length)d.overallCosts=p.overallCosts;
   return d;
@@ -627,7 +628,7 @@ function buildSeasonTable(programKey){
 }
 function buildDevTable(){
   const table=document.getElementById('proj-dev-table');
-  table.innerHTML=`<thead><tr><th>Session</th><th>Hours</th><th>Ice $/hr</th><th>Coach<br>@$15/hr</th><th>Coach<br>@$25/hr</th><th>LJ Players</th><th>LJ $/hr</th><th>PH Players</th><th>PH $/hr</th><th>Expense</th><th>Income</th><th>Net</th><th>Proposed<br>LJ Player Cost</th><th>Proposed<br>PH Player Cost</th></tr></thead><tbody>${DEV_SESSIONS.map(s=>{const r=projected.dev.sessions[s];return`<tr><td>Session ${s}</td><td><input type="number" min="0" step="0.5" value="${r.hours}" data-s="${s}" data-f="hours"/></td><td><input type="number" min="0" step="0.01" value="${r.iceRate}" data-s="${s}" data-f="iceRate"/></td><td><input type="number" min="0" step="1" value="${r.coach15}" data-s="${s}" data-f="coach15"/></td><td><input type="number" min="0" step="1" value="${r.coach25}" data-s="${s}" data-f="coach25"/></td><td><input type="number" min="0" step="1" value="${r.ljPlayers}" data-s="${s}" data-f="ljPlayers"/></td><td><input type="number" min="0" step="0.01" value="${r.ljPriceHr}" data-s="${s}" data-f="ljPriceHr"/></td><td><input type="number" min="0" step="1" value="${r.phPlayers}" data-s="${s}" data-f="phPlayers"/></td><td><input type="number" min="0" step="0.01" value="${r.phPriceHr}" data-s="${s}" data-f="phPriceHr"/></td><td class="calc expense" id="proj-dev-${s}-expense">$0</td><td class="calc income" id="proj-dev-${s}-income">$0</td><td class="calc" id="proj-dev-${s}-net">$0</td><td class="calc" id="proj-dev-${s}-ljcost">$0</td><td class="calc" id="proj-dev-${s}-phcost">$0</td></tr>`;}).join('')}</tbody>`;
+  table.innerHTML=`<thead><tr><th>Session</th><th>Freq</th><th>Hours</th><th>Ice $/hr</th><th>Coach<br>@$15/hr</th><th>Coach<br>@$25/hr</th><th>LJ Players</th><th>LJ $/hr</th><th>PH Players</th><th>PH $/hr</th><th>Expense</th><th>Income</th><th>Net</th><th>Proposed<br>LJ Player Cost</th><th>Proposed<br>PH Player Cost</th></tr></thead><tbody>${DEV_SESSION_NUMS.flatMap(sn=>DEV_FREQ.map(f=>{const sk=sn+"_"+f;const r=projected.dev.sessions[sk];return`<tr style="${f==="2x"?"background:rgba(255,255,255,0.03)":""}"><td style="white-space:nowrap">Session ${sn}</td><td style="font-family:'Barlow Condensed';font-size:11px;color:var(--gold-light);font-weight:700">${f}</td><td><input type="number" min="0" step="0.5" value="${r.hours}" data-s="${sk}" data-f="hours"/></td><td><input type="number" min="0" step="0.01" value="${r.iceRate}" data-s="${sk}" data-f="iceRate"/></td><td><input type="number" min="0" step="1" value="${r.coach15}" data-s="${sk}" data-f="coach15"/></td><td><input type="number" min="0" step="1" value="${r.coach25}" data-s="${sk}" data-f="coach25"/></td><td><input type="number" min="0" step="1" value="${r.ljPlayers}" data-s="${sk}" data-f="ljPlayers"/></td><td><input type="number" min="0" step="0.01" value="${r.ljPriceHr}" data-s="${sk}" data-f="ljPriceHr"/></td><td><input type="number" min="0" step="1" value="${r.phPlayers}" data-s="${sk}" data-f="phPlayers"/></td><td><input type="number" min="0" step="0.01" value="${r.phPriceHr}" data-s="${sk}" data-f="phPriceHr"/></td><td class="calc expense" id="proj-dev-${sk}-expense">$0</td><td class="calc income" id="proj-dev-${sk}-income">$0</td><td class="calc" id="proj-dev-${sk}-net">$0</td><td class="calc" id="proj-dev-${sk}-ljcost">$0</td><td class="calc" id="proj-dev-${sk}-phcost">$0</td></tr>`;})).join('')}</tbody>`;
   table.querySelectorAll('input[data-f]').forEach(inp=>{inp.oninput=()=>{const{s,f}=inp.dataset;projected.dev.sessions[s][f]=+inp.value||0;document.getElementById('proj-save-note').textContent='';updateProjectedCalcs();};});
 }
 function buildCostList(listKey){
@@ -641,7 +642,7 @@ function removeCostRow(listKey,idx){const arr=listKey==='overall'?projected.over
 
 function updateProjectedCalcs(){
   ['adm','ih'].forEach(pk=>{ADM_IH_SEASONS.forEach(s=>{const c=calcSeasonRow(pk,s);const r=projected[pk].seasons[s];document.getElementById(`proj-${pk}-${s}-expense`).textContent=money(c.expense);document.getElementById(`proj-${pk}-${s}-income`).textContent=money(c.income);document.getElementById(`proj-${pk}-${s}-net`).textContent=money(c.net);document.getElementById(`proj-${pk}-${s}-playercost`).textContent=money((r.hours||0)*(r.priceHr||0));});});
-  DEV_SESSIONS.forEach(s=>{const c=calcDevRow(s);const r=projected.dev.sessions[s];document.getElementById(`proj-dev-${s}-expense`).textContent=money(c.expense);document.getElementById(`proj-dev-${s}-income`).textContent=money(c.income);document.getElementById(`proj-dev-${s}-net`).textContent=money(c.net);document.getElementById(`proj-dev-${s}-ljcost`).textContent=money((r.hours||0)*(r.ljPriceHr||0));document.getElementById(`proj-dev-${s}-phcost`).textContent=money((r.hours||0)*(r.phPriceHr||0));});
+  DEV_SESSION_NUMS.forEach(sn=>DEV_FREQ.forEach(f=>{const sk=sn+"_"+f;const c=calcDevRow(sk);const r=projected.dev.sessions[sk];const el=id=>document.getElementById(`proj-dev-${sk}-${id}`);if(el("expense")){el("expense").textContent=money(c.expense);el("income").textContent=money(c.income);el("net").textContent=money(c.net);el("ljcost").textContent=money((r.hours||0)*(r.ljPriceHr||0));el("phcost").textContent=money((r.hours||0)*(r.phPriceHr||0));}}));
   const t=computeProjectedTotals();
   document.getElementById('proj-adm-sub-income').textContent=money(t.adm.income);document.getElementById('proj-adm-sub-expense').textContent=money(t.adm.expense);document.getElementById('proj-adm-sub-net').textContent=money(t.adm.net);
   document.getElementById('proj-ih-sub-income').textContent=money(t.ih.income);document.getElementById('proj-ih-sub-expense').textContent=money(t.ih.expense);document.getElementById('proj-ih-sub-net').textContent=money(t.ih.net);
