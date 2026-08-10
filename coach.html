@@ -347,7 +347,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V14</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V15</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -758,7 +758,6 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 
 <script>
 if(!sessionStorage.getItem("jds_auth")){window.location.href="index.html";}
-
 /* ---------------------------------------------------
    CONSTANTS
 --------------------------------------------------- */
@@ -1213,9 +1212,7 @@ function addAllActiveToHoursGrid(){
     toast('Every Active coach is already on the Hours Grid.');
     return;
   }
-  if(!confirm(`Add ${needsLinking.length} Active coach${needsLinking.length!==1?'es':''} to the Hours Grid now?
-
-${needsLinking.map(c=>c.name).join(', ')}`))return;
+  if(!confirm(`Add ${needsLinking.length} Active coach${needsLinking.length!==1?'es':''} to the Hours Grid now?\n\n${needsLinking.map(c=>c.name).join(', ')}`))return;
   needsLinking.forEach(c=>{
     let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
     if(!pc){
@@ -1485,13 +1482,7 @@ function migrateExistingCoachesToProfiles(){
     toast('Hours Grid is already empty \u2014 nothing to migrate.');
     return;
   }
-  if(!confirm(`This will:
-
-1. Create an Active Coach Profile for each of your ${coaches.length} current Hours Grid coaches (${toMigrate.length} new, ${coaches.length-toMigrate.length} already have a profile)
-2. Download a full backup of your current Hours Grid data
-3. Completely clear the Hours Grid so it can be rebuilt fresh via "Add to Active" on each profile
-
-This cannot be undone except by re-importing the backup. Continue?`))return;
+  if(!confirm(`This will:\n\n1. Create an Active Coach Profile for each of your ${coaches.length} current Hours Grid coaches (${toMigrate.length} new, ${coaches.length-toMigrate.length} already have a profile)\n2. Download a full backup of your current Hours Grid data\n3. Completely clear the Hours Grid so it can be rebuilt fresh via "Add to Active" on each profile\n\nThis cannot be undone except by re-importing the backup. Continue?`))return;
 
   try{
     const blob=new Blob([JSON.stringify({app:'jaguar-coaches-backup',v:1,exported:new Date().toISOString(),coaches},null,2)],{type:'application/json'});
@@ -1524,13 +1515,8 @@ function cleanOrphanedCoachHours(){
     toast('No orphaned hours found \u2014 every logged hour has a matching active date on the schedule.');
     return;
   }
-  const summary=orphans.map(o=>`${o.coach.name||'(unnamed)'}: ${o.hours}h on ${o.label}`).join('
-');
-  if(!confirm(`Found ${orphans.length} orphaned hour ${orphans.length!==1?'entries':'entry'} (logged against a date that's no longer checked active in the schedule):
-
-${summary}
-
-Remove ${orphans.length!==1?'these':'this'}? They're currently being counted in totals and payouts even though they don't appear anywhere in the grid. A backup downloads first.`))return;
+  const summary=orphans.map(o=>`${o.coach.name||'(unnamed)'}: ${o.hours}h on ${o.label}`).join('\n');
+  if(!confirm(`Found ${orphans.length} orphaned hour ${orphans.length!==1?'entries':'entry'} (logged against a date that's no longer checked active in the schedule):\n\n${summary}\n\nRemove ${orphans.length!==1?'these':'this'}? They're currently being counted in totals and payouts even though they don't appear anywhere in the grid. A backup downloads first.`))return;
 
   try{
     const blob=new Blob([JSON.stringify({app:'jaguar-coaches-backup',v:1,exported:new Date().toISOString(),coaches},null,2)],{type:'application/json'});
@@ -2853,8 +2839,7 @@ function exportPlanDataDebug(){
   const readable=sortedKeys.map(k=>{
     const v=checkedOnly[k];
     return k+' -> checked:'+v.checked+', endSession:'+(v.endSession||false)+', sessionNum:'+(v.sessionNum||'(none)');
-  }).join('
-');
+  }).join('\n');
   const blob=new Blob([readable],{type:'text/plain'});
   const a=document.createElement('a'),d=new Date();
   a.href=URL.createObjectURL(blob);
@@ -2918,11 +2903,7 @@ function applyPlanCheck(sk,sessionNum,checked=true){
       const affected=coaches.filter(c=>(c.hours||{})[colId]>0);
       if(affected.length){
         const names=affected.map(c=>`${c.name} (${c.hours[colId]}h)`).join(', ');
-        if(!confirm(`${affected.length} coach${affected.length!==1?'es have':' has'} hours logged on this date: ${names}.
-
-Unchecking it will hide those hours from the grid, but they'll still count toward totals and pay until removed with "Clean Up Orphaned Hours" on the Hours tab.
-
-Continue anyway?`)){
+        if(!confirm(`${affected.length} coach${affected.length!==1?'es have':' has'} hours logged on this date: ${names}.\n\nUnchecking it will hide those hours from the grid, but they'll still count toward totals and pay until removed with "Clean Up Orphaned Hours" on the Hours tab.\n\nContinue anyway?`)){
           return;
         }
       }
@@ -3193,14 +3174,8 @@ function sendEmailShare(){
   }
   const subject=encodeURIComponent('Jaguar Development — Season Program Summary');
   const body=encodeURIComponent(
-    'Hi,
-
-Please find attached the Jaguar Development Season Program Summary (Sep 2026 – Aug 2027).
-
-'+
-    'Attach the PDF you saved from the Data Center.
-
-Jaguar Development Data Center'
+    'Hi,\n\nPlease find attached the Jaguar Development Season Program Summary (Sep 2026 – Aug 2027).\n\n'+
+    'Attach the PDF you saved from the Data Center.\n\nJaguar Development Data Center'
   );
   const mailto='mailto:'+recipients.join(',')+
     '?subject='+subject+'&body='+body;
