@@ -415,7 +415,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V43.1</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V44</div>
 
 <nav>
   <div class="nav-left">
@@ -961,7 +961,8 @@ function mapRow(headers,vals){
   return row;
 }
 function parseCSV(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const lines=text.split(/?
+/).filter(l=>l.trim());
   if(lines.length<2)return[];
   const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
   return lines.slice(1).map(line=>{
@@ -2964,21 +2965,17 @@ function openPlayerCard(idx){
 function renderSummary(){
   const div=document.getElementById('panel-summary');if(!div)return;
   const all=DB.master||[];
-
   if(!document.getElementById('summary-css')){
     const s=document.createElement('style');s.id='summary-css';
-    s.textContent='.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;padding:4px 0 28px;}.sum-card{background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:18px 18px 14px;}.sum-card-title{font-family:\'Barlow Condensed\',sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}.sum-canvas-wrap{position:relative;width:100%;max-width:260px;margin:0 auto 12px;}.sum-legend{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:11px;}.sum-legend-item{display:flex;align-items:center;gap:5px;color:var(--dim);}.sum-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}';
+    s.textContent='.sum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;padding:4px 0 28px;}.sum-card{background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:18px 18px 14px;}.sum-card-title{font-family:"Barlow Condensed",sans-serif;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}.sum-canvas-wrap{position:relative;width:100%;max-width:260px;margin:0 auto 12px;}.sum-legend{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:11px;}.sum-legend-item{display:flex;align-items:center;gap:5px;color:var(--dim);}.sum-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}';
     document.head.appendChild(s);
   }
-
   function tally(rows,fn){
     const m={};
     rows.forEach(r=>{const k=fn(r)||'Unknown';m[k]=(m[k]||0)+1;});
     return Object.entries(m).map(([label,count])=>({label,count})).sort((a,b)=>b.count-a.count);
   }
-
   const PALETTE=['#C9A84C','#5CCC88','#F07050','#7EC8E3','#A07FD0','#E8C97A','#3A9BD5','#F4A261','#90C9A0','#D4678A','#66B2B2','#E2B96F','#8BB8E8','#C4886F','#AAD87A','#B07AC9','#7CBFD4','#F0C060'];
-
   function drawPie(canvasId,data){
     const canvas=document.getElementById(canvasId);if(!canvas)return;
     const ctx=canvas.getContext('2d');
@@ -2999,22 +2996,18 @@ function renderSummary(){
     ctx.font="10px 'Barlow Condensed',sans-serif";ctx.fillStyle='#888';
     ctx.fillText('ATHLETES',cx,cy+10);
   }
-
   function buildCard(title,data,canvasId){
     const top=data.slice(0,12);
     const legend=top.map((d,i)=>'<div class="sum-legend-item"><span class="sum-legend-dot" style="background:'+PALETTE[i%PALETTE.length]+';"></span>'+d.label+' <strong style="color:var(--wht);margin-left:2px;">'+d.count+'</strong></div>').join('');
     return '<div class="sum-card"><div class="sum-card-title">'+title+'</div><div class="sum-canvas-wrap"><canvas id="'+canvasId+'" width="240" height="240"></canvas></div><div class="sum-legend">'+legend+'</div></div>';
   }
-
-  const byLevel   = tally(all,r=>r.level||'Unknown');
-  const byBirthYr = tally(all,r=>{const m=(r.birthdate||'').match(/(\d{4})/);return m?m[1]:'Unknown';});
-  const byCity    = tally(all,r=>(r.city||'Unknown').trim());
-  const byState   = tally(all,r=>(r.state||'Unknown').trim());
-  const byStatus  = tally(all,r=>r.status||'Active');
-  const byClass   = tally(all,r=>r.class_registered||'Unknown');
-
+  const byLevel=tally(all,r=>r.level||'Unknown');
+  const byBirthYr=tally(all,r=>{const m=(r.birthdate||'').match(/(\d{4})/);return m?m[1]:'Unknown';});
+  const byCity=tally(all,r=>(r.city||'Unknown').trim());
+  const byState=tally(all,r=>(r.state||'Unknown').trim());
+  const byStatus=tally(all,r=>r.status||'Active');
+  const byClass=tally(all,r=>r.class_registered||'Unknown');
   div.innerHTML='<div style="padding:0 0 4px;"><div class="toolbar"><div class="toolbar-left">Program Summary &mdash; '+all.length+' athletes in Master File</div></div><div class="sum-grid">'+buildCard('By Level',byLevel,'pie-level')+buildCard('By Birth Year',byBirthYr,'pie-birthyear')+buildCard('By City',byCity,'pie-city')+buildCard('By State',byState,'pie-state')+buildCard('By Status',byStatus,'pie-status')+buildCard('By Class Registered',byClass,'pie-class')+'</div></div>';
-
   requestAnimationFrame(()=>{
     drawPie('pie-level',byLevel.slice(0,12));
     drawPie('pie-birthyear',byBirthYr.slice(0,12));
@@ -3024,7 +3017,6 @@ function renderSummary(){
     drawPie('pie-class',byClass.slice(0,12));
   });
 }
-
 function renderDashboard(){
   const div=document.getElementById('panel-dashboard');if(!div)return;
   const all=DB.master,act=all.filter(r=>(r.status||'Active')==='Active').length,inact=all.filter(r=>r.status==='Inactive').length,lost=all.filter(r=>r.status==='Lost').length,wbad=all.filter(r=>r.waiver==='Missing').length,wok=all.filter(r=>r.waiver==='Received').length;
