@@ -413,7 +413,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V40</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V42</div>
 
 <nav>
   <div class="nav-left">
@@ -1390,24 +1390,59 @@ function printCertificates(sNum){
   var sessLabels={1:'Fall',2:'Winter',3:'Spring',4:'Summer Early',5:'Summer Late',6:'Summer'};
   var year=new Date().getFullYear();
   var sessLabel=(sessLabels[sNum]||'Session '+sNum)+' '+year;
-  function lvDisplay(lv){
-    var map={LJ1:'Little Jaguar 1',LJ2:'Little Jaguar 2',LJ3:'Little Jaguar 3',PH1:'Pre-Hockey 1',PH2:'Pre-Hockey 2',PH3:'Pre-Hockey 3',ADM:'Advanced Development',INHOUSE:'InHouse'};
+  // Level full names (spelled out)
+  function lvFull(lv){
+    var map={
+      LJ1:'Little Jaguars 1',LJ2:'Little Jaguars 2',LJ3:'Little Jaguars 3',
+      PH1:'Pre-Hockey 1',PH2:'Pre-Hockey 2',PH3:'Pre-Hockey 3',
+      ADM:'ADM',INHOUSE:'InHouse',TRAVEL:'Travel'
+    };
     return map[(lv||'').toUpperCase().replace(/\s/g,'')]||lv||'';
   }
+  // Level rank for comparison
+  var lvRank={'LJ1':1,'LJ2':2,'LJ3':3,'PH1':4,'PH2':5,'PH3':6,'ADM':7,'INHOUSE':8,'TRAVEL':9};
+  function lvNorm(lv){return(lv||'').toUpperCase().replace(/\s/g,'');}
+
   var cards=promos.map(function(p){
     var name=(p.first_name||'')+' '+(p.last_name||'');
-    var fromLv=lvDisplay(p.from_level);
-    var toLv=lvDisplay(p.to_level);
+    var fromKey=lvNorm(p.from_level);
+    var toKey=lvNorm(p.to_level);
+    var fromName=lvFull(fromKey);
+    var toName=lvFull(toKey);
+    var fromRank=lvRank[fromKey]||0;
+    var toRank=lvRank[toKey]||0;
+
+    var titleLine,bodyLine,levelLine,flagBanner='';
+
+    if(toRank < fromRank){
+      // Downgrade — flag it
+      flagBanner='<div class="cert-flag">&#9888; LEVEL REVIEW — Please verify before printing</div>';
+      titleLine='Certificate of Participation';
+      bodyLine='participated in <strong>'+fromName+'</strong><br>and will be reviewed for placement in';
+      levelLine=toName;
+    } else if(fromKey===toKey){
+      // Same level — lateral / re-enroll
+      titleLine='Certificate of Achievement';
+      bodyLine='has successfully completed <strong>'+fromName+'</strong>.<br>We encourage you to register for <strong>'+fromName+'</strong> again next session<br>to continue building your fundamentals and skills!';
+      levelLine=fromName;
+    } else {
+      // Promotion — standard full congratulations
+      titleLine='Certificate of Achievement';
+      bodyLine='has successfully completed <strong>'+fromName+'</strong><br>and is promoted to';
+      levelLine=toName;
+    }
+
     return '<div class="cert-page">'+
       '<div class="cert-border">'+
         '<div class="cert-inner">'+
+          flagBanner+
           '<img src="'+logo+'" class="cert-logo">'+
           '<div class="cert-program">Fronek Skillzone Hockey</div>'+
-          '<div class="cert-title">Certificate of Achievement</div>'+
+          '<div class="cert-title">'+titleLine+'</div>'+
           '<div class="cert-presented">This certifies that</div>'+
           '<div class="cert-name">'+name+'</div>'+
-          '<div class="cert-body">has successfully completed <strong>'+fromLv+'</strong><br>and is promoted to</div>'+
-          '<div class="cert-level">'+toLv+'</div>'+
+          '<div class="cert-body">'+bodyLine+'</div>'+
+          '<div class="cert-level">'+levelLine+'</div>'+
           '<div class="cert-session">'+sessLabel+'</div>'+
           '<div class="cert-sig-row">'+
             '<div class="cert-sig-block"><div class="cert-sig-line"></div><div class="cert-sig-label">Program Director</div></div>'+
@@ -1433,6 +1468,7 @@ function printCertificates(sNum){
     '.cert-sig-block{display:flex;flex-direction:column;align-items:center;width:200px;}'+
     '.cert-sig-line{width:100%;border-bottom:1px solid #aaa;margin-bottom:6px;height:36px;}'+
     '.cert-sig-label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#888;}'+
+    '.cert-flag{background:#fff3cd;border:2px solid #e6ac00;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:bold;color:#7a5c00;letter-spacing:1px;text-align:center;margin-bottom:10px;width:100%;}'+
     '@media print{.cert-page{page-break-after:always;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}';
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Certificates Session '+sNum+'</title><style>'+css+'</style></head><body>'+cards+'</body></html>';
   var w=window.open('','_blank','width=900,height=700');
