@@ -522,6 +522,8 @@ body.display-mode .rlast{font-size:22px;}
 </div>
 
 <script>
+if(!sessionStorage.getItem("jds_auth")){window.location.href="index.html";}
+
 // ── GAME DATE (declared first: everything below depends on reading it immediately) ──
 let team='al';
 let gameDate='';  // which specific Sunday's data is currently being viewed/edited
@@ -1119,7 +1121,7 @@ function switchTeam(t,el){
 }
 
 function capitalize(str){
-  return str.replace(/\b\w/g,(c)=>c.toUpperCase());
+  return str.replace(/\w/g,(c)=>c.toUpperCase());
 }
 
 function addPlayer(){
@@ -1459,7 +1461,7 @@ function renderMgr(){
       const val=el.value;
       const hasTrailG = id==='inp-l' && / G$/i.test(val);
       const base = hasTrailG ? val.replace(/ G$/i,'') : val;
-      const capped = base.replace(/\b\w/g,c=>c.toUpperCase());
+      const capped = base.replace(/\w/g,c=>c.toUpperCase());
       el.value = capped + (hasTrailG ? ' G' : '');
       el.setSelectionRange(pos,pos);
     });
@@ -1672,7 +1674,9 @@ function confirmCSVImport(){
     const seasonSlot=SEASONS[targetSeason];
     document.getElementById('csvSeasonModal').classList.add('hidden');
 
-    const lines = pendingCsvText.split(/\r\n|\r|\n/).filter(l=>l.trim());
+    const lines = pendingCsvText.split(/
+||
+/).filter(l=>l.trim());
     if(lines.length < 2){ showCSVResult('err','File appears empty or has no data rows.'); return; }
     // parse header -- required column MEANING (any labels work): First, Last,
     // Birthdate, Level, then a parent Name/Email/Phone group (twice, for two
@@ -2081,9 +2085,13 @@ function archiveSeason(){
   const promoted=masterList.filter(m=>m.promotionDecision==='promote_next'||m.promotionDecision==='promote_immediate'||m.promotionDecision==='inhouse').length;
   const undecided=total-staying-promoted;
   const seasonLabel=currentSeason.charAt(0).toUpperCase()+currentSeason.slice(1);
-  let msg=`Archive and close out ${seasonLabel}?\n\n${total} players total \u2014 ${staying} staying in ADM, ${promoted} promoted to InHouse`;
+  let msg=`Archive and close out ${seasonLabel}?
+
+${total} players total \u2014 ${staying} staying in ADM, ${promoted} promoted to InHouse`;
   if(undecided)msg+=`, ${undecided} still undecided`;
-  msg+=`.\n\nThis downloads a full backup, saves a browsable summary in-app, and RESETS ${seasonLabel} completely so it's ready to reuse next year. This can only be undone by re-importing the backup.`;
+  msg+=`.
+
+This downloads a full backup, saves a browsable summary in-app, and RESETS ${seasonLabel} completely so it's ready to reuse next year. This can only be undone by re-importing the backup.`;
   if(!confirm(msg))return;
 
   const archiveRecord={
