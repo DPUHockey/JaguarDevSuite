@@ -412,7 +412,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V29</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V30</div>
 
 <nav>
   <div class="nav-left">
@@ -633,6 +633,17 @@ const LEGACY_STORE_KEY = 'jaguar_athlete_db_v1';
 const SEASON_FIELDS = ['session1','session2','session3','session4','session5','session6','lj1','lj2','lj3','ph1','ph2','ph3','lj','ph','promo1','promo2','promo3','promo4','promo5','promo6'];
 const DB = {session1:[],session2:[],session3:[],session4:[],session5:[],session6:[],master:[],lj1:[],lj2:[],lj3:[],ph1:[],ph2:[],ph3:[],lj:[],ph:[],promo1:[],promo2:[],promo3:[],promo4:[],promo5:[],promo6:[]};
 let pending = null, pendingName = '', selSess = null;
+// Promo-complete flags per session
+let promoComplete={1:false,2:false,3:false,4:false,5:false,6:false};
+function savePromoComplete(){
+  try{localStorage.setItem('jag_promo_complete',JSON.stringify(promoComplete));}catch(e){}
+  if(window._fbDb&&window._fbRef&&window._fbSet){
+    try{window._fbSet(window._fbRef(window._fbDb,'jaguar_db/promoComplete'),promoComplete).catch(()=>{});}catch(e){}
+  }
+}
+function loadPromoComplete(){
+  try{const r=localStorage.getItem('jag_promo_complete');if(r)promoComplete=Object.assign(promoComplete,JSON.parse(r));}catch(e){}
+}
 
 // Expose globally so Firebase module script can access
 window.DB = DB;
@@ -1234,21 +1245,25 @@ function renderAllSubTab(sNum){
 
 function renderPromoTab(sNum){
   const promos=DB['promo'+sNum]||[];
+  const isComplete=promoComplete[sNum]===true;
+  // ── toolbar ──
+  const completeBtnHtml=isComplete
+    ?`<button class="btn-sm" style="background:rgba(92,204,136,.15);border-color:#5CCC88;color:#5CCC88;" onclick="reopenPromos(${sNum})">&#x21BA; Reopen Session</button>`
+    :`<button class="btn-sm gold" onclick="markPromosComplete(${sNum})">&#x2713; Promotions Complete</button>`;
   if(!promos.length){
-    return`<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg><p>No promotions yet — use the Promote button on a player</p></div>`;
+    return`<div class="toolbar"><div class="toolbar-left">0 promotions</div><div style="display:flex;gap:6px;">${completeBtnHtml}</div></div><div class="empty-state"><p>No promotions yet — use the Promote button on a player</p></div>`;
   }
   const tabKey='promo'+sNum;
   const sort=sortState[tabKey]||{col:null,dir:'asc'};
   const cols=['first_name','last_name','birthdate','from_level','to_level','promoted_on','promo_status','notes','parent1_name','parent1_email','parent1_phone'];
   const labels=['First','Last','Birthdate','From','To','Date','Status','Notes','P1 Name','P1 Email','P1 Phone'];
   const indexed=applySortRows(promos,sort);
-  const toolbar=`<div class="toolbar"><div class="toolbar-left">${promos.length} promotion${promos.length!==1?'s':''}</div><div style="display:flex;gap:6px;"><button class="btn-sm" onclick="exportPromoCSV(${sNum})">&#x2193; Export CSV</button><button class="btn-sm" onclick="clearPromos(${sNum})">Clear</button></div></div>`;
+  const toolbar=`<div class="toolbar"><div class="toolbar-left">${promos.length} promotion${promos.length!==1?'s':''}</div><div style="display:flex;gap:6px;">${completeBtnHtml}<button class="btn-sm" onclick="exportPromoCSV(${sNum})">&#x2193; Export CSV</button><button class="btn-sm" onclick="clearPromos(${sNum})">Clear</button></div></div>`;
   const thead=`<thead><tr>${cols.map((k,ci)=>thSort(k,labels[ci],sort,null,tabKey)).join('')}</tr></thead>`;
   const tbody=`<tbody>${indexed.map(({r:p,i})=>{
     const promoOrigIdx=DB['promo'+sNum].indexOf(p);
     const masterIdx=DB.master.findIndex(m=>masterKey(m)===masterKey(p));
-    const nameClick=masterIdx>=0?` onclick="openPlayerCard(${masterIdx})" title="View timeline / undo promotion" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;"`:'';
-    const statusCell=p.promo_status==='Pending'
+    const nameClick=masterIdx>=0?` onclick="openPlayerCard(${masterIdx})" title="View timeline / undo promotion" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;"`:'';    const statusCell=p.promo_status==='Pending'
       ?`<span onclick="confirmPromoFromTab(${sNum},${promoOrigIdx})" title="Click to confirm this promotion" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:var(--gold);cursor:pointer;text-decoration:underline dotted;padding:2px 5px;border:1px solid var(--gold);border-radius:4px;">PENDING &#x2192;</span>`
       :`<span onclick="openPromoHistory(${sNum},${promoOrigIdx})" title="View promotion history" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">CONFIRMED &#x2139;</span>`;
     return `<tr>
@@ -1264,7 +1279,60 @@ function renderPromoTab(sNum){
     <td style="font-size:11px;">${p.parent1_email||'—'}</td>
     <td style="font-size:11px;">${p.parent1_phone||'—'}</td>
   </tr>`;}).join('')}</tbody>`;
-  return toolbar+`<div class="table-outer"><table class="data-table">${thead}${tbody}</table></div>`;
+  const table=`<div class="table-outer"><table class="data-table">${thead}${tbody}</table></div>`;
+  // ── Email-by-level section (shown when complete) ──
+  let emailSection='';
+  if(isComplete){
+    // Group by to_level
+    const groups={};
+    promos.forEach(p=>{
+      const lv=(p.to_level||'').trim().toUpperCase().replace(/\s/g,'');
+      if(!lv)return;
+      if(!groups[lv])groups[lv]=[];
+      groups[lv].push(p);
+    });
+    const lvOrder=['LJ1','LJ2','LJ3','PH1','PH2','PH3','ADM','INHOUSE'];
+    const allLvs=[...lvOrder.filter(l=>groups[l]),...Object.keys(groups).filter(l=>!lvOrder.includes(l)).sort()];
+    const lvColors={'LJ1':'#5CCC88','LJ2':'#5CCC88','LJ3':'#5CCC88','PH1':'#F07050','PH2':'#F07050','PH3':'#F07050','ADM':'#C9A84C','INHOUSE':'#7EC8E3'};
+    const cards=allLvs.map(lv=>{
+      const ps=groups[lv];
+      const color=lvColors[lv]||'#8FA3C0';
+      const emails=ps.map(p=>p.parent1_email||'').filter(Boolean);
+      const emailStr=emails.join(', ');
+      const mailtoHref=emails.length?'mailto:?bcc='+encodeURIComponent(emails.join(',')):'#';
+      const rows=ps.map(p=>`<tr><td style="font-size:12px;padding:5px 10px;">${p.first_name||''} ${p.last_name||''}</td><td style="font-size:12px;padding:5px 10px;color:var(--dim);">${p.parent1_email||'<span style="color:var(--dim);font-style:italic;">no email</span>'}</td></tr>`).join('');
+      return `<div style="margin-bottom:18px;background:var(--surf2);border:1px solid ${color}44;border-radius:10px;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:${color}18;border-bottom:1px solid ${color}33;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:${color};">${lv} <span style="font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1px;color:var(--dim);">${ps.length} athlete${ps.length!==1?'s':''}</span></div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-sm" style="font-size:10px;" onclick="navigator.clipboard.writeText('${emailStr.replace(/'/g,"\'")}').then(()=>showAlert('Emails copied!','ok'))">&#x2398; Copy Emails</button>
+            ${emails.length?`<a href="${mailtoHref}" style="font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;padding:3px 9px;border:1px solid var(--gborder);border-radius:4px;background:var(--gfaint);color:var(--gold);text-decoration:none;white-space:nowrap;">&#x2709; Open in Email</a>`:''}
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;"><thead><tr><th style="padding:5px 10px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Player</th><th style="padding:5px 10px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);">Parent Email</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    }).join('');
+    emailSection=`<div style="margin-top:28px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--gold);margin-bottom:4px;">&#x2709; Registration Email Lists</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;color:var(--dim);margin-bottom:16px;letter-spacing:.5px;">Athletes grouped by their next level — use to send registration emails.</div>
+      ${cards}
+    </div>`;
+  }
+  return toolbar+table+emailSection;
+}
+function markPromosComplete(sNum){
+  jagConfirm('Mark Session '+sNum+' promotions as complete? This will show the email lists by level so you can send registration emails. You can reopen this at any time.',function(){
+    promoComplete[sNum]=true;
+    savePromoComplete();
+    renderSessionPanel(sNum);
+  });
+}
+function reopenPromos(sNum){
+  jagConfirm('Reopen Session '+sNum+' promotions? This will hide the email lists and allow further changes.',function(){
+    promoComplete[sNum]=false;
+    savePromoComplete();
+    renderSessionPanel(sNum);
+  });
 }
 
 // ── PROMO MODAL ──
@@ -3021,6 +3089,7 @@ window.showAlert = showAlert;
 function _startApp(){
   loadDB();
   loadAttendData();
+  loadPromoComplete();
   renderAll();
   updateStats();
   window._appInitialized = true;
