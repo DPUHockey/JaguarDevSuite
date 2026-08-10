@@ -2237,10 +2237,15 @@ function openGmailAddr(email){
 function openGmailBCC(emails){
   window.open('https://mail.google.com/mail/?view=cm&bcc='+encodeURIComponent(emails),'_blank');
 }
-function copyAddrList(id){
-  var el=document.getElementById(id);
+function copyAddrList(elOrId){
+  var el=typeof elOrId==='string'?document.getElementById(elOrId):elOrId;
   if(!el)return;
-  navigator.clipboard.writeText(el.dataset.emails||'').then(function(){alert('Emails copied!');});
+  // Walk up to find the data-emails attribute
+  var emails=el.dataset.emails||el.dataset.email||'';
+  if(!emails){var par=el.closest('[data-emails]');if(par)emails=par.dataset.emails;}
+  navigator.clipboard.writeText(emails).then(function(){alert('Emails copied!');}).catch(function(){
+    var ta=document.createElement('textarea');ta.value=emails;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);alert('Emails copied!');
+  });
 }
 function renderIHEmailTab(){
   var season=IH_SEASONS[ihCurrentSeason];
@@ -2254,16 +2259,16 @@ function renderIHEmailTab(){
     var rows=players.map(function(p){
       var e=p.p1Email||'';
       var e2=(p.p2Email&&p.p2Email!==p.p1Email)?p.p2Email:'';
-      var eCell=e?('<span onclick="openGmailAddr(''+e+'')" style="color:var(--gold,#C9A84C);text-decoration:underline dotted;cursor:pointer;">'+e+'</span>'+(e2?' / <span onclick="openGmailAddr(''+e2+'')" style="color:var(--gold,#C9A84C);text-decoration:underline dotted;cursor:pointer;">'+e2+'</span>':'')):'<em style="color:#666;font-size:11px;">no email</em>';
+      var eCell=e?('<a href="javascript:void(0)" onclick="openGmailAddr(this.dataset.email)" data-email="'+e+'" style="color:var(--gold,#C9A84C);text-decoration:underline dotted;">'+e+'</a>'+(e2?' / <a href="javascript:void(0)" onclick="openGmailAddr(this.dataset.email)" data-email="'+e2+'" style="color:var(--gold,#C9A84C);text-decoration:underline dotted;">'+e2+'</a>':'')):'<em style="color:#666;font-size:11px;">no email</em>';
       return '<tr><td style="padding:5px 10px;font-size:13px;">'+(p.first||'')+' '+(p.last||'')+'</td><td style="padding:5px 10px;font-size:12px;">'+eCell+'</td></tr>';
     }).join('');
     var h='<div style="margin-bottom:20px;background:rgba(255,255,255,0.04);border:1px solid '+color+'44;border-radius:10px;overflow:hidden;">';
     h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:'+color+'18;border-bottom:1px solid '+color+'33;">';
-    h+='<div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;color:'+color+';">'+label+' <span style="font-size:12px;color:#888;font-family:sans-serif;">'+players.length+' player'+(players.length!==1?'s':'')+'</span></div>';
+    h+='<div style="font-family:\'Bebas Neue\',sans-serif;font-size:20px;letter-spacing:2px;color:'+color+';">'+label+' <span style="font-size:12px;color:#888;font-family:sans-serif;">'+players.length+' player'+(players.length!==1?'s':'')+'</span></div>';
     h+='<div style="display:flex;gap:6px;">';
     var safeEmails=emails.join(', ').replace(/"/g,'&quot;');
-    h+='<button class="nav-btn" style="font-size:10px;padding:3px 10px;" id="ihc_'+regKey+'" data-emails="'+safeEmails+'" onclick="copyAddrList('ihc_'+regKey+'')">&#x2398; Copy</button>';
-    if(emails.length)h+='<button class="nav-btn" style="font-size:10px;padding:3px 10px;" onclick="openGmailBCC(window._ihEmailReg[''+regKey+''])">&#x2709; Gmail</button>';
+    h+='<button class="nav-btn" style="font-size:10px;padding:3px 10px;" id="ihc_'+regKey+'" data-emails="'+emails.join(', ')+'" onclick="copyAddrList(this)">&#x2398; Copy</button>';
+    if(emails.length)h+='<button class="nav-btn" style="font-size:10px;padding:3px 10px;" data-rk="'+regKey+'" onclick="openGmailBCC(window._ihEmailReg[this.dataset.rk])">&#x2709; Gmail</button>';
     h+='</div></div>';
     h+='<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="padding:5px 10px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#888;border-bottom:1px solid #333;">Player</th><th style="padding:5px 10px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#888;border-bottom:1px solid #333;">Email</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
     return h;
