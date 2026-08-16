@@ -307,7 +307,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v2.0.0</div>
+<div class="ver">v2.1.0</div>
 
 <script>
 // ============================================================
@@ -845,13 +845,16 @@ function openInMail() {
     }
   }
 
-  var bcc     = emails.join(',');
-  var mailto  = 'mailto:?bcc=' + encodeURIComponent(bcc)
-              + '&subject=' + encodeURIComponent(subject)
-              + '&body='    + encodeURIComponent(body);
+  var bcc = emails.join(',');
 
-  window.location.href = mailto;
-  toast('Opening mail client...', 'ok');
+  // Open Gmail compose in new tab — same method used throughout the suite
+  var gmailUrl = 'https://mail.google.com/mail/?view=cm'
+    + '&bcc='     + encodeURIComponent(bcc)
+    + '&su='      + encodeURIComponent(subject)
+    + '&body='    + encodeURIComponent(body);
+
+  window.open(gmailUrl, '_blank');
+  toast('Gmail compose opened in new tab!', 'ok');
 }
 
 function copyEmails() {
