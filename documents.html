@@ -348,7 +348,7 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
             <div class="compose-to" id="compose-to-display">Select players on the left to populate recipients.</div>
 
             <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
-              <input type="email" id="manual-email" placeholder="Add email manually…" style="flex:1;" onkeydown="if(event.key==='Enter'){addManualEmail();event.preventDefault();}"/>
+              <input type="email" id="manual-email" placeholder="Add email manually…" style="flex:1;" onkeydown="if(event.key==='Enter'){addManualEmail();event.preventDefault();}" oninput="previewSendState()"/>
               <button class="btn sm secondary" onclick="addManualEmail()">+ Add</button>
             </div>
 
@@ -410,7 +410,7 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="version-badge">v1.2.0</div>
+<div class="version-badge">v1.3.0</div>
 
 <script>
 // ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -857,13 +857,23 @@ function updateToDisplay() {
 }
 
 function updateSendButtons() {
-  const hasRecipients = getAllActiveEmails().length > 0;
+  const inp = document.getElementById('manual-email');
+  const pendingValid = inp && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((inp.value||'').trim());
+  const hasRecipients = getAllActiveEmails().length > 0 || pendingValid;
   document.getElementById('send-btn').disabled = !hasRecipients;
   document.getElementById('copy-btn').disabled = !hasRecipients;
   // dl-btn visibility is controlled by setDocMode
 }
 
+function previewSendState() { updateSendButtons(); }
+
 async function openInMail() {
+  // Auto-commit anything still typed in the manual email box
+  const inp = document.getElementById('manual-email');
+  if (inp && inp.value.trim()) {
+    const v = inp.value.trim().toLowerCase();
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { manualEmails.add(v); inp.value = ''; updateToDisplay(); }
+  }
   const emails = getAllActiveEmails();
   if (!emails.length) { toast('Add at least one recipient first.', 'error'); return; }
 
@@ -875,12 +885,19 @@ async function openInMail() {
     if (doc) {
       try {
         const extracted = await extractDocText(doc);
-        if (extracted) {
+        if (extracted && extracted.length > 10) {
           bodyText = bodyText
-            ? bodyText + '\n\n--- Document Content ---\n\n' + extracted
+            ? bodyText + '\n\n--- ' + doc.name + ' ---\n\n' + extracted
             : extracted;
+        } else {
+          // Extraction failed or returned nothing — insert a placeholder
+          const note = '\n\n[Document: ' + doc.name + ' — copy not available in body. Download and reference separately.]';
+          bodyText = (bodyText || '') + note;
         }
-      } catch(e) { /* extraction failed — just send body as-is */ }
+      } catch(e) {
+        const note = '\n\n[Document: ' + doc.name + ' — could not extract text. Download separately.]';
+        bodyText = (bodyText || '') + note;
+      }
     }
   }
 
@@ -999,6 +1016,11 @@ function downloadDoc() {
 }
 
 function copyEmails() {
+  const inp = document.getElementById('manual-email');
+  if (inp && inp.value.trim()) {
+    const v = inp.value.trim().toLowerCase();
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { manualEmails.add(v); inp.value = ''; updateToDisplay(); }
+  }
   const emails = getAllActiveEmails();
   if (!emails.length) return;
   navigator.clipboard.writeText(emails.join('; ')).then(() => toast('Email addresses copied!', 'success'));
