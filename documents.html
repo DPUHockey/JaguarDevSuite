@@ -142,7 +142,9 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 /* ── COMPOSE ── */
 .compose-panel { background:var(--surface); border:1px solid #2a2a2a; border-radius:10px; padding:1.5rem; }
 .compose-to { background:var(--bg2); border:1px solid #333; border-radius:7px; padding:.6rem .8rem; min-height:48px; font-size:.78rem; color:var(--text-muted); line-height:1.6; margin-bottom:.8rem; }
-.email-chip { display:inline-block; background:rgba(201,168,76,.15); border:1px solid var(--gold-dark); color:var(--gold-light); font-size:.72rem; border-radius:4px; padding:.1rem .4rem; margin:.1rem .2rem .1rem 0; }
+.email-chip { display:inline-flex; align-items:center; gap:.25rem; background:rgba(201,168,76,.15); border:1px solid var(--gold-dark); color:var(--gold-light); font-size:.72rem; border-radius:4px; padding:.1rem .5rem .1rem .4rem; margin:.1rem .2rem .1rem 0; cursor:pointer; transition:background .15s,border-color .15s; }
+.email-chip:hover { background:rgba(224,82,82,.2); border-color:var(--error); color:#e88; }
+.email-chip-x { font-size:.65rem; opacity:.7; margin-left:.1rem; }
 .attach-preview { display:flex; align-items:center; gap:.6rem; background:var(--bg3); border:1px solid #333; border-radius:7px; padding:.6rem .9rem; margin-bottom:.8rem; font-size:.8rem; }
 .attach-name { flex:1; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .attach-size { color:var(--text-muted); font-size:.72rem; }
@@ -339,8 +341,13 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
           <div class="compose-panel">
             <div class="card-title">3. Compose & Send</div>
 
-            <label>To: (parent emails from selection)</label>
+            <label>To: <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--text-muted);font-size:.7rem;">click any address to remove it</span></label>
             <div class="compose-to" id="compose-to-display">Select players on the left to populate recipients.</div>
+
+            <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
+              <input type="email" id="manual-email" placeholder="Add email manually…" style="flex:1;" onkeydown="if(event.key==='Enter'){addManualEmail();event.preventDefault();}"/>
+              <button class="btn sm secondary" onclick="addManualEmail()">+ Add</button>
+            </div>
 
             <div id="attach-preview-area"></div>
 
@@ -386,7 +393,7 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="version-badge">v1.0.0</div>
+<div class="version-badge">v1.1.0</div>
 
 <script>
 // ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -631,6 +638,17 @@ function renderSendDocSelector() {
 }
 
 function selectDoc(id, el) {
+  // clicking the already-selected doc deselects it
+  if (selectedDocId === id) {
+    selectedDocId = null;
+    document.querySelectorAll('.send-doc-row').forEach(r => {
+      r.style.borderColor = 'transparent';
+      r.style.background = 'var(--bg3)';
+    });
+    document.getElementById('attach-preview-area').innerHTML = '';
+    updateSendButtons();
+    return;
+  }
   selectedDocId = id;
   document.querySelectorAll('.send-doc-row').forEach(r => {
     r.style.borderColor = r.dataset.docId == id ? 'var(--gold-dark)' : 'transparent';
@@ -763,27 +781,57 @@ function getSelectedEmails() {
   return [...emails];
 }
 
+// manually added emails (not tied to a player selection)
+let manualEmails = new Set();
+// emails explicitly removed from the auto-set
+let removedEmails = new Set();
+
+function addManualEmail() {
+  const inp = document.getElementById('manual-email');
+  const val = inp.value.trim().toLowerCase();
+  if (!val || !/^[^@]+@[^@]+\.[^@]+$/.test(val)) { toast('Enter a valid email address.', 'error'); return; }
+  manualEmails.add(val);
+  removedEmails.delete(val); // un-remove if it was removed before
+  inp.value = '';
+  updateToDisplay();
+  toast('Email added.', 'success');
+}
+
+function removeEmail(email) {
+  manualEmails.delete(email);
+  removedEmails.add(email);
+  updateToDisplay();
+}
+
+function getAllActiveEmails() {
+  const auto = getSelectedEmails().filter(e => !removedEmails.has(e));
+  const combined = new Set([...auto, ...manualEmails]);
+  return [...combined];
+}
+
 function updateToDisplay() {
-  const emails = getSelectedEmails();
+  const emails = getAllActiveEmails();
   const el = document.getElementById('compose-to-display');
   if (!emails.length) {
-    el.innerHTML = '<span style="color:var(--text-muted);">Select players on the left to populate recipients.</span>';
+    el.innerHTML = '<span style="color:var(--text-muted);">Select players on the left, or add emails manually above.</span>';
   } else {
-    el.innerHTML = emails.map(e => `<span class="email-chip">${escHtml(e)}</span>`).join('');
+    el.innerHTML = emails.map(e =>
+      `<span class="email-chip" onclick="removeEmail('${escAttr(e)}')" title="Click to remove">${escHtml(e)}<span class="email-chip-x">✕</span></span>`
+    ).join('');
   }
   updateSendButtons();
 }
 
 function updateSendButtons() {
   const hasDoc = !!selectedDocId;
-  const hasPlayers = selectedPlayers.size > 0;
-  document.getElementById('send-btn').disabled = !(hasDoc && hasPlayers);
+  const hasRecipients = getAllActiveEmails().length > 0;
+  document.getElementById('send-btn').disabled = !(hasDoc && hasRecipients);
   document.getElementById('dl-btn').disabled = !hasDoc;
-  document.getElementById('copy-btn').disabled = !hasPlayers;
+  document.getElementById('copy-btn').disabled = !hasRecipients;
 }
 
 function openInMail() {
-  const emails = getSelectedEmails();
+  const emails = getAllActiveEmails();
   const subject = encodeURIComponent(document.getElementById('email-subject').value || '');
   const body = encodeURIComponent(document.getElementById('email-body').value || '');
   // BCC all — one mailto, players in BCC to protect privacy
@@ -805,7 +853,7 @@ function downloadDoc() {
 }
 
 function copyEmails() {
-  const emails = getSelectedEmails();
+  const emails = getAllActiveEmails();
   if (!emails.length) return;
   navigator.clipboard.writeText(emails.join('; ')).then(() => toast('Email addresses copied!', 'success'));
 }
