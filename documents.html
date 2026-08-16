@@ -83,6 +83,10 @@ label.lbl{font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:u
 .doc-tags{display:flex;gap:.3rem;flex-wrap:wrap;}
 .doc-actions{display:flex;gap:.4rem;margin-top:.2rem;}
 .empty{text-align:center;color:var(--muted);padding:2.5rem 1rem;font-size:.85rem;}
+.edit-panel{background:var(--bg2);border-top:1px solid #2a2a2a;margin-top:.6rem;padding:.8rem;border-radius:0 0 8px 8px;display:none;}
+.edit-panel.open{display:block;}
+.lvl-row{display:flex;gap:.6rem;flex-wrap:wrap;padding:.3rem 0;}
+.lvl-row label{display:flex;align-items:center;gap:.3rem;font-size:.78rem;cursor:pointer;color:var(--muted);}
 /* SEND TAB LAYOUT */
 .send-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start;}
 .doc-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .8rem;border-radius:7px;cursor:pointer;border:1px solid transparent;margin-bottom:.35rem;background:var(--bg3);transition:all .2s;}
@@ -307,7 +311,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v2.4.0</div>
+<div class="ver">v2.5.0</div>
 
 <script>
 // ============================================================
@@ -429,11 +433,7 @@ function renderLibrary() {
       + (d.desc ? '<div class="doc-meta">'+esc(d.desc)+'</div>' : '')
       + '<div class="doc-meta">'+fmtSize(d.size)+' &middot; '+d.dateAdded+'</div>'
       + '<div class="doc-tags">'+tags+'</div>'
-      + '<div class="doc-actions">'
-      +   '<button class="btn sm" data-dl="'+d.id+'">Download</button>'
-      +   '<button class="btn sm sec" data-send="'+d.id+'">Send</button>'
-      + '</div>'
-      + '</div>';
+      + '<div class="doc-actions">'      +   '<button class="btn sm" data-dl="'+d.id+'">Download</button>'      +   '<button class="btn sm sec" data-send="'+d.id+'">Send</button>'      +   '<button class="btn sm sec" data-edit="'+d.id+'">Edit</button>'      + '</div>'      + '<div class="edit-panel" id="ep-'+d.id+'">'      +   '<div style="margin-bottom:.5rem;"><label class="lbl" style="margin-bottom:.25rem;">Name</label>'      +   '<input type="text" class="ep-name" value="'+esc(d.name)+'"/></div>'      +   '<div style="margin-bottom:.5rem;"><label class="lbl" style="margin-bottom:.25rem;">Description</label>'      +   '<input type="text" class="ep-desc" value="'+esc(d.desc||'')+'" placeholder="optional"/></div>'      +   '<div style="margin-bottom:.6rem;"><label class="lbl" style="margin-bottom:.25rem;">Levels</label>'      +   '<div class="lvl-row">'      +     '<label><input type="checkbox" class="ep-lv" value="LJ" '+((d.levels||[]).includes('LJ')?'checked':'')+' style="accent-color:var(--lj);width:auto;"/> <span style="color:var(--lj);">LJ</span></label>'      +     '<label><input type="checkbox" class="ep-lv" value="PH" '+((d.levels||[]).includes('PH')?'checked':'')+' style="accent-color:var(--ph);width:auto;"/> <span style="color:var(--ph);">PH</span></label>'      +     '<label><input type="checkbox" class="ep-lv" value="ADM" '+((d.levels||[]).includes('ADM')?'checked':'')+' style="accent-color:var(--adm);width:auto;"/> <span style="color:var(--adm);">ADM</span></label>'      +     '<label><input type="checkbox" class="ep-lv" value="IH" '+((d.levels||[]).includes('IH')?'checked':'')+' style="accent-color:var(--ih);width:auto;"/> <span style="color:var(--ih);">IH</span></label>'      +   '</div></div>'      +   '<div style="display:flex;gap:.4rem;">'      +     '<button class="btn sm" data-save="'+d.id+'">Save</button>'      +     '<button class="btn sm sec" data-cancel="'+d.id+'">Cancel</button>'      +   '</div>'      + '</div>'      + '</div>';
   }).join('');
   // bind doc-grid button events
   grid.querySelectorAll('[data-del]').forEach(function(b){
@@ -445,11 +445,44 @@ function renderLibrary() {
   grid.querySelectorAll('[data-send]').forEach(function(b){
     b.addEventListener('click', function(){
       selectedDocId = parseInt(b.dataset.send);
-      // switch to send tab
       document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab==='send'); });
       document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('active', p.id==='pane-send'); });
       renderSendDocs();
       renderPlayers();
+    });
+  });
+  grid.querySelectorAll('[data-edit]').forEach(function(b){
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var ep = document.getElementById('ep-'+b.dataset.edit);
+      var opening = !ep.classList.contains('open');
+      ep.classList.toggle('open');
+      b.textContent = opening ? 'Close' : 'Edit';
+    });
+  });
+  grid.querySelectorAll('[data-save]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var id = parseInt(b.dataset.save);
+      var ep = document.getElementById('ep-'+id);
+      var d  = docs.find(function(x){ return x.id===id; });
+      if (!d) return;
+      var name = ep.querySelector('.ep-name').value.trim();
+      if (!name) { toast('Name cannot be empty', 'err'); return; }
+      d.name   = name;
+      d.desc   = ep.querySelector('.ep-desc').value.trim();
+      d.levels = Array.from(ep.querySelectorAll('.ep-lv:checked')).map(function(c){ return c.value; });
+      saveDocs();
+      toast('Saved!', 'ok');
+      renderLibrary();
+    });
+  });
+  grid.querySelectorAll('[data-cancel]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var ep = document.getElementById('ep-'+b.dataset.cancel);
+      ep.classList.remove('open');
+      var btn = ep.previousElementSibling && ep.previousElementSibling.querySelector('[data-edit]');
+      if (!btn) btn = ep.closest('.doc-card').querySelector('[data-edit]');
+      if (btn) btn.textContent = 'Edit';
     });
   });
 }
