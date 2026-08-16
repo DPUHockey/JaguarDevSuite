@@ -141,11 +141,14 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 
 /* ── COMPOSE ── */
 .compose-panel { background:var(--surface); border:1px solid #2a2a2a; border-radius:10px; padding:1.5rem; }
-.compose-to { background:var(--bg2); border:1px solid #333; border-radius:7px; padding:.6rem .8rem; min-height:48px; font-size:.78rem; color:var(--text-muted); line-height:1.6; margin-bottom:.8rem; }
+.compose-to { background:var(--bg2); border:1px solid #333; border-radius:7px; padding:.6rem .8rem; min-height:48px; font-size:.78rem; color:var(--text-muted); line-height:1.6; margin-bottom:.8rem; pointer-events:auto; cursor:default; }
 .email-chip { display:inline-flex; align-items:center; gap:.25rem; background:rgba(201,168,76,.15); border:1px solid var(--gold-dark); color:var(--gold-light); font-size:.72rem; border-radius:4px; padding:.1rem .5rem .1rem .4rem; margin:.1rem .2rem .1rem 0; cursor:pointer; transition:background .15s,border-color .15s; }
 .email-chip:hover { background:rgba(224,82,82,.2); border-color:var(--error); color:#e88; }
 .email-chip-x { font-size:.65rem; opacity:.7; margin-left:.1rem; }
 .attach-preview { display:flex; align-items:center; gap:.6rem; background:var(--bg3); border:1px solid #333; border-radius:7px; padding:.6rem .9rem; margin-bottom:.8rem; font-size:.8rem; }
+.doc-mode-btn { background:var(--bg3); border:1px solid #333; color:var(--text-muted); font-family:'Barlow',sans-serif; font-size:.75rem; font-weight:600; padding:.35rem .8rem; border-radius:6px; cursor:pointer; transition:all .2s; }
+.doc-mode-btn:hover { border-color:var(--gold-dark); color:var(--text); }
+.doc-mode-btn.active { background:rgba(201,168,76,.15); border-color:var(--gold); color:var(--gold); }
 .attach-name { flex:1; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .attach-size { color:var(--text-muted); font-size:.72rem; }
 
@@ -349,7 +352,21 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
               <button class="btn sm secondary" onclick="addManualEmail()">+ Add</button>
             </div>
 
-            <div id="attach-preview-area"></div>
+            <!-- doc mode toggle — only shown when a doc is selected -->
+            <div id="doc-mode-row" style="display:none;margin-bottom:.8rem;">
+              <label>Selected Document — How to use it?</label>
+              <div id="doc-mode-preview" style="display:flex;align-items:center;gap:.6rem;background:var(--bg3);border:1px solid #333;border-radius:7px;padding:.55rem .8rem;font-size:.8rem;margin-bottom:.5rem;">
+                <span id="doc-mode-icon">📄</span>
+                <span id="doc-mode-name" style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                <span id="doc-mode-size" style="color:var(--text-muted);font-size:.72rem;"></span>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="doc-mode-btn active" id="mode-body" onclick="setDocMode('body')">📋 Paste text into body</button>
+                <button class="doc-mode-btn" id="mode-attach" onclick="setDocMode('attach')">📎 Download &amp; attach manually</button>
+                <button class="doc-mode-btn" id="mode-none" onclick="setDocMode('none')">✕ Don't include</button>
+              </div>
+              <div id="doc-mode-hint" style="font-size:.72rem;color:var(--text-muted);margin-top:.4rem;"></div>
+            </div>
 
             <div class="form-row" style="margin-bottom:.8rem;">
               <div>
@@ -360,16 +377,16 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 
             <div style="margin-bottom:.8rem;">
               <label>Message Body</label>
-              <textarea id="email-body" style="min-height:180px;" placeholder="Type your message here. The selected document will be attached automatically.&#10;&#10;You can also reference players by name — or keep it general for bulk sends."></textarea>
+              <textarea id="email-body" style="min-height:200px;" placeholder="Type your message here.&#10;&#10;If you chose 'Paste text into body' above, the document text will be appended when you click Open in Mail."></textarea>
             </div>
 
             <div style="background:var(--bg3);border:1px solid #2a2a2a;border-radius:7px;padding:.8rem;margin-bottom:1rem;font-size:.75rem;color:var(--text-muted);">
-              ℹ️ Clicking <strong style="color:var(--text);">Open in Mail</strong> will launch your default email client with all recipients in BCC and the composed message. Attach the document manually from the file your browser downloads, or drag it in before sending.
+              ℹ️ <strong style="color:var(--text);">Open in Mail</strong> launches your default email client (Outlook, Apple Mail, etc.) with recipients in BCC and your message pre-filled. A doc is never required — you can send without one.
             </div>
 
             <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
               <button class="btn" onclick="openInMail()" id="send-btn" disabled>✉ Open in Mail</button>
-              <button class="btn secondary" onclick="downloadDoc()" id="dl-btn" disabled>⬇ Download Doc</button>
+              <button class="btn secondary" onclick="downloadDoc()" id="dl-btn" style="display:none;">⬇ Download Doc</button>
               <button class="btn secondary" onclick="copyEmails()" id="copy-btn" disabled>📋 Copy Emails</button>
             </div>
           </div>
@@ -393,7 +410,7 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="version-badge">v1.1.0</div>
+<div class="version-badge">v1.2.0</div>
 
 <script>
 // ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -637,6 +654,23 @@ function renderSendDocSelector() {
   `).join('');
 }
 
+let docMode = 'body'; // 'body' | 'attach' | 'none'
+
+function setDocMode(mode) {
+  docMode = mode;
+  ['body','attach','none'].forEach(m => {
+    document.getElementById('mode-' + m).classList.toggle('active', m === mode);
+  });
+  const hints = {
+    body: 'Document text will be extracted and appended to the email body when you click Open in Mail.',
+    attach: 'Document will download to your computer. Drag it into your mail client before sending.',
+    none: 'The document will not be included. You can still download it separately anytime.'
+  };
+  document.getElementById('doc-mode-hint').textContent = hints[mode];
+  document.getElementById('dl-btn').style.display = mode === 'attach' ? '' : 'none';
+  updateSendButtons();
+}
+
 function selectDoc(id, el) {
   // clicking the already-selected doc deselects it
   if (selectedDocId === id) {
@@ -645,7 +679,8 @@ function selectDoc(id, el) {
       r.style.borderColor = 'transparent';
       r.style.background = 'var(--bg3)';
     });
-    document.getElementById('attach-preview-area').innerHTML = '';
+    document.getElementById('doc-mode-row').style.display = 'none';
+    document.getElementById('dl-btn').style.display = 'none';
     updateSendButtons();
     return;
   }
@@ -655,13 +690,12 @@ function selectDoc(id, el) {
     r.style.background = r.dataset.docId == id ? 'var(--surface2)' : 'var(--bg3)';
   });
   const doc = DOCS.find(d => d.id === id);
-  const area = document.getElementById('attach-preview-area');
   if (doc) {
-    area.innerHTML = `<label>Attached Document</label><div class="attach-preview" style="margin-bottom:.8rem;">
-      <span>${doc.type==='xlsx'?'📊':'📄'}</span>
-      <span class="attach-name">${escHtml(doc.name)}</span>
-      <span class="attach-size">${formatSize(doc.size)}</span>
-    </div>`;
+    document.getElementById('doc-mode-row').style.display = '';
+    document.getElementById('doc-mode-icon').textContent = doc.type === 'xlsx' ? '📊' : '📄';
+    document.getElementById('doc-mode-name').textContent = doc.name;
+    document.getElementById('doc-mode-size').textContent = formatSize(doc.size);
+    setDocMode(docMode); // re-apply current mode to refresh hint/buttons
   }
   updateSendButtons();
 }
@@ -823,25 +857,137 @@ function updateToDisplay() {
 }
 
 function updateSendButtons() {
-  const hasDoc = !!selectedDocId;
   const hasRecipients = getAllActiveEmails().length > 0;
-  document.getElementById('send-btn').disabled = !(hasDoc && hasRecipients);
-  document.getElementById('dl-btn').disabled = !hasDoc;
+  document.getElementById('send-btn').disabled = !hasRecipients;
   document.getElementById('copy-btn').disabled = !hasRecipients;
+  // dl-btn visibility is controlled by setDocMode
 }
 
-function openInMail() {
+async function openInMail() {
   const emails = getAllActiveEmails();
-  const subject = encodeURIComponent(document.getElementById('email-subject').value || '');
-  const body = encodeURIComponent(document.getElementById('email-body').value || '');
-  // BCC all — one mailto, players in BCC to protect privacy
-  const bcc = emails.join(',');
-  const mailto = `mailto:?bcc=${encodeURIComponent(bcc)}&subject=${subject}&body=${body}`;
-  window.location.href = mailto;
+  if (!emails.length) { toast('Add at least one recipient first.', 'error'); return; }
 
-  // Also trigger doc download so they can attach
-  if (selectedDocId) downloadDoc();
-  toast('Mail client opened. Attach the downloaded document before sending!', 'success');
+  let bodyText = document.getElementById('email-body').value || '';
+
+  // If mode is 'body', try to extract text from the stored dataUrl
+  if (docMode === 'body' && selectedDocId) {
+    const doc = DOCS.find(d => d.id === selectedDocId);
+    if (doc) {
+      try {
+        const extracted = await extractDocText(doc);
+        if (extracted) {
+          bodyText = bodyText
+            ? bodyText + '\n\n--- Document Content ---\n\n' + extracted
+            : extracted;
+        }
+      } catch(e) { /* extraction failed — just send body as-is */ }
+    }
+  }
+
+  // If mode is 'attach', trigger download now
+  if (docMode === 'attach' && selectedDocId) {
+    downloadDoc();
+  }
+
+  const subject = document.getElementById('email-subject').value || '';
+  const bcc = emails.join(',');
+
+  // Build mailto and trigger via <a> click (works in all browsers, unlike window.location.href)
+  const mailto = 'mailto:?bcc=' + encodeURIComponent(bcc)
+    + '&subject=' + encodeURIComponent(subject)
+    + '&body=' + encodeURIComponent(bodyText);
+
+  const a = document.createElement('a');
+  a.href = mailto;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 300);
+
+  const attachMsg = docMode === 'attach' ? ' Document downloaded — drag it in before sending.' : '';
+  toast('Opening your mail client…' + attachMsg, 'success');
+}
+
+// Extract plain text from a stored doc (best-effort; only works for docx via zip/xml)
+async function extractDocText(doc) {
+  if (doc.type !== 'docx') return null;
+  try {
+    // dataUrl is base64 — convert to binary and parse the docx zip
+    const base64 = doc.dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    // Minimal zip reader to find word/document.xml
+    const text = await readDocxText(bytes);
+    return text || null;
+  } catch(e) { return null; }
+}
+
+// Minimal DOCX text extractor — reads ZIP entries, finds word/document.xml, strips XML tags
+function readDocxText(bytes) {
+  return new Promise((resolve) => {
+    try {
+      // Find PK entries in the zip
+      const entries = [];
+      let i = 0;
+      while (i < bytes.length - 4) {
+        if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
+          const fnLen = bytes[i+26] | (bytes[i+27]<<8);
+          const extraLen = bytes[i+28] | (bytes[i+29]<<8);
+          const compSize = bytes[i+18] | (bytes[i+19]<<8) | (bytes[i+20]<<16) | (bytes[i+21]<<24);
+          const fnBytes = bytes.slice(i+30, i+30+fnLen);
+          const fn = new TextDecoder().decode(fnBytes);
+          const dataStart = i + 30 + fnLen + extraLen;
+          entries.push({ fn, dataStart, compSize, method: bytes[i+8] | (bytes[i+9]<<8) });
+          i = dataStart + compSize;
+        } else { i++; }
+      }
+
+      const xmlEntry = entries.find(e => e.fn === 'word/document.xml');
+      if (!xmlEntry) { resolve(null); return; }
+
+      let xmlBytes = bytes.slice(xmlEntry.dataStart, xmlEntry.dataStart + xmlEntry.compSize);
+
+      // Method 8 = deflate; method 0 = stored
+      if (xmlEntry.method === 8) {
+        // Use DecompressionStream if available
+        if (typeof DecompressionStream !== 'undefined') {
+          const ds = new DecompressionStream('deflate-raw');
+          const writer = ds.writable.getWriter();
+          writer.write(xmlBytes);
+          writer.close();
+          const reader = ds.readable.getReader();
+          const chunks = [];
+          const pump = () => reader.read().then(({ done, value }) => {
+            if (done) {
+              const out = new Uint8Array(chunks.reduce((a,c) => a+c.length, 0));
+              let off = 0;
+              chunks.forEach(c => { out.set(c, off); off += c.length; });
+              const xml = new TextDecoder().decode(out);
+              resolve(xmlToText(xml));
+            } else { chunks.push(value); pump(); }
+          });
+          pump();
+        } else { resolve(null); } // no DecompressionStream — skip
+      } else {
+        const xml = new TextDecoder().decode(xmlBytes);
+        resolve(xmlToText(xml));
+      }
+    } catch(e) { resolve(null); }
+  });
+}
+
+function xmlToText(xml) {
+  // Extract text from <w:t> tags, insert line breaks at <w:p>
+  return xml
+    .replace(/<w:p[ >][^>]*>/g, '\n')
+    .replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
 }
 
 function downloadDoc() {
