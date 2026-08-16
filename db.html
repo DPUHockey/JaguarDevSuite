@@ -3137,6 +3137,56 @@ function renderDashboard(){
       +'<div style="font-size:18px;font-weight:700;color:#F07050;">'+a.pct+'%</div></div>';
   }).join('');
 
+
+  // ---- FULL ROSTER TABLE ----
+  const rosterRows=(()=>{
+    const seen={};const rows=[];
+    const sessions=_dashSessFilter===0?[1,2,3,4,5,6]:[_dashSessFilter];
+    sessions.forEach(s=>{
+      ['lj1','lj2','lj3','ph1','ph2','ph3'].forEach(g=>{
+        const grpRows=getGroupRows(s,g),dates=getSessionDates(s);
+        grpRows.forEach(r=>{
+          const k=(r.first_name||'')+'_'+(r.last_name||'');
+          if(seen[k])return;seen[k]=true;
+          const pa=window.attendData[s]?.[g]?.[playerKey(r)]||{};
+          const att=dates.length?dates.filter(d=>pa[d]).length:0;
+          const pct=dates.length?Math.round(att/dates.length*100):null;
+          const mi=DB.master.findIndex(m=>m.first_name===r.first_name&&m.last_name===r.last_name);
+          rows.push({r,s,g:g.toUpperCase(),att,total:dates.length,pct,mi});
+        });
+      });
+    });
+    return rows.sort((a,b)=>{
+      const la=a.r.level||'',lb=b.r.level||'';
+      if(la<lb)return -1;if(la>lb)return 1;
+      return (a.r.last_name||'').localeCompare(b.r.last_name||'');
+    });
+  })();
+  const rosterSection=(()=>{
+    if(!rosterRows.length)return'';
+    const trs=rosterRows.map(({r,s,g,att,total,pct,mi})=>{
+      const low=pct!==null&&pct<60;
+      const nm=mi>=0?'<span onclick="openPlayerCard('+mi+')" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;">'+(r.first_name||'')+' '+(r.last_name||'')+'</span>':(r.first_name||'')+' '+(r.last_name||'');
+      const pc=pct===null?'<span style="color:var(--dim);font-size:10px;">—</span>':low?'<span style="color:#F07050;font-weight:700;">'+pct+'%</span>':'<span style="color:#5CCC88;font-weight:600;">'+pct+'%</span>';
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.04);'+(low?'background:rgba(240,112,80,.05);':'')+'"><td style="padding:5px 8px;font-size:12px;white-space:nowrap;">'+nm+'</td><td style="padding:5px 8px;font-size:11px;text-align:center;">'+lvBadge(r.level)+'</td><td style="padding:5px 8px;font-size:11px;color:var(--dim);text-align:center;">S'+s+'</td><td style="padding:5px 8px;font-size:11px;color:var(--dim);text-align:center;">'+(total?att+'/'+total:'—')+'</td><td style="padding:5px 8px;text-align:center;">'+pc+(low?' &#9650;':'')+'</td></tr>';
+    }).join('');
+    const tot=rosterRows.length,u60=rosterRows.filter(x=>x.pct!==null&&x.pct<60).length;
+    const th=s=>'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:'+s+';">'+arguments[1]+'</th>';
+    return '<div style="margin-top:4px;">'
+      +'<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;">'
+      +'<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);">All Athletes</div>'
+      +'<div style="font-size:11px;color:var(--dim);">'+tot+' in this view &middot; <span style="color:#F07050;">'+u60+' under 60%</span></div></div>'
+      +'<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;">'
+      +'<table style="width:100%;border-collapse:collapse;">'
+      +'<thead><tr style="background:var(--surf2);">'
+      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:left;">Athlete</th>'
+      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Level</th>'
+      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Sess</th>'
+      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Days</th>'
+      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Attend %</th>'
+      +'</tr></thead><tbody>'+trs+'</tbody></table></div></div>';
+  })();
+
   div.innerHTML='<div style="padding:0 0 28px;">'
     +'<div class="toolbar"><div class="toolbar-left">Program Dashboard</div><div style="display:flex;gap:6px;"><button class="btn-sm" onclick="exportEmailList()">Export Emails</button><button class="btn-sm" onclick="printRoster()">Print Roster</button></div></div>'
     +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;"><div class="dash-stat-big"><div class="dash-big-num">'+all.length+'</div><div class="dash-big-lbl">Total</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:#5CCC88;">'+act+'</div><div class="dash-big-lbl">Active</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:var(--dim);">'+inact+'</div><div class="dash-big-lbl">Inactive</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:#F07050;">'+lost+'</div><div class="dash-big-lbl">Lost</div></div></div>'
@@ -3156,7 +3206,7 @@ function renderDashboard(){
     +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);">Sessions</div>'
     +'<div style="font-size:11px;color:var(--dim);">Click a session to filter attendance &uarr;</div></div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;">'+cards+'</div>'
-    +'</div>';
+    +rosterSection+'</div>';
 }
 
 function setDashSessFilter(s){
