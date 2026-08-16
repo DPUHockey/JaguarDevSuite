@@ -410,10 +410,10 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="version-badge">v1.4.0</div>
+<div class="version-badge">v1.5.0</div>
 
 <script>
-// ── AUTH ──────────────────────────────────────────────────────────────────────
+// -- AUTH ----------------------------------------------------------------------
 const DEFAULT_PIN = '9451';
 const SESSION_KEY = 'jds_auth';
 const PIN_KEY = 'jds_pin';
@@ -428,7 +428,7 @@ function checkPin() {
     document.getElementById('app').style.display = 'block';
     init();
   } else {
-    err.textContent = 'Incorrect code — try again';
+    err.textContent = 'Incorrect code - try again';
     inp.classList.add('shake');
     inp.value = '';
     setTimeout(() => inp.classList.remove('shake'), 450);
@@ -449,7 +449,7 @@ if (sessionStorage.getItem(SESSION_KEY) === '1') {
   document.addEventListener('DOMContentLoaded', init);
 }
 
-// ── STORAGE ───────────────────────────────────────────────────────────────────
+// -- STORAGE -------------------------------------------------------------------
 const DOCS_KEY = 'jds_documents_v1';
 let DOCS = [];
 
@@ -461,13 +461,13 @@ function loadDocs() {
 }
 function saveDocs() {
   try { localStorage.setItem(DOCS_KEY, JSON.stringify(DOCS)); } catch(e) {
-    toast('Storage full — try removing old documents.', 'error');
+    toast('Storage full - try removing old documents.', 'error');
   }
 }
 
 // Doc shape: { id, name, desc, levels:[], type:'docx'|'xlsx', size, dateAdded, dataUrl }
 
-// ── TABS ──────────────────────────────────────────────────────────────────────
+// -- TABS ----------------------------------------------------------------------
 function switchTab(name) {
   ['library','upload','send'].forEach(t => {
     document.getElementById('pane-' + t).style.display = t === name ? '' : 'none';
@@ -477,14 +477,14 @@ function switchTab(name) {
   if (name === 'send') { renderSendDocSelector(); renderPlayerTable(); }
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+// -- INIT ----------------------------------------------------------------------
 function init() {
   loadDocs();
   renderLibrary();
   setupUploadZone();
 }
 
-// ── UPLOAD ────────────────────────────────────────────────────────────────────
+// -- UPLOAD --------------------------------------------------------------------
 let pendingFiles = [];
 
 function setupUploadZone() {
@@ -570,7 +570,7 @@ function saveUpload() {
   });
 }
 
-// ── LIBRARY ───────────────────────────────────────────────────────────────────
+// -- LIBRARY -------------------------------------------------------------------
 let activeFilter = 'all';
 
 function setFilter(f, btn) {
@@ -595,15 +595,15 @@ function renderLibrary() {
 
   grid.innerHTML = docs.map(d => `
     <div class="doc-card">
-      <button class="doc-card-del" onclick="deleteDoc(${d.id})" title="Remove">✕</button>
+      <button class="doc-card-del" onclick="deleteDoc(${d.id})" title="Remove">?</button>
       <div class="doc-card-icon">${d.type==='xlsx'?'📊':'📄'}</div>
       <div class="doc-card-name">${escHtml(d.name)}</div>
       ${d.desc ? `<div class="doc-card-meta">${escHtml(d.desc)}</div>` : ''}
-      <div class="doc-card-meta">${formatSize(d.size)} · Added ${d.dateAdded}</div>
+      <div class="doc-card-meta">${formatSize(d.size)} ? Added ${d.dateAdded}</div>
       <div class="doc-card-tags">${(d.levels||[]).map(l => `<span class="badge badge-${l.toLowerCase()}">${l}</span>`).join('')}</div>
       <div class="doc-card-actions">
-        <button class="btn sm" onclick="downloadDocById(${d.id})">⬇ Download</button>
-        <button class="btn sm secondary" onclick="startSendWith(${d.id})">✉ Send</button>
+        <button class="btn sm" onclick="downloadDocById(${d.id})">? Download</button>
+        <button class="btn sm secondary" onclick="startSendWith(${d.id})">? Send</button>
       </div>
     </div>
   `).join('');
@@ -623,7 +623,7 @@ function downloadDocById(id) {
   triggerDownload(doc.dataUrl, doc.originalName || doc.name + (doc.type==='xlsx'?'.xlsx':'.docx'));
 }
 
-// ── SEND TAB ─────────────────────────────────────────────────────────────────
+// -- SEND TAB -----------------------------------------------------------------
 let selectedDocId = null;
 let playerFilters = new Set();
 let selectedPlayers = new Set(); // set of player id strings
@@ -640,7 +640,7 @@ function renderSendDocSelector() {
   loadDocs();
   const el = document.getElementById('send-doc-selector');
   if (!DOCS.length) {
-    el.innerHTML = '<div class="empty-state" style="padding:1rem;">No documents yet. <a href="#" onclick="switchTab(\'upload\');return false;" style="color:var(--gold);">Upload one →</a></div>';
+    el.innerHTML = '<div class="empty-state" style="padding:1rem;">No documents yet. <a href="#" onclick="switchTab(\'upload\');return false;" style="color:var(--gold);">Upload one ?</a></div>';
     return;
   }
   el.innerHTML = DOCS.map(d => `
@@ -648,7 +648,7 @@ function renderSendDocSelector() {
       <span style="font-size:1.4rem;">${d.type==='xlsx'?'📊':'📄'}</span>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(d.name)}</div>
-        <div style="font-size:.7rem;color:var(--text-muted);">${(d.levels||[]).join(', ')||'No level tags'} · ${formatSize(d.size)}</div>
+        <div style="font-size:.7rem;color:var(--text-muted);">${(d.levels||[]).join(', ')||'No level tags'} ? ${formatSize(d.size)}</div>
       </div>
     </div>
   `).join('');
@@ -754,8 +754,8 @@ function renderPlayerTable() {
       <td><input type="checkbox" class="chk player-chk" ${chk?'checked':''} data-pid="${escAttr(pid)}" onchange="togglePlayer('${escAttr(pid)}',this.closest('tr'));event.stopPropagation()"/></td>
       <td><strong>${escHtml(p.first_name)} ${escHtml(p.last_name)}</strong></td>
       <td>${lvlClass ? `<span class="badge badge-${lvlClass}">${escHtml(lvl)}</span>` : escHtml(lvl)}</td>
-      <td style="font-size:.75rem;color:var(--text-muted);">${escHtml(p.parent1_email||'—')}</td>
-      <td style="font-size:.75rem;color:var(--text-muted);">${escHtml(p.parent2_email||'—')}</td>
+      <td style="font-size:.75rem;color:var(--text-muted);">${escHtml(p.parent1_email||'-')}</td>
+      <td style="font-size:.75rem;color:var(--text-muted);">${escHtml(p.parent2_email||'-')}</td>
     </tr>`;
   }).join('');
 
@@ -850,9 +850,9 @@ function updateToDisplay() {
     el.innerHTML = '<span style="color:var(--text-muted);">Select players on the left, or add emails manually above.</span>';
   } else {
     el.innerHTML = emails.map(e =>
-      `<span class="email-chip" data-email="${escHtml(e)}" title="Click to remove">${escHtml(e)}<span class="email-chip-x">✕</span></span>`
+      `<span class="email-chip" data-email="${escHtml(e)}" title="Click to remove">${escHtml(e)}<span class="email-chip-x">?</span></span>`
     ).join('');
-    // bind clicks via event delegation — avoids escaping issues with inline handlers
+    // bind clicks via event delegation - avoids escaping issues with inline handlers
     el.querySelectorAll('.email-chip').forEach(chip => {
       chip.addEventListener('click', () => removeEmail(chip.dataset.email));
     });
@@ -884,29 +884,19 @@ function openInMail() {
   const subject = document.getElementById('email-subject').value || '';
   let bodyText = document.getElementById('email-body').value || '';
 
-  // Append doc note to body synchronously (no async needed — extraction is too unreliable)
+  // Append doc note to body synchronously (no async needed - extraction is too unreliable)
   if (selectedDocId && docMode !== 'none') {
     const doc = DOCS.find(d => d.id === selectedDocId);
     if (doc) {
       if (docMode === 'attach') {
-        // Trigger download first, then open mail
         downloadDoc();
-        bodyText += (bodyText ? '
-
-' : '') + '[See attached: ' + doc.name + ']';
+        bodyText += (bodyText ? '\n\n' : '') + '[See attached: ' + doc.name + ']';
       } else if (docMode === 'body') {
-        // Try fast sync extraction — if it fails, add a note
         const extracted = extractDocTextSync(doc);
         if (extracted) {
-          bodyText += (bodyText ? '
-
---- ' + doc.name + ' ---
-
-' : '') + extracted;
+          bodyText += (bodyText ? '\n\n--- ' + doc.name + ' ---\n\n' : '') + extracted;
         } else {
-          bodyText += (bodyText ? '
-
-' : '') + '[Document content: ' + doc.name + ' — see the Downloads folder if you chose to download it.]';
+          bodyText += (bodyText ? '\n\n' : '') + '[Document: ' + doc.name + ' - download separately and reference as needed.]';
         }
       }
     }
@@ -917,7 +907,7 @@ function openInMail() {
     + '&subject=' + encodeURIComponent(subject)
     + '&body=' + encodeURIComponent(bodyText);
 
-  // Must be synchronous — async breaks the user-gesture chain and browsers block mailto
+  // Must be synchronous - async breaks the user-gesture chain and browsers block mailto
   const a = document.createElement('a');
   a.href = mailto;
   a.target = '_self';
@@ -978,7 +968,7 @@ function downloadDoc() {
   const doc = DOCS.find(d => d.id === selectedDocId);
   if (!doc) return;
   triggerDownload(doc.dataUrl, doc.originalName || doc.name + (doc.type==='xlsx'?'.xlsx':'.docx'));
-  toast('Document downloaded — attach it to your email.', 'success');
+  toast('Document downloaded - attach it to your email.', 'success');
 }
 
 function copyEmails() {
@@ -992,7 +982,7 @@ function copyEmails() {
   navigator.clipboard.writeText(emails.join('; ')).then(() => toast('Email addresses copied!', 'success'));
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
+// -- HELPERS -------------------------------------------------------------------
 function triggerDownload(dataUrl, filename) {
   const a = document.createElement('a');
   a.href = dataUrl;
