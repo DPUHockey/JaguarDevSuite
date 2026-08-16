@@ -3167,23 +3167,23 @@ function renderDashboard(){
     const trs=rosterRows.map(({r,s,g,att,total,pct,mi})=>{
       const low=pct!==null&&pct<60;
       const nm=mi>=0?'<span onclick="openPlayerCard('+mi+')" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;">'+(r.first_name||'')+' '+(r.last_name||'')+'</span>':(r.first_name||'')+' '+(r.last_name||'');
-      const pc=pct===null?'<span style="color:var(--dim);font-size:10px;">—</span>':low?'<span style="color:#F07050;font-weight:700;">'+pct+'%</span>':'<span style="color:#5CCC88;font-weight:600;">'+pct+'%</span>';
-      return '<tr style="border-bottom:1px solid rgba(255,255,255,.04);'+(low?'background:rgba(240,112,80,.05);':'')+'"><td style="padding:5px 8px;font-size:12px;white-space:nowrap;">'+nm+'</td><td style="padding:5px 8px;font-size:11px;text-align:center;">'+lvBadge(r.level)+'</td><td style="padding:5px 8px;font-size:11px;color:var(--dim);text-align:center;">S'+s+'</td><td style="padding:5px 8px;font-size:11px;color:var(--dim);text-align:center;">'+(total?att+'/'+total:'—')+'</td><td style="padding:5px 8px;text-align:center;">'+pc+(low?' &#9650;':'')+'</td></tr>';
+      const pc=pct===null?'<span style="color:var(--dim);font-size:10px;">no dates</span>':low?'<span style="color:#F07050;font-weight:700;">'+pct+'%</span>':'<span style="color:#5CCC88;font-weight:600;">'+pct+'%</span>';
+      return '<tr style="border-bottom:1px solid rgba(255,255,255,.04);'+(low?'background:rgba(240,112,80,.05);':'')+'"><td style="padding:5px 8px;font-size:12px;white-space:nowrap;">'+nm+'</td><td style="padding:5px 8px;font-size:11px;text-align:center;">'+lvBadge(r.level)+'</td><td style="padding:5px 8px;font-size:11px;color:var(--dim);text-align:center;">S'+s+'</td><td style="padding:5px 8px;font-size:11px;color:var(--dim);text-align:center;">'+(total?att+'/'+total:'--')+'</td><td style="padding:5px 8px;text-align:center;">'+pc+(low?' &#9650;':'')+'</td></tr>';
     }).join('');
     const tot=rosterRows.length,u60=rosterRows.filter(x=>x.pct!==null&&x.pct<60).length;
-    const th=s=>'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:'+s+';">'+arguments[1]+'</th>';
+    const th='padding:6px 8px;font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);';
     return '<div style="margin-top:4px;">'
       +'<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px;">'
-      +'<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);">All Athletes</div>'
+      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);">All Athletes</div>'
       +'<div style="font-size:11px;color:var(--dim);">'+tot+' in this view &middot; <span style="color:#F07050;">'+u60+' under 60%</span></div></div>'
       +'<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;">'
       +'<table style="width:100%;border-collapse:collapse;">'
       +'<thead><tr style="background:var(--surf2);">'
-      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:left;">Athlete</th>'
-      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Level</th>'
-      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Sess</th>'
-      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Days</th>'
-      +'<th style="padding:6px 8px;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);text-align:center;">Attend %</th>'
+      +'<th style="'+th+'text-align:left;">Athlete</th>'
+      +'<th style="'+th+'text-align:center;">Level</th>'
+      +'<th style="'+th+'text-align:center;">Sess</th>'
+      +'<th style="'+th+'text-align:center;">Days</th>'
+      +'<th style="'+th+'text-align:center;">Attend %</th>'
       +'</tr></thead><tbody>'+trs+'</tbody></table></div></div>';
   })();
 
