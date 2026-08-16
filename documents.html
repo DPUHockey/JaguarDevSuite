@@ -410,7 +410,7 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="version-badge">v1.3.0</div>
+<div class="version-badge">v1.4.0</div>
 
 <script>
 // ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -850,8 +850,12 @@ function updateToDisplay() {
     el.innerHTML = '<span style="color:var(--text-muted);">Select players on the left, or add emails manually above.</span>';
   } else {
     el.innerHTML = emails.map(e =>
-      `<span class="email-chip" onclick="removeEmail('${escAttr(e)}')" title="Click to remove">${escHtml(e)}<span class="email-chip-x">✕</span></span>`
+      `<span class="email-chip" data-email="${escHtml(e)}" title="Click to remove">${escHtml(e)}<span class="email-chip-x">✕</span></span>`
     ).join('');
+    // bind clicks via event delegation — avoids escaping issues with inline handlers
+    el.querySelectorAll('.email-chip').forEach(chip => {
+      chip.addEventListener('click', () => removeEmail(chip.dataset.email));
+    });
   }
   updateSendButtons();
 }
@@ -867,7 +871,7 @@ function updateSendButtons() {
 
 function previewSendState() { updateSendButtons(); }
 
-async function openInMail() {
+function openInMail() {
   // Auto-commit anything still typed in the manual email box
   const inp = document.getElementById('manual-email');
   if (inp && inp.value.trim()) {
@@ -877,123 +881,85 @@ async function openInMail() {
   const emails = getAllActiveEmails();
   if (!emails.length) { toast('Add at least one recipient first.', 'error'); return; }
 
+  const subject = document.getElementById('email-subject').value || '';
   let bodyText = document.getElementById('email-body').value || '';
 
-  // If mode is 'body', try to extract text from the stored dataUrl
-  if (docMode === 'body' && selectedDocId) {
+  // Append doc note to body synchronously (no async needed — extraction is too unreliable)
+  if (selectedDocId && docMode !== 'none') {
     const doc = DOCS.find(d => d.id === selectedDocId);
     if (doc) {
-      try {
-        const extracted = await extractDocText(doc);
-        if (extracted && extracted.length > 10) {
-          bodyText = bodyText
-            ? bodyText + '\n\n--- ' + doc.name + ' ---\n\n' + extracted
-            : extracted;
+      if (docMode === 'attach') {
+        // Trigger download first, then open mail
+        downloadDoc();
+        bodyText += (bodyText ? '
+
+' : '') + '[See attached: ' + doc.name + ']';
+      } else if (docMode === 'body') {
+        // Try fast sync extraction — if it fails, add a note
+        const extracted = extractDocTextSync(doc);
+        if (extracted) {
+          bodyText += (bodyText ? '
+
+--- ' + doc.name + ' ---
+
+' : '') + extracted;
         } else {
-          // Extraction failed or returned nothing — insert a placeholder
-          const note = '\n\n[Document: ' + doc.name + ' — copy not available in body. Download and reference separately.]';
-          bodyText = (bodyText || '') + note;
+          bodyText += (bodyText ? '
+
+' : '') + '[Document content: ' + doc.name + ' — see the Downloads folder if you chose to download it.]';
         }
-      } catch(e) {
-        const note = '\n\n[Document: ' + doc.name + ' — could not extract text. Download separately.]';
-        bodyText = (bodyText || '') + note;
       }
     }
   }
 
-  // If mode is 'attach', trigger download now
-  if (docMode === 'attach' && selectedDocId) {
-    downloadDoc();
-  }
-
-  const subject = document.getElementById('email-subject').value || '';
   const bcc = emails.join(',');
-
-  // Build mailto and trigger via <a> click (works in all browsers, unlike window.location.href)
   const mailto = 'mailto:?bcc=' + encodeURIComponent(bcc)
     + '&subject=' + encodeURIComponent(subject)
     + '&body=' + encodeURIComponent(bodyText);
 
+  // Must be synchronous — async breaks the user-gesture chain and browsers block mailto
   const a = document.createElement('a');
   a.href = mailto;
-  a.style.display = 'none';
+  a.target = '_self';
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => document.body.removeChild(a), 300);
+  document.body.removeChild(a);
 
-  const attachMsg = docMode === 'attach' ? ' Document downloaded — drag it in before sending.' : '';
-  toast('Opening your mail client…' + attachMsg, 'success');
+  toast('Mail client should open now. If nothing happened, check your default mail app is set.', 'success');
 }
 
-// Extract plain text from a stored doc (best-effort; only works for docx via zip/xml)
-async function extractDocText(doc) {
+// Synchronous best-effort docx text extractor (stored/uncompressed entries only)
+function extractDocTextSync(doc) {
   if (doc.type !== 'docx') return null;
   try {
-    // dataUrl is base64 — convert to binary and parse the docx zip
     const base64 = doc.dataUrl.split(',')[1];
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-    // Minimal zip reader to find word/document.xml
-    const text = await readDocxText(bytes);
-    return text || null;
+    // Walk ZIP local file headers looking for word/document.xml with method=0 (stored)
+    let i = 0;
+    while (i < bytes.length - 30) {
+      if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
+        const method   = bytes[i+8]  | (bytes[i+9]  << 8);
+        const compSize = bytes[i+18] | (bytes[i+19]<<8) | (bytes[i+20]<<16) | (bytes[i+21]<<24);
+        const fnLen    = bytes[i+26] | (bytes[i+27] << 8);
+        const extraLen = bytes[i+28] | (bytes[i+29] << 8);
+        const fn = new TextDecoder().decode(bytes.slice(i+30, i+30+fnLen));
+        const dataStart = i + 30 + fnLen + extraLen;
+        if (fn === 'word/document.xml' && method === 0) {
+          const xml = new TextDecoder().decode(bytes.slice(dataStart, dataStart + compSize));
+          return xmlToText(xml);
+        }
+        i = dataStart + Math.max(compSize, 0);
+        if (compSize === 0) i++; // guard against infinite loop on zero-length entries
+      } else { i++; }
+    }
+    return null;
   } catch(e) { return null; }
 }
 
-// Minimal DOCX text extractor — reads ZIP entries, finds word/document.xml, strips XML tags
-function readDocxText(bytes) {
-  return new Promise((resolve) => {
-    try {
-      // Find PK entries in the zip
-      const entries = [];
-      let i = 0;
-      while (i < bytes.length - 4) {
-        if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
-          const fnLen = bytes[i+26] | (bytes[i+27]<<8);
-          const extraLen = bytes[i+28] | (bytes[i+29]<<8);
-          const compSize = bytes[i+18] | (bytes[i+19]<<8) | (bytes[i+20]<<16) | (bytes[i+21]<<24);
-          const fnBytes = bytes.slice(i+30, i+30+fnLen);
-          const fn = new TextDecoder().decode(fnBytes);
-          const dataStart = i + 30 + fnLen + extraLen;
-          entries.push({ fn, dataStart, compSize, method: bytes[i+8] | (bytes[i+9]<<8) });
-          i = dataStart + compSize;
-        } else { i++; }
-      }
 
-      const xmlEntry = entries.find(e => e.fn === 'word/document.xml');
-      if (!xmlEntry) { resolve(null); return; }
-
-      let xmlBytes = bytes.slice(xmlEntry.dataStart, xmlEntry.dataStart + xmlEntry.compSize);
-
-      // Method 8 = deflate; method 0 = stored
-      if (xmlEntry.method === 8) {
-        // Use DecompressionStream if available
-        if (typeof DecompressionStream !== 'undefined') {
-          const ds = new DecompressionStream('deflate-raw');
-          const writer = ds.writable.getWriter();
-          writer.write(xmlBytes);
-          writer.close();
-          const reader = ds.readable.getReader();
-          const chunks = [];
-          const pump = () => reader.read().then(({ done, value }) => {
-            if (done) {
-              const out = new Uint8Array(chunks.reduce((a,c) => a+c.length, 0));
-              let off = 0;
-              chunks.forEach(c => { out.set(c, off); off += c.length; });
-              const xml = new TextDecoder().decode(out);
-              resolve(xmlToText(xml));
-            } else { chunks.push(value); pump(); }
-          });
-          pump();
-        } else { resolve(null); } // no DecompressionStream — skip
-      } else {
-        const xml = new TextDecoder().decode(xmlBytes);
-        resolve(xmlToText(xml));
-      }
-    } catch(e) { resolve(null); }
-  });
-}
 
 function xmlToText(xml) {
   // Extract text from <w:t> tags, insert line breaks at <w:p>
