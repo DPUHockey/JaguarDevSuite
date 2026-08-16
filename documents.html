@@ -3,391 +3,300 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Documents · Jaguar Dev Suite</title>
+<title>Documents - Jaguar Dev Suite</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-:root {
-  --gold: #C9A84C;
-  --gold-light: #E8C96A;
-  --gold-dark: #8B6914;
-  --bg: #0a0a0a;
-  --bg2: #111111;
-  --bg3: #1a1a1a;
-  --surface: #1e1e1e;
-  --surface2: #252525;
-  --text: #f0f0f0;
-  --text-muted: #888;
-  --error: #e05252;
-  --success: #4caf50;
-  --lj-color: #5CCC88;
-  --ph-color: #F07050;
-  --adm-color: #C9A84C;
-  --ih-color: #6AAFE8;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
-
-/* ── GATE ── */
-#gate { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:2rem; }
-.gate-logo { font-family:'Bebas Neue',sans-serif; font-size:clamp(2.5rem,8vw,5rem); color:var(--gold); letter-spacing:.08em; line-height:1; text-align:center; }
-.gate-sub { font-size:.85rem; font-weight:600; letter-spacing:.25em; text-transform:uppercase; color:var(--text-muted); margin:.4rem 0 2.5rem; text-align:center; }
-.gate-box { background:var(--surface); border:1px solid #2a2a2a; border-radius:12px; padding:2.5rem 2rem; width:100%; max-width:360px; display:flex; flex-direction:column; align-items:center; gap:1.2rem; }
-.gate-label { font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:.12em; color:var(--gold); }
-#pin-input { width:100%; background:var(--bg2); border:2px solid #2a2a2a; border-radius:8px; color:var(--text); font-family:'Bebas Neue',sans-serif; font-size:2rem; letter-spacing:.4em; text-align:center; padding:.75rem 1rem; outline:none; transition:border-color .2s; -webkit-text-security:disc; }
-#pin-input:focus { border-color:var(--gold); }
-#pin-input.shake { animation:shake .4s ease; border-color:var(--error); }
-@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
-.gate-btn { width:100%; background:var(--gold); color:#000; border:none; border-radius:8px; font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:.15em; padding:.85rem; cursor:pointer; transition:background .2s; }
-.gate-btn:hover { background:var(--gold-light); }
-.gate-error { color:var(--error); font-size:.8rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; min-height:1.2em; text-align:center; }
-
-/* ── HEADER ── */
-#app { display:none; }
-header { background:var(--bg2); border-bottom:2px solid var(--gold-dark); padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; position:sticky; top:0; z-index:50; }
-.header-title { font-family:'Bebas Neue',sans-serif; font-size:clamp(1.4rem,4vw,2rem); color:var(--gold); letter-spacing:.08em; line-height:1; }
-.header-sub { font-size:.7rem; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:var(--text-muted); }
-.header-right { display:flex; gap:.75rem; }
-.hbtn { background:transparent; border:1px solid var(--gold-dark); color:var(--gold); font-family:'Barlow',sans-serif; font-size:.75rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase; padding:.4rem .9rem; border-radius:6px; cursor:pointer; transition:background .2s,color .2s; text-decoration:none; }
-.hbtn:hover { background:var(--gold-dark); color:#fff; }
-
-/* ── TABS ── */
-.tab-bar { display:flex; gap:0; border-bottom:2px solid #222; background:var(--bg2); padding:0 1.5rem; }
-.tab { font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:.12em; color:var(--text-muted); padding:.85rem 1.4rem; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:color .2s,border-color .2s; white-space:nowrap; }
-.tab:hover { color:var(--text); }
-.tab.active { color:var(--gold); border-bottom-color:var(--gold); }
-
-/* ── MAIN ── */
-main { padding:2rem 1.5rem 5rem; max-width:1100px; margin:0 auto; }
-.section-label { font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:.2em; color:var(--text-muted); margin-bottom:1rem; margin-top:2rem; padding-bottom:.4rem; border-bottom:1px solid #222; }
-.section-label:first-child { margin-top:0; }
-
-/* ── CARDS ── */
-.card { background:var(--surface); border:1px solid #2a2a2a; border-radius:10px; padding:1.5rem; margin-bottom:1.2rem; }
-.card-title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.1em; color:var(--gold); margin-bottom:.6rem; }
-.card-sub { font-size:.8rem; color:var(--text-muted); margin-bottom:1rem; line-height:1.5; }
-
-/* ── BUTTONS ── */
-.btn { display:inline-flex; align-items:center; gap:.4rem; background:var(--gold); color:#000; border:none; border-radius:7px; font-family:'Barlow',sans-serif; font-size:.8rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:.55rem 1.1rem; cursor:pointer; transition:background .2s; }
-.btn:hover { background:var(--gold-light); }
-.btn.secondary { background:transparent; border:1px solid var(--gold-dark); color:var(--gold); }
-.btn.secondary:hover { background:var(--gold-dark); color:#fff; }
-.btn.danger { background:#8B2020; color:#fff; }
-.btn.danger:hover { background:#a02828; }
-.btn.sm { font-size:.72rem; padding:.35rem .75rem; }
-.btn:disabled { opacity:.4; cursor:not-allowed; pointer-events:none; }
-
-/* ── INPUTS ── */
-input[type=text], input[type=email], textarea, select {
-  background:var(--bg2); border:1px solid #333; border-radius:7px; color:var(--text);
-  font-family:'Barlow',sans-serif; font-size:.85rem; padding:.55rem .8rem; outline:none;
-  transition:border-color .2s; width:100%;
-}
-input:focus, textarea:focus, select:focus { border-color:var(--gold); }
-textarea { resize:vertical; min-height:120px; }
-.form-row { display:grid; gap:.8rem; margin-bottom:.8rem; }
-.form-row.cols-2 { grid-template-columns:1fr 1fr; }
-.form-row.cols-3 { grid-template-columns:1fr 1fr 1fr; }
-label { font-size:.75rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:.3rem; }
-
-/* ── UPLOAD ZONE ── */
-.upload-zone { border:2px dashed #333; border-radius:10px; padding:2.5rem; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; }
-.upload-zone:hover, .upload-zone.drag-over { border-color:var(--gold); background:rgba(201,168,76,.05); }
-.upload-zone-icon { font-size:2.5rem; margin-bottom:.6rem; }
-.upload-zone-label { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; letter-spacing:.1em; color:var(--gold); margin-bottom:.3rem; }
-.upload-zone-sub { font-size:.78rem; color:var(--text-muted); }
-#file-input { display:none; }
-
-/* ── LEVEL BADGES ── */
-.badge { display:inline-block; font-size:.65rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:.15rem .45rem; border-radius:4px; }
-.badge-lj { background:rgba(92,204,136,.15); color:var(--lj-color); }
-.badge-ph { background:rgba(240,112,80,.15); color:var(--ph-color); }
-.badge-adm { background:rgba(201,168,76,.15); color:var(--adm-color); }
-.badge-ih { background:rgba(106,175,232,.15); color:var(--ih-color); }
-
-/* ── DOCUMENT LIBRARY ── */
-.doc-filters { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1.2rem; align-items:center; }
-.filter-btn { background:var(--surface2); border:1px solid #333; color:var(--text-muted); font-family:'Barlow',sans-serif; font-size:.75rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; padding:.4rem .9rem; border-radius:20px; cursor:pointer; transition:all .2s; }
-.filter-btn:hover { border-color:var(--gold-dark); color:var(--text); }
-.filter-btn.active { background:var(--gold-dark); border-color:var(--gold); color:#fff; }
-.filter-btn.lj.active { background:rgba(92,204,136,.25); border-color:var(--lj-color); color:var(--lj-color); }
-.filter-btn.ph.active { background:rgba(240,112,80,.25); border-color:var(--ph-color); color:var(--ph-color); }
-.filter-btn.adm.active { background:rgba(201,168,76,.2); border-color:var(--adm-color); color:var(--adm-color); }
-.filter-btn.ih.active { background:rgba(106,175,232,.2); border-color:var(--ih-color); color:var(--ih-color); }
-
-.doc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:1rem; }
-.doc-card { background:var(--bg3); border:1px solid #2a2a2a; border-radius:9px; padding:1.2rem; display:flex; flex-direction:column; gap:.6rem; transition:border-color .2s,transform .15s; position:relative; }
-.doc-card:hover { border-color:var(--gold-dark); transform:translateY(-1px); }
-.doc-card-icon { font-size:2rem; line-height:1; }
-.doc-card-name { font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:.06em; color:var(--text); line-height:1.2; }
-.doc-card-meta { font-size:.72rem; color:var(--text-muted); }
-.doc-card-tags { display:flex; gap:.3rem; flex-wrap:wrap; }
-.doc-card-actions { display:flex; gap:.5rem; margin-top:.3rem; }
-.doc-card-del { position:absolute; top:.6rem; right:.6rem; background:transparent; border:none; color:#444; font-size:.85rem; cursor:pointer; transition:color .2s; padding:.1rem; }
-.doc-card-del:hover { color:var(--error); }
-.empty-state { text-align:center; color:var(--text-muted); padding:3rem 1rem; font-size:.85rem; }
-
-/* ── PLAYER PICKER ── */
-.player-filters { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center; }
-.player-search { max-width:300px; }
-.player-table-wrap { overflow-x:auto; border-radius:8px; border:1px solid #2a2a2a; }
-table { width:100%; border-collapse:collapse; font-size:.8rem; }
-thead th { background:var(--bg3); color:var(--text-muted); font-size:.7rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; padding:.6rem .8rem; text-align:left; border-bottom:1px solid #2a2a2a; white-space:nowrap; }
-tbody tr { border-bottom:1px solid #1e1e1e; transition:background .15s; }
-tbody tr:last-child { border-bottom:none; }
-tbody tr:hover { background:var(--surface); }
-tbody td { padding:.55rem .8rem; vertical-align:middle; }
-.chk { width:16px; height:16px; accent-color:var(--gold); cursor:pointer; }
-.sel-count { font-family:'Bebas Neue',sans-serif; font-size:.9rem; color:var(--gold); letter-spacing:.08em; }
-
-/* ── COMPOSE ── */
-.compose-panel { background:var(--surface); border:1px solid #2a2a2a; border-radius:10px; padding:1.5rem; }
-.compose-to { background:var(--bg2); border:1px solid #333; border-radius:7px; padding:.6rem .8rem; min-height:48px; font-size:.78rem; color:var(--text-muted); line-height:1.6; margin-bottom:.8rem; pointer-events:auto; cursor:default; }
-.email-chip { display:inline-flex; align-items:center; gap:.25rem; background:rgba(201,168,76,.15); border:1px solid var(--gold-dark); color:var(--gold-light); font-size:.72rem; border-radius:4px; padding:.1rem .5rem .1rem .4rem; margin:.1rem .2rem .1rem 0; cursor:pointer; transition:background .15s,border-color .15s; }
-.email-chip:hover { background:rgba(224,82,82,.2); border-color:var(--error); color:#e88; }
-.email-chip-x { font-size:.65rem; opacity:.7; margin-left:.1rem; }
-.attach-preview { display:flex; align-items:center; gap:.6rem; background:var(--bg3); border:1px solid #333; border-radius:7px; padding:.6rem .9rem; margin-bottom:.8rem; font-size:.8rem; }
-.doc-mode-btn { background:var(--bg3); border:1px solid #333; color:var(--text-muted); font-family:'Barlow',sans-serif; font-size:.75rem; font-weight:600; padding:.35rem .8rem; border-radius:6px; cursor:pointer; transition:all .2s; }
-.doc-mode-btn:hover { border-color:var(--gold-dark); color:var(--text); }
-.doc-mode-btn.active { background:rgba(201,168,76,.15); border-color:var(--gold); color:var(--gold); }
-.attach-name { flex:1; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.attach-size { color:var(--text-muted); font-size:.72rem; }
-
-/* ── STATUS TOAST ── */
-.toast { position:fixed; bottom:2rem; left:50%; transform:translateX(-50%) translateY(4rem); background:var(--surface2); border:1px solid var(--gold-dark); border-radius:8px; padding:.75rem 1.4rem; font-size:.82rem; font-weight:600; color:var(--text); z-index:200; transition:transform .3s,opacity .3s; opacity:0; pointer-events:none; max-width:90vw; text-align:center; }
-.toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
-.toast.success { border-color:var(--success); color:var(--success); }
-.toast.error { border-color:var(--error); color:var(--error); }
-
-/* ── VERSION ── */
-.version-badge { position:fixed; bottom:.6rem; right:.8rem; font-size:.65rem; font-weight:600; color:#333; letter-spacing:.08em; pointer-events:none; z-index:100; }
-
-/* ── MODAL ── */
-.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:150; align-items:center; justify-content:center; padding:1rem; }
-.modal-bg.open { display:flex; }
-.modal { background:var(--surface); border:1px solid #333; border-radius:12px; padding:2rem; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
-.modal-title { font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:.1em; color:var(--gold); margin-bottom:1.2rem; }
-.modal-actions { display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.5rem; }
-
-@media(max-width:600px) {
-  .form-row.cols-2, .form-row.cols-3 { grid-template-columns:1fr; }
-  .tab { padding:.75rem .8rem; font-size:.85rem; }
-  .doc-grid { grid-template-columns:1fr 1fr; }
-}
+:root{--gold:#C9A84C;--gold-light:#E8C96A;--gold-dark:#8B6914;--bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--surface:#1e1e1e;--surface2:#252525;--text:#f0f0f0;--muted:#888;--error:#e05252;--success:#4caf50;--lj:#5CCC88;--ph:#F07050;--adm:#C9A84C;--ih:#6AAFE8;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;}
+/* GATE */
+#gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;}
+.gate-logo{font-family:'Bebas Neue',sans-serif;font-size:clamp(2.5rem,8vw,5rem);color:var(--gold);letter-spacing:.08em;line-height:1;text-align:center;}
+.gate-sub{font-size:.85rem;font-weight:600;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin:.4rem 0 2.5rem;text-align:center;}
+.gate-box{background:var(--surface);border:1px solid #2a2a2a;border-radius:12px;padding:2.5rem 2rem;width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center;gap:1.2rem;}
+.gate-label{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:.12em;color:var(--gold);}
+#pin-input{width:100%;background:var(--bg2);border:2px solid #2a2a2a;border-radius:8px;color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:.4em;text-align:center;padding:.75rem 1rem;outline:none;transition:border-color .2s;-webkit-text-security:disc;}
+#pin-input:focus{border-color:var(--gold);}
+#pin-input.shake{animation:shake .4s ease;border-color:var(--error);}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+.gate-btn{width:100%;background:var(--gold);color:#000;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:.15em;padding:.85rem;cursor:pointer;transition:background .2s;}
+.gate-btn:hover{background:var(--gold-light);}
+.gate-error{color:var(--error);font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;min-height:1.2em;text-align:center;}
+/* APP */
+#app{display:none;}
+header{background:var(--bg2);border-bottom:2px solid var(--gold-dark);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;position:sticky;top:0;z-index:50;}
+.hdr-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(1.4rem,4vw,2rem);color:var(--gold);letter-spacing:.08em;line-height:1;}
+.hdr-sub{font-size:.7rem;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);}
+.hbtn{background:transparent;border:1px solid var(--gold-dark);color:var(--gold);font-family:'Barlow',sans-serif;font-size:.75rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:.4rem .9rem;border-radius:6px;cursor:pointer;transition:background .2s,color .2s;text-decoration:none;display:inline-block;}
+.hbtn:hover{background:var(--gold-dark);color:#fff;}
+/* TABS */
+.tab-bar{display:flex;border-bottom:2px solid #222;background:var(--bg2);padding:0 1.5rem;}
+.tab{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.12em;color:var(--muted);padding:.85rem 1.4rem;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+/* PANES */
+.pane{display:none;}
+.pane.active{display:block;}
+main{padding:2rem 1.5rem 5rem;max-width:1100px;margin:0 auto;}
+/* CARD */
+.card{background:var(--surface);border:1px solid #2a2a2a;border-radius:10px;padding:1.5rem;margin-bottom:1.2rem;}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.5rem;}
+.card-sub{font-size:.8rem;color:var(--muted);margin-bottom:1rem;line-height:1.5;}
+.sec-label{font-family:'Bebas Neue',sans-serif;font-size:.9rem;letter-spacing:.2em;color:var(--muted);margin-bottom:.8rem;margin-top:1.5rem;padding-bottom:.3rem;border-bottom:1px solid #222;}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:.4rem;background:var(--gold);color:#000;border:none;border-radius:7px;font-family:'Barlow',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:.55rem 1.1rem;cursor:pointer;transition:background .2s;}
+.btn:hover{background:var(--gold-light);}
+.btn.sec{background:transparent;border:1px solid var(--gold-dark);color:var(--gold);}
+.btn.sec:hover{background:var(--gold-dark);color:#fff;}
+.btn.sm{font-size:.72rem;padding:.35rem .75rem;}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}
+/* INPUTS */
+input[type=text],input[type=email],textarea,select{background:var(--bg2);border:1px solid #333;border-radius:7px;color:var(--text);font-family:'Barlow',sans-serif;font-size:.85rem;padding:.55rem .8rem;outline:none;transition:border-color .2s;width:100%;}
+input:focus,textarea:focus,select:focus{border-color:var(--gold);}
+textarea{resize:vertical;min-height:120px;}
+label.lbl{font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.3rem;}
+/* UPLOAD */
+.upload-zone{border:2px dashed #333;border-radius:10px;padding:2.5rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--gold);background:rgba(201,168,76,.05);}
+#file-input{display:none;}
+/* BADGES */
+.badge{display:inline-block;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.15rem .45rem;border-radius:4px;}
+.badge-lj{background:rgba(92,204,136,.15);color:var(--lj);}
+.badge-ph{background:rgba(240,112,80,.15);color:var(--ph);}
+.badge-adm{background:rgba(201,168,76,.15);color:var(--adm);}
+.badge-ih{background:rgba(106,175,232,.15);color:var(--ih);}
+/* DOC GRID */
+.filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;}
+.fbtn{background:var(--surface2);border:1px solid #333;color:var(--muted);font-family:'Barlow',sans-serif;font-size:.75rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:.35rem .85rem;border-radius:20px;cursor:pointer;transition:all .2s;}
+.fbtn:hover{border-color:var(--gold-dark);color:var(--text);}
+.fbtn.on{background:rgba(201,168,76,.2);border-color:var(--gold);color:var(--gold);}
+.fbtn.lj.on{background:rgba(92,204,136,.2);border-color:var(--lj);color:var(--lj);}
+.fbtn.ph.on{background:rgba(240,112,80,.2);border-color:var(--ph);color:var(--ph);}
+.fbtn.ih.on{background:rgba(106,175,232,.2);border-color:var(--ih);color:var(--ih);}
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;}
+.doc-card{background:var(--bg3);border:1px solid #2a2a2a;border-radius:9px;padding:1.1rem;display:flex;flex-direction:column;gap:.5rem;position:relative;transition:border-color .2s;}
+.doc-card:hover{border-color:var(--gold-dark);}
+.doc-card-del{position:absolute;top:.5rem;right:.5rem;background:none;border:none;color:#555;font-size:.9rem;cursor:pointer;line-height:1;padding:.1rem;}
+.doc-card-del:hover{color:var(--error);}
+.doc-name{font-family:'Bebas Neue',sans-serif;font-size:.95rem;letter-spacing:.05em;line-height:1.2;}
+.doc-meta{font-size:.7rem;color:var(--muted);}
+.doc-tags{display:flex;gap:.3rem;flex-wrap:wrap;}
+.doc-actions{display:flex;gap:.4rem;margin-top:.2rem;}
+.empty{text-align:center;color:var(--muted);padding:2.5rem 1rem;font-size:.85rem;}
+/* SEND TAB LAYOUT */
+.send-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start;}
+.doc-row{display:flex;align-items:center;gap:.75rem;padding:.6rem .8rem;border-radius:7px;cursor:pointer;border:1px solid transparent;margin-bottom:.35rem;background:var(--bg3);transition:all .2s;}
+.doc-row:hover{border-color:var(--gold-dark);}
+.doc-row.selected{border-color:var(--gold);background:var(--surface2);}
+/* PLAYER TABLE */
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid #2a2a2a;max-height:380px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:.8rem;}
+thead th{background:var(--bg3);color:var(--muted);font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:.55rem .7rem;text-align:left;border-bottom:1px solid #2a2a2a;position:sticky;top:0;white-space:nowrap;}
+tbody tr{border-bottom:1px solid #1e1e1e;cursor:pointer;}
+tbody tr:hover{background:rgba(255,255,255,.03);}
+tbody tr.sel-row{background:rgba(201,168,76,.08);}
+tbody td{padding:.5rem .7rem;vertical-align:middle;}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:pointer;}
+/* TO FIELD */
+.to-box{background:var(--bg2);border:1px solid #333;border-radius:7px;padding:.5rem .7rem;min-height:44px;line-height:1.8;margin-bottom:.7rem;}
+.chip{display:inline-flex;align-items:center;gap:.3rem;background:rgba(201,168,76,.15);border:1px solid var(--gold-dark);color:var(--gold-light);font-size:.72rem;border-radius:4px;padding:.1rem .45rem;margin:.1rem .2rem .1rem 0;cursor:pointer;user-select:none;}
+.chip:hover{background:rgba(224,82,82,.2);border-color:var(--error);color:#f99;}
+/* DOC MODE */
+.mode-btns{display:flex;gap:.4rem;flex-wrap:wrap;margin:.4rem 0;}
+.mbtn{background:var(--bg3);border:1px solid #333;color:var(--muted);font-family:'Barlow',sans-serif;font-size:.75rem;font-weight:600;padding:.3rem .75rem;border-radius:6px;cursor:pointer;transition:all .2s;}
+.mbtn:hover{border-color:var(--gold-dark);color:var(--text);}
+.mbtn.on{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold);}
+/* TOAST */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(5rem);background:var(--surface2);border:1px solid var(--gold-dark);border-radius:8px;padding:.7rem 1.4rem;font-size:.82rem;font-weight:600;color:var(--text);z-index:300;transition:transform .3s,opacity .3s;opacity:0;pointer-events:none;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.toast.ok{border-color:var(--success);color:var(--success);}
+.toast.err{border-color:var(--error);color:var(--error);}
+.ver{position:fixed;bottom:.5rem;right:.8rem;font-size:.6rem;color:#333;pointer-events:none;}
+@media(max-width:700px){.send-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
 
-<!-- GATE -->
 <div id="gate">
   <div class="gate-logo">Jaguar Dev</div>
   <div class="gate-sub">Hockey Development Suite</div>
   <div class="gate-box">
     <div class="gate-label">Enter Access Code</div>
-    <input id="pin-input" type="password" maxlength="6" autocomplete="off" placeholder="····" inputmode="text"/>
-    <button class="gate-btn" onclick="checkPin()">ENTER SUITE</button>
-    <div class="gate-error" id="gate-error"></div>
+    <input id="pin-input" type="password" maxlength="6" autocomplete="off" placeholder="&middot;&middot;&middot;&middot;"/>
+    <button class="gate-btn" id="gate-go">ENTER SUITE</button>
+    <div class="gate-error" id="gate-err"></div>
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <header>
     <div>
-      <div class="header-title">Documents</div>
-      <div class="header-sub">Jaguar Dev Suite · Form Letters & Email</div>
+      <div class="hdr-title">Documents</div>
+      <div class="hdr-sub">Jaguar Dev Suite &middot; Form Letters &amp; Email</div>
     </div>
-    <div class="header-right">
-      <a class="hbtn" href="index.html">⬅ Home</a>
-      <button class="hbtn" onclick="logout()">Lock</button>
+    <div style="display:flex;gap:.6rem;">
+      <a class="hbtn" href="index.html">Home</a>
+      <button class="hbtn" id="lock-btn">Lock</button>
     </div>
   </header>
 
   <div class="tab-bar">
-    <div class="tab active" onclick="switchTab('library')" id="tab-library">📁 Library</div>
-    <div class="tab" onclick="switchTab('upload')" id="tab-upload">⬆ Upload</div>
-    <div class="tab" onclick="switchTab('send')" id="tab-send">✉ Send Email</div>
+    <div class="tab active" data-tab="library">Library</div>
+    <div class="tab" data-tab="upload">Upload</div>
+    <div class="tab" data-tab="send">Send Email</div>
   </div>
 
-  <!-- ══════════ LIBRARY TAB ══════════ -->
-  <div id="pane-library">
+  <!-- LIBRARY -->
+  <div id="pane-library" class="pane active">
     <main>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem;">
-        <div class="section-label" style="margin:0;border:none;font-size:1.1rem;">Uploaded Documents</div>
-        <button class="btn sm" onclick="switchTab('upload')">+ Upload New</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.1em;color:var(--gold);">Uploaded Documents</div>
+        <button class="btn sm" id="lib-upload-btn">+ Upload New</button>
       </div>
-
-      <div class="doc-filters">
-        <span style="font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);">Filter:</span>
-        <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
-        <button class="filter-btn lj" onclick="setFilter('LJ',this)">LJ Dev</button>
-        <button class="filter-btn ph" onclick="setFilter('PH',this)">PH Dev</button>
-        <button class="filter-btn adm" onclick="setFilter('ADM',this)">ADM</button>
-        <button class="filter-btn ih" onclick="setFilter('IH',this)">InHouse</button>
-        <input type="text" id="doc-search" placeholder="Search documents…" oninput="renderLibrary()" style="max-width:220px;width:auto;"/>
+      <div class="filter-bar">
+        <span style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Filter:</span>
+        <button class="fbtn on" data-lf="all">All</button>
+        <button class="fbtn lj" data-lf="LJ">LJ Dev</button>
+        <button class="fbtn ph" data-lf="PH">PH Dev</button>
+        <button class="fbtn" data-lf="ADM">ADM</button>
+        <button class="fbtn ih" data-lf="IH">InHouse</button>
+        <input type="text" id="lib-search" placeholder="Search..." style="width:180px;"/>
       </div>
-
-      <div class="doc-grid" id="doc-grid">
-        <div class="empty-state">No documents yet. Upload your first form letter to get started.</div>
-      </div>
+      <div class="doc-grid" id="doc-grid"></div>
     </main>
   </div>
 
-  <!-- ══════════ UPLOAD TAB ══════════ -->
-  <div id="pane-upload" style="display:none;">
+  <!-- UPLOAD -->
+  <div id="pane-upload" class="pane">
     <main>
       <div class="card">
         <div class="card-title">Upload Document</div>
-        <div class="card-sub">Upload .docx or .xlsx form letters and templates. Files are stored in your browser (localStorage) and available for emailing to any player group.</div>
-
-        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
-          <div class="upload-zone-icon">📄</div>
-          <div class="upload-zone-label">Drop file here or click to browse</div>
-          <div class="upload-zone-sub">Accepts .docx and .xlsx files (max 5 MB each)</div>
+        <div class="card-sub">Store .docx or .xlsx form letters here to use when sending emails. Files stay in your browser storage.</div>
+        <div class="upload-zone" id="upload-zone">
+          <div style="font-size:2.5rem;margin-bottom:.5rem;">&#128196;</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.3rem;">Drop file here or click to browse</div>
+          <div style="font-size:.78rem;color:var(--muted);">Accepts .docx and .xlsx &mdash; max 5 MB</div>
         </div>
-        <input type="file" id="file-input" accept=".docx,.xlsx,.doc,.xls" multiple/>
-
-        <div id="upload-preview" style="display:none;margin-top:1.2rem;">
-          <div class="section-label">File Details</div>
-          <div class="form-row cols-2">
+        <input type="file" id="file-input" accept=".docx,.doc,.xlsx,.xls" multiple/>
+        <div id="upload-form" style="display:none;margin-top:1.2rem;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem;">
             <div>
-              <label>Document Name</label>
-              <input type="text" id="doc-name" placeholder="e.g. Welcome to InHouse 2025"/>
+              <label class="lbl">Document Name</label>
+              <input type="text" id="up-name" placeholder="e.g. Welcome to InHouse 2025"/>
             </div>
             <div>
-              <label>Category / Program Level(s)</label>
-              <div style="display:flex;gap:.5rem;flex-wrap:wrap;padding:.4rem 0;">
-                <label style="text-transform:none;letter-spacing:0;font-size:.8rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
-                  <input type="checkbox" class="lvl-check" value="LJ" style="accent-color:var(--lj-color);width:auto;"> <span style="color:var(--lj-color);">LJ Dev</span>
+              <label class="lbl">Levels</label>
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;padding:.4rem 0;">
+                <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer;text-transform:none;letter-spacing:0;">
+                  <input type="checkbox" class="lvl-chk" value="LJ" style="width:auto;accent-color:var(--lj);"/> <span style="color:var(--lj);">LJ</span>
                 </label>
-                <label style="text-transform:none;letter-spacing:0;font-size:.8rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
-                  <input type="checkbox" class="lvl-check" value="PH" style="accent-color:var(--ph-color);width:auto;"> <span style="color:var(--ph-color);">PH Dev</span>
+                <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer;text-transform:none;letter-spacing:0;">
+                  <input type="checkbox" class="lvl-chk" value="PH" style="width:auto;accent-color:var(--ph);"/> <span style="color:var(--ph);">PH</span>
                 </label>
-                <label style="text-transform:none;letter-spacing:0;font-size:.8rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
-                  <input type="checkbox" class="lvl-check" value="ADM" style="accent-color:var(--adm-color);width:auto;"> <span style="color:var(--adm-color);">ADM</span>
+                <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer;text-transform:none;letter-spacing:0;">
+                  <input type="checkbox" class="lvl-chk" value="ADM" style="width:auto;accent-color:var(--adm);"/> <span style="color:var(--adm);">ADM</span>
                 </label>
-                <label style="text-transform:none;letter-spacing:0;font-size:.8rem;display:flex;align-items:center;gap:.3rem;cursor:pointer;">
-                  <input type="checkbox" class="lvl-check" value="IH" style="accent-color:var(--ih-color);width:auto;"> <span style="color:var(--ih-color);">InHouse</span>
+                <label style="display:flex;align-items:center;gap:.3rem;font-size:.8rem;cursor:pointer;text-transform:none;letter-spacing:0;">
+                  <input type="checkbox" class="lvl-chk" value="IH" style="width:auto;accent-color:var(--ih);"/> <span style="color:var(--ih);">IH</span>
                 </label>
               </div>
             </div>
           </div>
-          <div class="form-row">
-            <div>
-              <label>Description (optional)</label>
-              <input type="text" id="doc-desc" placeholder="e.g. Sent at the start of each InHouse season to all registered players"/>
-            </div>
+          <div style="margin-bottom:.8rem;">
+            <label class="lbl">Description (optional)</label>
+            <input type="text" id="up-desc" placeholder="e.g. Sent at start of each InHouse season"/>
           </div>
-          <div id="upload-file-list" style="margin-bottom:1rem;"></div>
-          <button class="btn" onclick="saveUpload()">💾 Save to Library</button>
+          <div id="up-file-list" style="margin-bottom:.8rem;"></div>
+          <button class="btn" id="up-save-btn">Save to Library</button>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- ══════════ SEND TAB ══════════ -->
-  <div id="pane-send" style="display:none;">
+  <!-- SEND -->
+  <div id="pane-send" class="pane">
     <main>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;align-items:start;">
+      <div class="send-grid">
 
-        <!-- LEFT: pick doc + players -->
+        <!-- LEFT -->
         <div>
-          <!-- Pick Document -->
-          <div class="card" style="margin-bottom:1.2rem;">
-            <div class="card-title">1. Select Document</div>
-            <div id="send-doc-selector">
-              <div class="empty-state" style="padding:1.5rem;">No documents in library yet.</div>
-            </div>
+          <!-- 1. Doc -->
+          <div class="card" style="margin-bottom:1rem;">
+            <div class="card-title">1. Select Document (optional)</div>
+            <div id="send-doc-list"><div class="empty">No documents yet.</div></div>
           </div>
 
-          <!-- Pick Players -->
+          <!-- 2. Players -->
           <div class="card">
             <div class="card-title">2. Select Recipients</div>
-            <div class="card-sub" id="player-source-note">Pulls from Player Database on this device. <a href="playerdb.html" style="color:var(--gold);">Open Player DB →</a></div>
-
-            <div class="player-filters">
-              <input type="text" class="player-search" id="player-search" placeholder="Search name…" oninput="renderPlayerTable()"/>
-              <button class="filter-btn lj" id="pf-LJ" onclick="togglePlayerFilter('LJ',this)">LJ</button>
-              <button class="filter-btn ph" id="pf-PH" onclick="togglePlayerFilter('PH',this)">PH</button>
-              <button class="filter-btn adm" id="pf-ADM" onclick="togglePlayerFilter('ADM',this)">ADM</button>
-              <button class="filter-btn ih" id="pf-IH" onclick="togglePlayerFilter('IH',this)">IH</button>
+            <div class="card-sub">From Player Database on this device. <a href="playerdb.html" style="color:var(--gold);">Open Player DB</a></div>
+            <div class="filter-bar" style="margin-bottom:.6rem;">
+              <input type="text" id="p-search" placeholder="Search name..." style="width:160px;"/>
+              <button class="fbtn lj" data-pf="LJ">LJ</button>
+              <button class="fbtn ph" data-pf="PH">PH</button>
+              <button class="fbtn" data-pf="ADM">ADM</button>
+              <button class="fbtn ih" data-pf="IH">IH</button>
             </div>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;flex-wrap:wrap;gap:.4rem;">
-              <span class="sel-count" id="sel-count">0 selected</span>
-              <div style="display:flex;gap:.5rem;">
-                <button class="btn sm secondary" onclick="selectAllVisible()">Select Visible</button>
-                <button class="btn sm secondary" onclick="clearSelection()">Clear</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+              <span id="sel-count" style="font-family:'Bebas Neue',sans-serif;color:var(--gold);font-size:.9rem;">0 selected</span>
+              <div style="display:flex;gap:.4rem;">
+                <button class="btn sm sec" id="sel-all-btn">Select Visible</button>
+                <button class="btn sm sec" id="clr-btn">Clear</button>
               </div>
             </div>
-
-            <div class="player-table-wrap">
+            <div class="tbl-wrap">
               <table>
-                <thead>
-                  <tr>
-                    <th style="width:30px;"><input type="checkbox" class="chk" id="chk-all" onchange="toggleAll(this)"/></th>
-                    <th>Player</th>
-                    <th>Level</th>
-                    <th>Parent 1 Email</th>
-                    <th>Parent 2 Email</th>
-                  </tr>
-                </thead>
-                <tbody id="player-tbody">
-                  <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No players found in Player Database.</td></tr>
-                </tbody>
+                <thead><tr>
+                  <th><input type="checkbox" id="chk-all"/></th>
+                  <th>Player</th><th>Level</th><th>P1 Email</th><th>P2 Email</th>
+                </tr></thead>
+                <tbody id="p-tbody"></tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <!-- RIGHT: compose -->
+        <!-- RIGHT: Compose -->
         <div>
-          <div class="compose-panel">
-            <div class="card-title">3. Compose & Send</div>
+          <div class="card">
+            <div class="card-title">3. Compose &amp; Send</div>
 
-            <label>To: <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--text-muted);font-size:.7rem;">click any address to remove it</span></label>
-            <div class="compose-to" id="compose-to-display">Select players on the left to populate recipients.</div>
+            <label class="lbl">To: <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);">click a chip to remove</span></label>
+            <div class="to-box" id="to-box"><span style="color:var(--muted);font-size:.8rem;">Select players or add emails below.</span></div>
 
-            <div style="display:flex;gap:.5rem;margin-bottom:.8rem;align-items:center;">
-              <input type="email" id="manual-email" placeholder="Add email manually…" style="flex:1;" onkeydown="if(event.key==='Enter'){addManualEmail();event.preventDefault();}" oninput="previewSendState()"/>
-              <button class="btn sm secondary" onclick="addManualEmail()">+ Add</button>
+            <div style="display:flex;gap:.5rem;margin-bottom:.8rem;">
+              <input type="email" id="manual-email" placeholder="Add email address..." style="flex:1;"/>
+              <button class="btn sm sec" id="add-email-btn">+ Add</button>
             </div>
 
-            <!-- doc mode toggle — only shown when a doc is selected -->
-            <div id="doc-mode-row" style="display:none;margin-bottom:.8rem;">
-              <label>Selected Document — How to use it?</label>
-              <div id="doc-mode-preview" style="display:flex;align-items:center;gap:.6rem;background:var(--bg3);border:1px solid #333;border-radius:7px;padding:.55rem .8rem;font-size:.8rem;margin-bottom:.5rem;">
-                <span id="doc-mode-icon">📄</span>
-                <span id="doc-mode-name" style="flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-                <span id="doc-mode-size" style="color:var(--text-muted);font-size:.72rem;"></span>
+            <div id="doc-mode-area" style="display:none;margin-bottom:.8rem;">
+              <label class="lbl">Document: <span id="doc-mode-name" style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--text);"></span></label>
+              <div class="mode-btns">
+                <button class="mbtn on" data-mode="body">Paste into body</button>
+                <button class="mbtn" data-mode="attach">Download &amp; attach</button>
+                <button class="mbtn" data-mode="none">Don't include</button>
               </div>
-              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-                <button class="doc-mode-btn active" id="mode-body" onclick="setDocMode('body')">📋 Paste text into body</button>
-                <button class="doc-mode-btn" id="mode-attach" onclick="setDocMode('attach')">📎 Download &amp; attach manually</button>
-                <button class="doc-mode-btn" id="mode-none" onclick="setDocMode('none')">✕ Don't include</button>
-              </div>
-              <div id="doc-mode-hint" style="font-size:.72rem;color:var(--text-muted);margin-top:.4rem;"></div>
+              <div id="mode-hint" style="font-size:.72rem;color:var(--muted);"></div>
             </div>
 
-            <div class="form-row" style="margin-bottom:.8rem;">
-              <div>
-                <label>Subject</label>
-                <input type="text" id="email-subject" placeholder="e.g. Welcome to InHouse Hockey 2025-26!"/>
-              </div>
+            <div style="margin-bottom:.7rem;">
+              <label class="lbl">Subject</label>
+              <input type="text" id="e-subject" placeholder="e.g. Welcome to InHouse 2025-26!"/>
             </div>
 
             <div style="margin-bottom:.8rem;">
-              <label>Message Body</label>
-              <textarea id="email-body" style="min-height:200px;" placeholder="Type your message here.&#10;&#10;If you chose 'Paste text into body' above, the document text will be appended when you click Open in Mail."></textarea>
+              <label class="lbl">Message</label>
+              <textarea id="e-body" style="min-height:180px;" placeholder="Type your message here..."></textarea>
             </div>
 
-            <div style="background:var(--bg3);border:1px solid #2a2a2a;border-radius:7px;padding:.8rem;margin-bottom:1rem;font-size:.75rem;color:var(--text-muted);">
-              ℹ️ <strong style="color:var(--text);">Open in Mail</strong> launches your default email client (Outlook, Apple Mail, etc.) with recipients in BCC and your message pre-filled. A doc is never required — you can send without one.
+            <div style="background:var(--bg3);border:1px solid #2a2a2a;border-radius:7px;padding:.7rem;margin-bottom:.8rem;font-size:.75rem;color:var(--muted);">
+              Clicking <strong style="color:var(--text);">Open in Mail</strong> launches Outlook, Apple Mail, or your default client with recipients in BCC. Gmail users: use <strong style="color:var(--text);">Copy Emails</strong> and paste into Gmail manually.
             </div>
 
-            <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
-              <button class="btn" onclick="openInMail()" id="send-btn" disabled>✉ Open in Mail</button>
-              <button class="btn secondary" onclick="downloadDoc()" id="dl-btn" style="display:none;">⬇ Download Doc</button>
-              <button class="btn secondary" onclick="copyEmails()" id="copy-btn" disabled>📋 Copy Emails</button>
+            <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+              <button class="btn" id="open-mail-btn" disabled>Open in Mail</button>
+              <button class="btn sec" id="dl-btn" style="display:none;">Download Doc</button>
+              <button class="btn sec" id="copy-btn" disabled>Copy Emails</button>
             </div>
           </div>
         </div>
@@ -397,594 +306,614 @@ tbody td { padding:.55rem .8rem; vertical-align:middle; }
   </div>
 </div>
 
-<!-- Upload Modal (metadata for multi-file) -->
-<div class="modal-bg" id="modal-bg">
-  <div class="modal">
-    <div class="modal-title">Document Details</div>
-    <div id="modal-body"></div>
-    <div class="modal-actions">
-      <button class="btn secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="confirmModal()">Save</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
-<div class="version-badge">v1.5.0</div>
+<div class="ver">v2.0.0</div>
 
 <script>
-// -- AUTH ----------------------------------------------------------------------
-const DEFAULT_PIN = '9451';
-const SESSION_KEY = 'jds_auth';
-const PIN_KEY = 'jds_pin';
+// ============================================================
+// AUTH
+// ============================================================
+var DEFAULT_PIN = '9451';
+var SESSION_KEY = 'jds_auth';
+var PIN_KEY     = 'jds_pin';
 
 function getPin() { return localStorage.getItem(PIN_KEY) || DEFAULT_PIN; }
+
 function checkPin() {
-  const inp = document.getElementById('pin-input');
-  const err = document.getElementById('gate-error');
+  var inp = document.getElementById('pin-input');
+  var err = document.getElementById('gate-err');
   if (inp.value.trim() === getPin()) {
     sessionStorage.setItem(SESSION_KEY, '1');
     document.getElementById('gate').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    init();
+    document.getElementById('app').style.display  = 'block';
+    appInit();
   } else {
-    err.textContent = 'Incorrect code - try again';
+    err.textContent = 'Incorrect code';
     inp.classList.add('shake');
     inp.value = '';
-    setTimeout(() => inp.classList.remove('shake'), 450);
+    setTimeout(function(){ inp.classList.remove('shake'); }, 450);
     inp.focus();
   }
 }
-function logout() {
+
+function doLogout() {
   sessionStorage.removeItem(SESSION_KEY);
-  document.getElementById('app').style.display = 'none';
+  document.getElementById('app').style.display  = 'none';
   document.getElementById('gate').style.display = 'flex';
-  document.getElementById('pin-input').value = '';
-  document.getElementById('gate-error').textContent = '';
+  document.getElementById('pin-input').value    = '';
+  document.getElementById('gate-err').textContent = '';
 }
-document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkPin(); });
+
+document.getElementById('gate-go').addEventListener('click', checkPin);
+document.getElementById('pin-input').addEventListener('keydown', function(e){ if(e.key==='Enter') checkPin(); });
+document.getElementById('lock-btn').addEventListener('click', doLogout);
+
 if (sessionStorage.getItem(SESSION_KEY) === '1') {
   document.getElementById('gate').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.addEventListener('DOMContentLoaded', init);
+  document.getElementById('app').style.display  = 'block';
+  document.addEventListener('DOMContentLoaded', appInit);
 }
 
-// -- STORAGE -------------------------------------------------------------------
-const DOCS_KEY = 'jds_documents_v1';
-let DOCS = [];
+// ============================================================
+// STORAGE
+// ============================================================
+var DOCS_KEY = 'jds_docs_v1';
+var docs = [];
 
 function loadDocs() {
-  try {
-    const raw = localStorage.getItem(DOCS_KEY);
-    DOCS = raw ? JSON.parse(raw) : [];
-  } catch(e) { DOCS = []; }
+  try { docs = JSON.parse(localStorage.getItem(DOCS_KEY)) || []; } catch(e) { docs = []; }
 }
 function saveDocs() {
-  try { localStorage.setItem(DOCS_KEY, JSON.stringify(DOCS)); } catch(e) {
-    toast('Storage full - try removing old documents.', 'error');
-  }
+  try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch(e) { toast('Storage full', 'err'); }
 }
 
-// Doc shape: { id, name, desc, levels:[], type:'docx'|'xlsx', size, dateAdded, dataUrl }
-
-// -- TABS ----------------------------------------------------------------------
-function switchTab(name) {
-  ['library','upload','send'].forEach(t => {
-    document.getElementById('pane-' + t).style.display = t === name ? '' : 'none';
-    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+// ============================================================
+// TABS
+// ============================================================
+document.querySelectorAll('.tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    var name = tab.dataset.tab;
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab===name); });
+    document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('active', p.id==='pane-'+name); });
+    if (name==='library') renderLibrary();
+    if (name==='send')    { renderSendDocs(); renderPlayers(); }
   });
-  if (name === 'library') renderLibrary();
-  if (name === 'send') { renderSendDocSelector(); renderPlayerTable(); }
-}
+});
 
-// -- INIT ----------------------------------------------------------------------
-function init() {
+document.getElementById('lib-upload-btn').addEventListener('click', function(){
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab==='upload'); });
+  document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('active', p.id==='pane-upload'); });
+});
+
+// ============================================================
+// APP INIT
+// ============================================================
+function appInit() {
   loadDocs();
   renderLibrary();
-  setupUploadZone();
+  setupUpload();
+  setupSend();
 }
 
-// -- UPLOAD --------------------------------------------------------------------
-let pendingFiles = [];
+// ============================================================
+// LIBRARY
+// ============================================================
+var libFilter = 'all';
 
-function setupUploadZone() {
-  const zone = document.getElementById('upload-zone');
-  const input = document.getElementById('file-input');
-
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault(); zone.classList.remove('drag-over');
-    handleFiles([...e.dataTransfer.files]);
+document.querySelectorAll('[data-lf]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    libFilter = btn.dataset.lf;
+    document.querySelectorAll('[data-lf]').forEach(function(b){ b.classList.toggle('on', b.dataset.lf===libFilter); });
+    renderLibrary();
   });
-  input.addEventListener('change', () => handleFiles([...input.files]));
+});
+document.getElementById('lib-search').addEventListener('input', renderLibrary);
+
+function renderLibrary() {
+  loadDocs();
+  var q = document.getElementById('lib-search').value.toLowerCase();
+  var filtered = docs.filter(function(d) {
+    if (libFilter !== 'all' && !(d.levels||[]).includes(libFilter)) return false;
+    if (q && !d.name.toLowerCase().includes(q) && !(d.desc||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  var grid = document.getElementById('doc-grid');
+  if (!filtered.length) { grid.innerHTML = '<div class="empty">No documents. Upload some form letters to get started.</div>'; return; }
+  grid.innerHTML = filtered.map(function(d) {
+    var icon = d.type==='xlsx' ? '&#128202;' : '&#128196;';
+    var tags = (d.levels||[]).map(function(l){ return '<span class="badge badge-'+l.toLowerCase()+'">'+l+'</span>'; }).join('');
+    return '<div class="doc-card">'
+      + '<button class="doc-card-del" data-del="'+d.id+'">&#10005;</button>'
+      + '<div style="font-size:1.8rem;">'+icon+'</div>'
+      + '<div class="doc-name">'+esc(d.name)+'</div>'
+      + (d.desc ? '<div class="doc-meta">'+esc(d.desc)+'</div>' : '')
+      + '<div class="doc-meta">'+fmtSize(d.size)+' &middot; '+d.dateAdded+'</div>'
+      + '<div class="doc-tags">'+tags+'</div>'
+      + '<div class="doc-actions">'
+      +   '<button class="btn sm" data-dl="'+d.id+'">Download</button>'
+      +   '<button class="btn sm sec" data-send="'+d.id+'">Send</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+  // bind doc-grid button events
+  grid.querySelectorAll('[data-del]').forEach(function(b){
+    b.addEventListener('click', function(e){ e.stopPropagation(); delDoc(parseInt(b.dataset.del)); });
+  });
+  grid.querySelectorAll('[data-dl]').forEach(function(b){
+    b.addEventListener('click', function(){ dlDocById(parseInt(b.dataset.dl)); });
+  });
+  grid.querySelectorAll('[data-send]').forEach(function(b){
+    b.addEventListener('click', function(){
+      selectedDocId = parseInt(b.dataset.send);
+      // switch to send tab
+      document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab==='send'); });
+      document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('active', p.id==='pane-send'); });
+      renderSendDocs();
+      renderPlayers();
+    });
+  });
+}
+
+function delDoc(id) {
+  if (!confirm('Remove this document?')) return;
+  docs = docs.filter(function(d){ return d.id !== id; });
+  saveDocs();
+  renderLibrary();
+  toast('Removed', 'ok');
+}
+
+function dlDocById(id) {
+  var d = docs.find(function(x){ return x.id===id; });
+  if (d) triggerDl(d.dataUrl, d.originalName || d.name+'.'+(d.type||'docx'));
+}
+
+// ============================================================
+// UPLOAD
+// ============================================================
+var pendingFiles = [];
+
+function setupUpload() {
+  var zone  = document.getElementById('upload-zone');
+  var input = document.getElementById('file-input');
+
+  zone.addEventListener('click', function(){ input.click(); });
+  zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
+  zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFiles(Array.from(e.dataTransfer.files)); });
+  input.addEventListener('change', function(){ handleFiles(Array.from(input.files)); });
+
+  document.getElementById('up-save-btn').addEventListener('click', saveUpload);
 }
 
 function handleFiles(files) {
-  const allowed = files.filter(f => /\.(docx|doc|xlsx|xls)$/i.test(f.name));
-  if (!allowed.length) { toast('Only .docx and .xlsx files are accepted.', 'error'); return; }
-  const tooBig = allowed.filter(f => f.size > 5 * 1024 * 1024);
-  if (tooBig.length) { toast(`${tooBig.map(f=>f.name).join(', ')} exceeds 5 MB limit.`, 'error'); return; }
-
-  pendingFiles = allowed;
-  const preview = document.getElementById('upload-preview');
-  preview.style.display = '';
-
-  // Pre-fill name from first file
-  const firstName = allowed[0].name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-  document.getElementById('doc-name').value = firstName;
-
-  // Show file list
-  const list = document.getElementById('upload-file-list');
-  list.innerHTML = allowed.map(f => `
-    <div class="attach-preview">
-      <span>${fileIcon(f.name)}</span>
-      <span class="attach-name">${f.name}</span>
-      <span class="attach-size">${formatSize(f.size)}</span>
-    </div>
-  `).join('');
-
-  document.getElementById('doc-name').focus();
+  var ok = files.filter(function(f){ return /\.(docx?|xlsx?)$/i.test(f.name); });
+  if (!ok.length) { toast('Only .docx and .xlsx accepted', 'err'); return; }
+  var big = ok.filter(function(f){ return f.size > 5*1024*1024; });
+  if (big.length) { toast('File exceeds 5 MB limit', 'err'); return; }
+  pendingFiles = ok;
+  document.getElementById('up-name').value = ok[0].name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  document.getElementById('up-file-list').innerHTML = ok.map(function(f){
+    return '<div style="display:flex;align-items:center;gap:.5rem;background:var(--bg3);border:1px solid #333;border-radius:6px;padding:.5rem .8rem;margin-bottom:.4rem;font-size:.8rem;">'
+      + '<span style="font-weight:600;">'+esc(f.name)+'</span>'
+      + '<span style="color:var(--muted);margin-left:auto;">'+fmtSize(f.size)+'</span>'
+      + '</div>';
+  }).join('');
+  document.getElementById('upload-form').style.display = '';
 }
 
 function saveUpload() {
-  if (!pendingFiles.length) return;
-  const name = document.getElementById('doc-name').value.trim();
-  if (!name) { toast('Please enter a document name.', 'error'); return; }
-  const levels = [...document.querySelectorAll('.lvl-check:checked')].map(c => c.value);
-  const desc = document.getElementById('doc-desc').value.trim();
-
-  let saved = 0;
-  const total = pendingFiles.length;
-
-  pendingFiles.forEach((file, i) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const doc = {
-        id: Date.now() + i,
-        name: total === 1 ? name : `${name} (${i+1})`,
-        desc,
-        levels,
-        type: /xlsx|xls/i.test(file.name) ? 'xlsx' : 'docx',
+  var name = document.getElementById('up-name').value.trim();
+  if (!name) { toast('Enter a document name', 'err'); return; }
+  var levels = Array.from(document.querySelectorAll('.lvl-chk:checked')).map(function(c){ return c.value; });
+  var desc   = document.getElementById('up-desc').value.trim();
+  var saved  = 0;
+  pendingFiles.forEach(function(file, i) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var d = {
+        id: Date.now()+i,
+        name: pendingFiles.length===1 ? name : name+' ('+(i+1)+')',
+        desc: desc,
+        levels: levels,
+        type: /xlsx?/i.test(file.name) ? 'xlsx' : 'docx',
         size: file.size,
         originalName: file.name,
-        dateAdded: new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}),
+        dateAdded: new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
         dataUrl: e.target.result
       };
-      DOCS.unshift(doc);
+      docs.unshift(d);
       saved++;
-      if (saved === total) {
+      if (saved === pendingFiles.length) {
         saveDocs();
-        toast(`${total} document${total>1?'s':''} saved to library!`, 'success');
-        // Reset form
-        document.getElementById('upload-preview').style.display = 'none';
-        document.getElementById('doc-name').value = '';
-        document.getElementById('doc-desc').value = '';
-        document.querySelectorAll('.lvl-check').forEach(c => c.checked = false);
+        toast(saved+' document'+(saved>1?'s':'')+' saved!', 'ok');
+        document.getElementById('upload-form').style.display = 'none';
+        document.getElementById('up-name').value = '';
+        document.getElementById('up-desc').value = '';
+        document.querySelectorAll('.lvl-chk').forEach(function(c){ c.checked=false; });
         document.getElementById('file-input').value = '';
         pendingFiles = [];
-        switchTab('library');
+        // switch to library
+        document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab==='library'); });
+        document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('active', p.id==='pane-library'); });
+        renderLibrary();
       }
     };
     reader.readAsDataURL(file);
   });
 }
 
-// -- LIBRARY -------------------------------------------------------------------
-let activeFilter = 'all';
-
-function setFilter(f, btn) {
-  activeFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderLibrary();
-}
-
-function renderLibrary() {
-  loadDocs();
-  const q = (document.getElementById('doc-search')?.value || '').toLowerCase();
-  let docs = DOCS;
-  if (activeFilter !== 'all') docs = docs.filter(d => d.levels && d.levels.includes(activeFilter));
-  if (q) docs = docs.filter(d => d.name.toLowerCase().includes(q) || (d.desc||'').toLowerCase().includes(q));
-
-  const grid = document.getElementById('doc-grid');
-  if (!docs.length) {
-    grid.innerHTML = '<div class="empty-state">No documents match your filter. Upload some form letters to get started.</div>';
-    return;
-  }
-
-  grid.innerHTML = docs.map(d => `
-    <div class="doc-card">
-      <button class="doc-card-del" onclick="deleteDoc(${d.id})" title="Remove">?</button>
-      <div class="doc-card-icon">${d.type==='xlsx'?'📊':'📄'}</div>
-      <div class="doc-card-name">${escHtml(d.name)}</div>
-      ${d.desc ? `<div class="doc-card-meta">${escHtml(d.desc)}</div>` : ''}
-      <div class="doc-card-meta">${formatSize(d.size)} ? Added ${d.dateAdded}</div>
-      <div class="doc-card-tags">${(d.levels||[]).map(l => `<span class="badge badge-${l.toLowerCase()}">${l}</span>`).join('')}</div>
-      <div class="doc-card-actions">
-        <button class="btn sm" onclick="downloadDocById(${d.id})">? Download</button>
-        <button class="btn sm secondary" onclick="startSendWith(${d.id})">? Send</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function deleteDoc(id) {
-  if (!confirm('Remove this document from the library?')) return;
-  DOCS = DOCS.filter(d => d.id !== id);
-  saveDocs();
-  renderLibrary();
-  toast('Document removed.', 'success');
-}
-
-function downloadDocById(id) {
-  const doc = DOCS.find(d => d.id === id);
-  if (!doc) return;
-  triggerDownload(doc.dataUrl, doc.originalName || doc.name + (doc.type==='xlsx'?'.xlsx':'.docx'));
-}
-
-// -- SEND TAB -----------------------------------------------------------------
-let selectedDocId = null;
-let playerFilters = new Set();
-let selectedPlayers = new Set(); // set of player id strings
-let allPlayers = [];
+// ============================================================
+// SEND
+// ============================================================
+var selectedDocId = null;
+var docMode = 'body';
+var allPlayers = [];
+var selectedPids = {};   // pid -> true
+var manualEmails = [];   // array of strings
+var removedEmails = {};  // email -> true
 
 function loadPlayers() {
-  try {
-    const raw = localStorage.getItem('jag_player_database_v1');
-    allPlayers = raw ? JSON.parse(raw) : [];
-  } catch(e) { allPlayers = []; }
+  try { allPlayers = JSON.parse(localStorage.getItem('jag_player_database_v1')) || []; } catch(e) { allPlayers = []; }
 }
 
-function renderSendDocSelector() {
-  loadDocs();
-  const el = document.getElementById('send-doc-selector');
-  if (!DOCS.length) {
-    el.innerHTML = '<div class="empty-state" style="padding:1rem;">No documents yet. <a href="#" onclick="switchTab(\'upload\');return false;" style="color:var(--gold);">Upload one ?</a></div>';
-    return;
-  }
-  el.innerHTML = DOCS.map(d => `
-    <div onclick="selectDoc(${d.id}, this)" data-doc-id="${d.id}" style="display:flex;align-items:center;gap:.75rem;padding:.65rem .8rem;border-radius:7px;cursor:pointer;border:1px solid transparent;margin-bottom:.4rem;transition:all .2s;background:var(--bg3);" class="send-doc-row">
-      <span style="font-size:1.4rem;">${d.type==='xlsx'?'📊':'📄'}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(d.name)}</div>
-        <div style="font-size:.7rem;color:var(--text-muted);">${(d.levels||[]).join(', ')||'No level tags'} ? ${formatSize(d.size)}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-let docMode = 'body'; // 'body' | 'attach' | 'none'
-
-function setDocMode(mode) {
-  docMode = mode;
-  ['body','attach','none'].forEach(m => {
-    document.getElementById('mode-' + m).classList.toggle('active', m === mode);
-  });
-  const hints = {
-    body: 'Document text will be extracted and appended to the email body when you click Open in Mail.',
-    attach: 'Document will download to your computer. Drag it into your mail client before sending.',
-    none: 'The document will not be included. You can still download it separately anytime.'
-  };
-  document.getElementById('doc-mode-hint').textContent = hints[mode];
-  document.getElementById('dl-btn').style.display = mode === 'attach' ? '' : 'none';
-  updateSendButtons();
-}
-
-function selectDoc(id, el) {
-  // clicking the already-selected doc deselects it
-  if (selectedDocId === id) {
-    selectedDocId = null;
-    document.querySelectorAll('.send-doc-row').forEach(r => {
-      r.style.borderColor = 'transparent';
-      r.style.background = 'var(--bg3)';
+function setupSend() {
+  // doc mode buttons
+  document.querySelectorAll('[data-mode]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      docMode = btn.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach(function(b){ b.classList.toggle('on', b.dataset.mode===docMode); });
+      var hints = {
+        body:   'Document text will be appended to your message body.',
+        attach: 'Document will be downloaded to your computer to attach manually.',
+        none:   'Document will not be included.'
+      };
+      document.getElementById('mode-hint').textContent = hints[docMode];
+      document.getElementById('dl-btn').style.display = docMode==='attach' ? '' : 'none';
     });
-    document.getElementById('doc-mode-row').style.display = 'none';
-    document.getElementById('dl-btn').style.display = 'none';
-    updateSendButtons();
-    return;
-  }
-  selectedDocId = id;
-  document.querySelectorAll('.send-doc-row').forEach(r => {
-    r.style.borderColor = r.dataset.docId == id ? 'var(--gold-dark)' : 'transparent';
-    r.style.background = r.dataset.docId == id ? 'var(--surface2)' : 'var(--bg3)';
   });
-  const doc = DOCS.find(d => d.id === id);
-  if (doc) {
-    document.getElementById('doc-mode-row').style.display = '';
-    document.getElementById('doc-mode-icon').textContent = doc.type === 'xlsx' ? '📊' : '📄';
-    document.getElementById('doc-mode-name').textContent = doc.name;
-    document.getElementById('doc-mode-size').textContent = formatSize(doc.size);
-    setDocMode(docMode); // re-apply current mode to refresh hint/buttons
-  }
-  updateSendButtons();
+
+  // player level filter
+  document.querySelectorAll('[data-pf]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      btn.classList.toggle('on');
+      renderPlayers();
+    });
+  });
+
+  document.getElementById('p-search').addEventListener('input', renderPlayers);
+
+  // select all / clear
+  document.getElementById('sel-all-btn').addEventListener('click', selectVisible);
+  document.getElementById('clr-btn').addEventListener('click', clearSel);
+  document.getElementById('chk-all').addEventListener('change', function(e) {
+    if (e.target.checked) selectVisible(); else clearSel();
+  });
+
+  // manual email
+  document.getElementById('add-email-btn').addEventListener('click', addManualEmail);
+  document.getElementById('manual-email').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addManualEmail(); }
+  });
+
+  // send buttons
+  document.getElementById('open-mail-btn').addEventListener('click', openInMail);
+  document.getElementById('dl-btn').addEventListener('click', function() { dlDocById(selectedDocId); });
+  document.getElementById('copy-btn').addEventListener('click', copyEmails);
 }
 
-function startSendWith(id) {
-  switchTab('send');
-  setTimeout(() => {
-    const el = document.querySelector(`[data-doc-id="${id}"]`);
-    if (el) selectDoc(id, el);
-  }, 50);
+function renderSendDocs() {
+  loadDocs();
+  var el = document.getElementById('send-doc-list');
+  if (!docs.length) { el.innerHTML = '<div class="empty" style="padding:1rem;">No documents yet.</div>'; return; }
+  el.innerHTML = docs.map(function(d) {
+    var icon = d.type==='xlsx' ? '&#128202;' : '&#128196;';
+    var sel  = selectedDocId === d.id;
+    return '<div class="doc-row'+(sel?' selected':'')+'" data-sdoc="'+d.id+'">'
+      + '<span style="font-size:1.3rem;">'+icon+'</span>'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-weight:600;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(d.name)+'</div>'
+      +   '<div style="font-size:.7rem;color:var(--muted);">'+((d.levels||[]).join(', ')||'No tags')+' &middot; '+fmtSize(d.size)+'</div>'
+      + '</div></div>';
+  }).join('');
+  el.querySelectorAll('[data-sdoc]').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var id = parseInt(row.dataset.sdoc);
+      if (selectedDocId === id) {
+        // deselect
+        selectedDocId = null;
+        document.getElementById('doc-mode-area').style.display = 'none';
+        document.getElementById('dl-btn').style.display = 'none';
+      } else {
+        selectedDocId = id;
+        var d = docs.find(function(x){ return x.id===id; });
+        if (d) {
+          document.getElementById('doc-mode-name').textContent = d.name;
+          document.getElementById('doc-mode-area').style.display = '';
+          document.getElementById('mode-hint').textContent = 'Document text will be appended to your message body.';
+          document.getElementById('dl-btn').style.display = docMode==='attach' ? '' : 'none';
+        }
+      }
+      // re-render rows to update selection highlight
+      el.querySelectorAll('[data-sdoc]').forEach(function(r) {
+        r.classList.toggle('selected', parseInt(r.dataset.sdoc)===selectedDocId);
+      });
+      updateSendBtns();
+    });
+  });
 }
 
-function togglePlayerFilter(level, btn) {
-  if (playerFilters.has(level)) { playerFilters.delete(level); btn.classList.remove('active'); }
-  else { playerFilters.add(level); btn.classList.add('active'); }
-  renderPlayerTable();
-}
-
-function renderPlayerTable() {
+function renderPlayers() {
   loadPlayers();
-  const q = (document.getElementById('player-search')?.value || '').toLowerCase();
-  let players = allPlayers;
+  var q      = document.getElementById('p-search').value.toLowerCase();
+  var active = Array.from(document.querySelectorAll('[data-pf].on')).map(function(b){ return b.dataset.pf; });
+  var list   = allPlayers;
 
-  if (playerFilters.size) {
-    players = players.filter(p => {
-      const lvl = (p.level || '').toUpperCase();
-      return [...playerFilters].some(f => {
-        if (f === 'LJ') return lvl.includes('LJ');
-        if (f === 'PH') return lvl.includes('PH');
-        if (f === 'ADM') return lvl.includes('ADM') || lvl.includes('MITE');
-        if (f === 'IH') return lvl.includes('INHOUSE') || lvl.includes('IH');
+  if (active.length) {
+    list = list.filter(function(p) {
+      var lvl = (p.level||'').toUpperCase();
+      return active.some(function(f) {
+        if (f==='LJ')  return lvl.includes('LJ');
+        if (f==='PH')  return lvl.includes('PH');
+        if (f==='ADM') return lvl.includes('ADM')||lvl.includes('MITE');
+        if (f==='IH')  return lvl.includes('INHOUSE')||lvl===('IH');
         return false;
       });
     });
   }
-  if (q) players = players.filter(p =>
-    `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
-    (p.parent1_name||'').toLowerCase().includes(q) ||
-    (p.parent1_email||'').toLowerCase().includes(q)
-  );
+  if (q) {
+    list = list.filter(function(p) {
+      return (p.first_name+' '+p.last_name).toLowerCase().includes(q)
+        || (p.parent1_email||'').toLowerCase().includes(q);
+    });
+  }
 
-  const tbody = document.getElementById('player-tbody');
-  if (!players.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No players match. Make sure players are synced in <a href="playerdb.html" style="color:var(--gold);">Player DB</a>.</td></tr>';
+  var tbody = document.getElementById('p-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;">No players found. Sync from <a href="playerdb.html" style="color:var(--gold);">Player DB</a>.</td></tr>';
     updateSelCount();
     return;
   }
 
-  tbody.innerHTML = players.map(p => {
-    const pid = `${p.first_name}_${p.last_name}_${p.birthdate||''}`;
-    const chk = selectedPlayers.has(pid);
-    const lvl = p.level || '';
-    const lvlClass = lvl.toUpperCase().includes('LJ') ? 'lj' : lvl.toUpperCase().includes('PH') ? 'ph' : lvl.toUpperCase().includes('MITE')||lvl.toUpperCase()==='ADM' ? 'adm' : lvl.toUpperCase().includes('INHOUSE') ? 'ih' : '';
-    return `
-    <tr onclick="togglePlayer('${escAttr(pid)}',this)" style="cursor:pointer;">
-      <td><input type="checkbox" class="chk player-chk" ${chk?'checked':''} data-pid="${escAttr(pid)}" onchange="togglePlayer('${escAttr(pid)}',this.closest('tr'));event.stopPropagation()"/></td>
-      <td><strong>${escHtml(p.first_name)} ${escHtml(p.last_name)}</strong></td>
-      <td>${lvlClass ? `<span class="badge badge-${lvlClass}">${escHtml(lvl)}</span>` : escHtml(lvl)}</td>
-      <td style="font-size:.75rem;color:var(--text-muted);">${escHtml(p.parent1_email||'-')}</td>
-      <td style="font-size:.75rem;color:var(--text-muted);">${escHtml(p.parent2_email||'-')}</td>
-    </tr>`;
+  tbody.innerHTML = list.map(function(p) {
+    var pid  = p.first_name+'_'+p.last_name+'_'+(p.birthdate||'');
+    var lvl  = p.level||'';
+    var cls  = lvl.toUpperCase().includes('LJ') ? 'lj' : lvl.toUpperCase().includes('PH') ? 'ph' : (lvl.toUpperCase().includes('MITE')||lvl.toUpperCase()==='ADM') ? 'adm' : lvl.toUpperCase().includes('INHOUSE') ? 'ih' : '';
+    var chkd = selectedPids[pid] ? 'checked' : '';
+    var rowcls = selectedPids[pid] ? 'sel-row' : '';
+    return '<tr class="'+rowcls+'" data-pid="'+esc(pid)+'">'
+      + '<td><input type="checkbox" '+chkd+' data-cpid="'+esc(pid)+'"/></td>'
+      + '<td><strong>'+esc(p.first_name)+' '+esc(p.last_name)+'</strong></td>'
+      + '<td>'+(cls?'<span class="badge badge-'+cls+'">'+esc(lvl)+'</span>':esc(lvl))+'</td>'
+      + '<td style="font-size:.72rem;color:var(--muted);">'+esc(p.parent1_email||'--')+'</td>'
+      + '<td style="font-size:.72rem;color:var(--muted);">'+esc(p.parent2_email||'--')+'</td>'
+      + '</tr>';
   }).join('');
 
+  // row click toggles selection
+  tbody.querySelectorAll('tr[data-pid]').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      // don't double-fire if clicking the checkbox itself
+      if (e.target.type === 'checkbox') return;
+      var pid = row.dataset.pid;
+      togglePid(pid, row);
+    });
+    var chk = row.querySelector('input[type=checkbox]');
+    if (chk) {
+      chk.addEventListener('change', function(e) {
+        e.stopPropagation();
+        var pid = chk.dataset.cpid;
+        if (chk.checked) { selectedPids[pid] = true; row.classList.add('sel-row'); }
+        else { delete selectedPids[pid]; row.classList.remove('sel-row'); }
+        updateSelCount();
+        updateToBox();
+      });
+    }
+  });
+
   updateSelCount();
 }
 
-function togglePlayer(pid, row) {
-  if (selectedPlayers.has(pid)) selectedPlayers.delete(pid);
-  else selectedPlayers.add(pid);
-  const chk = row.querySelector('.player-chk');
-  if (chk) chk.checked = selectedPlayers.has(pid);
-  row.style.background = selectedPlayers.has(pid) ? 'rgba(201,168,76,.08)' : '';
+function togglePid(pid, row) {
+  if (selectedPids[pid]) { delete selectedPids[pid]; row.classList.remove('sel-row'); }
+  else { selectedPids[pid] = true; row.classList.add('sel-row'); }
+  var chk = row.querySelector('input[type=checkbox]');
+  if (chk) chk.checked = !!selectedPids[pid];
   updateSelCount();
-  updateToDisplay();
+  updateToBox();
 }
 
-function selectAllVisible() {
-  document.querySelectorAll('.player-chk').forEach(chk => {
-    selectedPlayers.add(chk.dataset.pid);
-    chk.checked = true;
-    chk.closest('tr').style.background = 'rgba(201,168,76,.08)';
+function selectVisible() {
+  document.querySelectorAll('#p-tbody tr[data-pid]').forEach(function(row) {
+    var pid = row.dataset.pid;
+    selectedPids[pid] = true;
+    row.classList.add('sel-row');
+    var chk = row.querySelector('input[type=checkbox]');
+    if (chk) chk.checked = true;
   });
   document.getElementById('chk-all').checked = true;
   updateSelCount();
-  updateToDisplay();
+  updateToBox();
 }
 
-function clearSelection() {
-  selectedPlayers.clear();
-  document.querySelectorAll('.player-chk').forEach(chk => {
-    chk.checked = false;
-    chk.closest('tr').style.background = '';
+function clearSel() {
+  selectedPids = {};
+  document.querySelectorAll('#p-tbody tr[data-pid]').forEach(function(row) {
+    row.classList.remove('sel-row');
+    var chk = row.querySelector('input[type=checkbox]');
+    if (chk) chk.checked = false;
   });
   document.getElementById('chk-all').checked = false;
   updateSelCount();
-  updateToDisplay();
-}
-
-function toggleAll(masterChk) {
-  if (masterChk.checked) selectAllVisible();
-  else clearSelection();
+  updateToBox();
 }
 
 function updateSelCount() {
-  document.getElementById('sel-count').textContent = `${selectedPlayers.size} selected`;
-  updateSendButtons();
+  document.getElementById('sel-count').textContent = Object.keys(selectedPids).length+' selected';
+  updateSendBtns();
 }
 
-function getSelectedEmails() {
-  const emails = new Set();
-  selectedPlayers.forEach(pid => {
-    const p = allPlayers.find(x => `${x.first_name}_${x.last_name}_${x.birthdate||''}` === pid);
+function getAutoEmails() {
+  var set = {};
+  Object.keys(selectedPids).forEach(function(pid) {
+    var p = allPlayers.find(function(x){ return (x.first_name+'_'+x.last_name+'_'+(x.birthdate||''))===pid; });
     if (!p) return;
-    if (p.parent1_email) emails.add(p.parent1_email.trim().toLowerCase());
-    if (p.parent2_email) emails.add(p.parent2_email.trim().toLowerCase());
+    if (p.parent1_email && p.parent1_email.trim()) set[p.parent1_email.trim().toLowerCase()] = true;
+    if (p.parent2_email && p.parent2_email.trim()) set[p.parent2_email.trim().toLowerCase()] = true;
   });
-  return [...emails];
+  return Object.keys(set).filter(function(e){ return !removedEmails[e]; });
 }
 
-// manually added emails (not tied to a player selection)
-let manualEmails = new Set();
-// emails explicitly removed from the auto-set
-let removedEmails = new Set();
-
-function addManualEmail() {
-  const inp = document.getElementById('manual-email');
-  const val = inp.value.trim().toLowerCase();
-  if (!val || !/^[^@]+@[^@]+\.[^@]+$/.test(val)) { toast('Enter a valid email address.', 'error'); return; }
-  manualEmails.add(val);
-  removedEmails.delete(val); // un-remove if it was removed before
-  inp.value = '';
-  updateToDisplay();
-  toast('Email added.', 'success');
+function getAllEmails() {
+  var auto = getAutoEmails();
+  var combined = {};
+  auto.forEach(function(e){ combined[e]=true; });
+  manualEmails.forEach(function(e){ combined[e]=true; });
+  return Object.keys(combined);
 }
 
-function removeEmail(email) {
-  manualEmails.delete(email);
-  removedEmails.add(email);
-  updateToDisplay();
-}
-
-function getAllActiveEmails() {
-  const auto = getSelectedEmails().filter(e => !removedEmails.has(e));
-  const combined = new Set([...auto, ...manualEmails]);
-  return [...combined];
-}
-
-function updateToDisplay() {
-  const emails = getAllActiveEmails();
-  const el = document.getElementById('compose-to-display');
+function updateToBox() {
+  var emails = getAllEmails();
+  var box = document.getElementById('to-box');
   if (!emails.length) {
-    el.innerHTML = '<span style="color:var(--text-muted);">Select players on the left, or add emails manually above.</span>';
+    box.innerHTML = '<span style="color:var(--muted);font-size:.8rem;">Select players or add emails below.</span>';
   } else {
-    el.innerHTML = emails.map(e =>
-      `<span class="email-chip" data-email="${escHtml(e)}" title="Click to remove">${escHtml(e)}<span class="email-chip-x">?</span></span>`
-    ).join('');
-    // bind clicks via event delegation - avoids escaping issues with inline handlers
-    el.querySelectorAll('.email-chip').forEach(chip => {
-      chip.addEventListener('click', () => removeEmail(chip.dataset.email));
+    box.innerHTML = emails.map(function(e) {
+      return '<span class="chip" data-cemail="'+esc(e)+'">'+esc(e)+' <span style="font-size:.65rem;opacity:.6;">x</span></span>';
+    }).join('');
+    box.querySelectorAll('.chip').forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        var email = chip.dataset.cemail;
+        removedEmails[email] = true;
+        manualEmails = manualEmails.filter(function(x){ return x!==email; });
+        updateToBox();
+      });
     });
   }
-  updateSendButtons();
+  updateSendBtns();
 }
 
-function updateSendButtons() {
-  const inp = document.getElementById('manual-email');
-  const pendingValid = inp && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test((inp.value||'').trim());
-  const hasRecipients = getAllActiveEmails().length > 0 || pendingValid;
-  document.getElementById('send-btn').disabled = !hasRecipients;
-  document.getElementById('copy-btn').disabled = !hasRecipients;
-  // dl-btn visibility is controlled by setDocMode
+function addManualEmail() {
+  var inp = document.getElementById('manual-email');
+  var v   = inp.value.trim().toLowerCase();
+  if (!v) return;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast('Invalid email address', 'err'); return; }
+  delete removedEmails[v];
+  if (!manualEmails.includes(v)) manualEmails.push(v);
+  inp.value = '';
+  updateToBox();
+  toast('Email added', 'ok');
 }
 
-function previewSendState() { updateSendButtons(); }
+function updateSendBtns() {
+  var inp = document.getElementById('manual-email');
+  var pendingOk = inp && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((inp.value||'').trim());
+  var hasR = getAllEmails().length > 0 || pendingOk;
+  document.getElementById('open-mail-btn').disabled = !hasR;
+  document.getElementById('copy-btn').disabled = !hasR;
+}
 
 function openInMail() {
-  // Auto-commit anything still typed in the manual email box
-  const inp = document.getElementById('manual-email');
+  // commit any pending manual email first
+  var inp = document.getElementById('manual-email');
   if (inp && inp.value.trim()) {
-    const v = inp.value.trim().toLowerCase();
-    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { manualEmails.add(v); inp.value = ''; updateToDisplay(); }
+    var v = inp.value.trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      delete removedEmails[v];
+      if (!manualEmails.includes(v)) manualEmails.push(v);
+      inp.value = '';
+      updateToBox();
+    }
   }
-  const emails = getAllActiveEmails();
-  if (!emails.length) { toast('Add at least one recipient first.', 'error'); return; }
 
-  const subject = document.getElementById('email-subject').value || '';
-  let bodyText = document.getElementById('email-body').value || '';
+  var emails = getAllEmails();
+  if (!emails.length) { toast('No recipients', 'err'); return; }
 
-  // Append doc note to body synchronously (no async needed - extraction is too unreliable)
-  if (selectedDocId && docMode !== 'none') {
-    const doc = DOCS.find(d => d.id === selectedDocId);
-    if (doc) {
+  var subject = document.getElementById('e-subject').value || '';
+  var body    = document.getElementById('e-body').value || '';
+
+  // handle doc mode
+  if (selectedDocId) {
+    var d = docs.find(function(x){ return x.id===selectedDocId; });
+    if (d) {
       if (docMode === 'attach') {
-        downloadDoc();
-        bodyText += (bodyText ? '\n\n' : '') + '[See attached: ' + doc.name + ']';
+        triggerDl(d.dataUrl, d.originalName || d.name+'.'+(d.type||'docx'));
+        body += (body ? '\n\n' : '') + '[See attached: ' + d.name + ']';
       } else if (docMode === 'body') {
-        const extracted = extractDocTextSync(doc);
-        if (extracted) {
-          bodyText += (bodyText ? '\n\n--- ' + doc.name + ' ---\n\n' : '') + extracted;
-        } else {
-          bodyText += (bodyText ? '\n\n' : '') + '[Document: ' + doc.name + ' - download separately and reference as needed.]';
-        }
+        var txt = extractDocxText(d);
+        body += (body ? '\n\n' : '') + (txt || '[' + d.name + ']');
       }
     }
   }
 
-  const bcc = emails.join(',');
-  const mailto = 'mailto:?bcc=' + encodeURIComponent(bcc)
-    + '&subject=' + encodeURIComponent(subject)
-    + '&body=' + encodeURIComponent(bodyText);
+  var bcc     = emails.join(',');
+  var mailto  = 'mailto:?bcc=' + encodeURIComponent(bcc)
+              + '&subject=' + encodeURIComponent(subject)
+              + '&body='    + encodeURIComponent(body);
 
-  // Must be synchronous - async breaks the user-gesture chain and browsers block mailto
-  const a = document.createElement('a');
-  a.href = mailto;
-  a.target = '_self';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-
-  toast('Mail client should open now. If nothing happened, check your default mail app is set.', 'success');
+  window.location.href = mailto;
+  toast('Opening mail client...', 'ok');
 }
 
-// Synchronous best-effort docx text extractor (stored/uncompressed entries only)
-function extractDocTextSync(doc) {
-  if (doc.type !== 'docx') return null;
-  try {
-    const base64 = doc.dataUrl.split(',')[1];
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+function copyEmails() {
+  var inp = document.getElementById('manual-email');
+  if (inp && inp.value.trim()) {
+    var v = inp.value.trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      delete removedEmails[v];
+      if (!manualEmails.includes(v)) manualEmails.push(v);
+      inp.value = '';
+      updateToBox();
+    }
+  }
+  var emails = getAllEmails();
+  if (!emails.length) { toast('No emails to copy', 'err'); return; }
+  navigator.clipboard.writeText(emails.join('; ')).then(function(){ toast('Copied '+emails.length+' emails!', 'ok'); });
+}
 
-    // Walk ZIP local file headers looking for word/document.xml with method=0 (stored)
-    let i = 0;
+// best-effort sync docx text extraction (method=0 stored entries only)
+function extractDocxText(d) {
+  if (!d || d.type !== 'docx') return null;
+  try {
+    var b64  = d.dataUrl.split(',')[1];
+    var bin  = atob(b64);
+    var len  = bin.length;
+    var bytes = new Uint8Array(len);
+    for (var i=0; i<len; i++) bytes[i] = bin.charCodeAt(i);
+    var i = 0;
     while (i < bytes.length - 30) {
       if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
-        const method   = bytes[i+8]  | (bytes[i+9]  << 8);
-        const compSize = bytes[i+18] | (bytes[i+19]<<8) | (bytes[i+20]<<16) | (bytes[i+21]<<24);
-        const fnLen    = bytes[i+26] | (bytes[i+27] << 8);
-        const extraLen = bytes[i+28] | (bytes[i+29] << 8);
-        const fn = new TextDecoder().decode(bytes.slice(i+30, i+30+fnLen));
-        const dataStart = i + 30 + fnLen + extraLen;
+        var method   = bytes[i+8]|(bytes[i+9]<<8);
+        var csize    = bytes[i+18]|(bytes[i+19]<<8)|(bytes[i+20]<<16)|(bytes[i+21]<<24);
+        var fnlen    = bytes[i+26]|(bytes[i+27]<<8);
+        var exlen    = bytes[i+28]|(bytes[i+29]<<8);
+        var fn       = new TextDecoder().decode(bytes.slice(i+30, i+30+fnlen));
+        var dstart   = i+30+fnlen+exlen;
         if (fn === 'word/document.xml' && method === 0) {
-          const xml = new TextDecoder().decode(bytes.slice(dataStart, dataStart + compSize));
+          var xml = new TextDecoder().decode(bytes.slice(dstart, dstart+csize));
           return xmlToText(xml);
         }
-        i = dataStart + Math.max(compSize, 0);
-        if (compSize === 0) i++; // guard against infinite loop on zero-length entries
+        i = dstart + Math.max(csize, 0);
+        if (csize === 0) i++;
       } else { i++; }
     }
-    return null;
-  } catch(e) { return null; }
+  } catch(e) {}
+  return null;
 }
 
-
-
 function xmlToText(xml) {
-  // Extract text from <w:t> tags, insert line breaks at <w:p>
   return xml
     .replace(/<w:p[ >][^>]*>/g, '\n')
     .replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, '$1')
     .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
-    .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
-    .replace(/\n{3,}/g,'\n\n')
-    .trim();
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')
+    .replace(/\n{3,}/g,'\n\n').trim();
 }
 
-function downloadDoc() {
-  if (!selectedDocId) return;
-  const doc = DOCS.find(d => d.id === selectedDocId);
-  if (!doc) return;
-  triggerDownload(doc.dataUrl, doc.originalName || doc.name + (doc.type==='xlsx'?'.xlsx':'.docx'));
-  toast('Document downloaded - attach it to your email.', 'success');
-}
-
-function copyEmails() {
-  const inp = document.getElementById('manual-email');
-  if (inp && inp.value.trim()) {
-    const v = inp.value.trim().toLowerCase();
-    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { manualEmails.add(v); inp.value = ''; updateToDisplay(); }
-  }
-  const emails = getAllActiveEmails();
-  if (!emails.length) return;
-  navigator.clipboard.writeText(emails.join('; ')).then(() => toast('Email addresses copied!', 'success'));
-}
-
-// -- HELPERS -------------------------------------------------------------------
-function triggerDownload(dataUrl, filename) {
-  const a = document.createElement('a');
+// ============================================================
+// HELPERS
+// ============================================================
+function triggerDl(dataUrl, filename) {
+  var a = document.createElement('a');
   a.href = dataUrl;
   a.download = filename;
   document.body.appendChild(a);
@@ -992,24 +921,24 @@ function triggerDownload(dataUrl, filename) {
   document.body.removeChild(a);
 }
 
-function fileIcon(name) { return /xlsx|xls/i.test(name) ? '📊' : '📄'; }
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-  return (bytes/(1024*1024)).toFixed(1) + ' MB';
-}
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escAttr(s) { return String(s||'').replace(/'/g,"\\'"); }
-
-function toast(msg, type='') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + type;
-  clearTimeout(t._to);
-  t._to = setTimeout(() => t.className = 'toast', 3200);
+function fmtSize(b) {
+  if (b<1024) return b+'B';
+  if (b<1024*1024) return (b/1024).toFixed(1)+'KB';
+  return (b/1024/1024).toFixed(1)+'MB';
 }
 
-function closeModal() { document.getElementById('modal-bg').classList.remove('open'); }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+var toastTimer;
+function toast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ el.className='toast'; }, 3000);
+}
 </script>
 </body>
 </html>
