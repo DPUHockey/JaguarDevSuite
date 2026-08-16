@@ -3075,15 +3075,93 @@ function renderSummary(){
     drawPieWithLabels('sum-pie-status',byStatus);
   },50);
 }
+let _dashSessFilter = 0; // 0 = all sessions
+
 function renderDashboard(){
   const div=document.getElementById('panel-dashboard');if(!div)return;
   const all=DB.master,act=all.filter(r=>(r.status||'Active')==='Active').length,inact=all.filter(r=>r.status==='Inactive').length,lost=all.filter(r=>r.status==='Lost').length,wbad=all.filter(r=>r.waiver==='Missing').length,wok=all.filter(r=>r.waiver==='Received').length;
-  const alerts=[];
-  [1,2,3,4,5,6].forEach(s=>{['lj1','lj2','lj3','ph1','ph2','ph3'].forEach(g=>{const rows=getGroupRows(s,g),dates=getSessionDates(s);if(!dates.length)return;rows.forEach(r=>{const pa=window.attendData[s]?.[g]?.[playerKey(r)]||{},att=dates.filter(d=>pa[d]).length,pct=Math.round(att/dates.length*100);if(pct<60&&dates.length>=3)alerts.push({name:(r.first_name||'')+' '+(r.last_name||''),pct,level:r.level,session:s,grp:g.toUpperCase()});});});});
-  alerts.sort((a,b)=>a.pct-b.pct);
-  const cards=[1,2,3,4,5,6].map(s=>{const rows=DB['session'+s]||[],pros=DB['promo'+s]||[],conf=pros.filter(p=>p.promo_status!=='Pending').length,pend=pros.filter(p=>p.promo_status==='Pending').length,lj=rows.filter(r=>isLJ(r)).length,ph=rows.filter(r=>isPH(r)).length,wm=rows.filter(r=>r.waiver==='Missing').length;return'<div class="dash-card" onclick="switchMainTab(\'session'+s+'\')">'+'<div class="dash-card-head">Session '+s+'</div>'+'<div class="dash-stat-row"><span class="dash-lbl">Athletes</span><span class="dash-val">'+rows.length+'</span></div>'+'<div class="dash-stat-row"><span class="dash-lbl" style="color:#5CCC88;">LJ</span><span class="dash-val">'+lj+'</span></div>'+'<div class="dash-stat-row"><span class="dash-lbl" style="color:#F07050;">PH</span><span class="dash-val">'+ph+'</span></div>'+'<div class="dash-stat-row"><span class="dash-lbl">Promos</span><span class="dash-val">'+conf+(pend?' <span style="color:var(--gold);font-size:10px;">(+'+pend+' pending)</span>':'')+' </span></div>'+(wm?'<div class="dash-stat-row"><span class="dash-lbl" style="color:#F07050;">! Waiver</span><span class="dash-val" style="color:#F07050;">'+wm+'</span></div>':'')+'</div>';}).join('');
-  if(!document.getElementById('dash-css')){const s=document.createElement('style');s.id='dash-css';s.textContent='.dash-card{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .2s;}.dash-card:hover{border-color:var(--gold);}.dash-card-head{font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}.dash-stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;}.dash-lbl{color:var(--dim);}.dash-val{font-weight:600;}.dash-stat-big{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}.dash-big-num{font-family:\'Bebas Neue\',sans-serif;font-size:36px;letter-spacing:2px;line-height:1;}.dash-big-lbl{font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:4px;}';document.head.appendChild(s);}
-  div.innerHTML='<div style="padding:0 0 28px;"><div class="toolbar"><div class="toolbar-left">Program Dashboard</div><div style="display:flex;gap:6px;"><button class="btn-sm" onclick="exportEmailList()">Export Emails</button><button class="btn-sm" onclick="printRoster()">Print Roster</button></div></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;"><div class="dash-stat-big"><div class="dash-big-num">'+all.length+'</div><div class="dash-big-lbl">Total</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:#5CCC88;">'+act+'</div><div class="dash-big-lbl">Active</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:var(--dim);">'+inact+'</div><div class="dash-big-lbl">Inactive</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:#F07050;">'+lost+'</div><div class="dash-big-lbl">Lost</div></div></div>'+(wbad?'<div style="background:rgba(240,112,80,.1);border:1px solid rgba(240,112,80,.4);border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:13px;color:#F07050;">! '+wbad+' athlete'+(wbad!==1?'s':'')+' with missing waivers &middot; '+wok+' received</div>':'')+(alerts.length?'<div style="margin-bottom:24px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#F07050;margin-bottom:12px;">! Low Attendance (under 60%)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">'+alerts.map(a=>'<div style="background:var(--surf2);border:1px solid rgba(240,112,80,.4);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><div style="font-size:13px;font-weight:500;">'+a.name+'</div><div style="font-size:11px;color:var(--dim);">'+lvBadge(a.level)+' S'+a.session+' '+a.grp+'</div></div><div style="font-size:18px;font-weight:700;color:#F07050;">'+a.pct+'%</div></div>').join('')+'</div></div>':'')+'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:12px;">Sessions</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;">'+cards+'</div></div>';
+
+  // Build full alerts list — include master index so names link to player cards
+  const allAlerts=[];
+  [1,2,3,4,5,6].forEach(s=>{
+    ['lj1','lj2','lj3','ph1','ph2','ph3'].forEach(g=>{
+      const rows=getGroupRows(s,g),dates=getSessionDates(s);
+      if(!dates.length)return;
+      rows.forEach(r=>{
+        const pa=window.attendData[s]?.[g]?.[playerKey(r)]||{},att=dates.filter(d=>pa[d]).length,pct=Math.round(att/dates.length*100);
+        if(pct<60&&dates.length>=3){
+          const mi=DB.master.findIndex(m=>m.first_name===r.first_name&&m.last_name===r.last_name);
+          allAlerts.push({name:(r.first_name||'')+' '+(r.last_name||''),pct,level:r.level,session:s,grp:g.toUpperCase(),masterIdx:mi});
+        }
+      });
+    });
+  });
+  allAlerts.sort((a,b)=>a.pct-b.pct);
+
+  // Filter by selected session
+  const alerts=_dashSessFilter===0?allAlerts:allAlerts.filter(a=>a.session===_dashSessFilter);
+
+  // Session cards — clicking one filters the attendance section
+  const cards=[1,2,3,4,5,6].map(s=>{
+    const rows=DB['session'+s]||[],pros=DB['promo'+s]||[],conf=pros.filter(p=>p.promo_status!=='Pending').length,pend=pros.filter(p=>p.promo_status==='Pending').length,lj=rows.filter(r=>isLJ(r)).length,ph=rows.filter(r=>isPH(r)).length,wm=rows.filter(r=>r.waiver==='Missing').length;
+    const isActive=_dashSessFilter===s;
+    return '<div class="dash-card" onclick="setDashSessFilter('+s+')" style="'+(isActive?'border-color:var(--gold);background:rgba(201,168,76,.06);':'')+'"><div class="dash-card-head">Session '+s+'</div>'
+      +'<div class="dash-stat-row"><span class="dash-lbl">Athletes</span><span class="dash-val">'+rows.length+'</span></div>'
+      +'<div class="dash-stat-row"><span class="dash-lbl" style="color:#5CCC88;">LJ</span><span class="dash-val">'+lj+'</span></div>'
+      +'<div class="dash-stat-row"><span class="dash-lbl" style="color:#F07050;">PH</span><span class="dash-val">'+ph+'</span></div>'
+      +'<div class="dash-stat-row"><span class="dash-lbl">Promos</span><span class="dash-val">'+conf+(pend?' <span style="color:var(--gold);font-size:10px;">(+'+pend+' pending)</span>':'')+' </span></div>'
+      +(wm?'<div class="dash-stat-row"><span class="dash-lbl" style="color:#F07050;">! Waiver</span><span class="dash-val" style="color:#F07050;">'+wm+'</span></div>':'')
+      +'</div>';
+  }).join('');
+
+  if(!document.getElementById('dash-css')){
+    const s=document.createElement('style');s.id='dash-css';
+    s.textContent='.dash-card{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .2s,background .2s;}.dash-card:hover{border-color:var(--gold);}.dash-card-head{font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}.dash-stat-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;}.dash-lbl{color:var(--dim);}.dash-val{font-weight:600;}.dash-stat-big{background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;}.dash-big-num{font-family:\'Bebas Neue\',sans-serif;font-size:36px;letter-spacing:2px;line-height:1;}.dash-big-lbl{font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:4px;}.dsf-btn{background:var(--surf2);border:1px solid var(--border);border-radius:5px;color:var(--dim);font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;cursor:pointer;transition:all .15s;}.dsf-btn.on{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold);}';
+    document.head.appendChild(s);
+  }
+
+  const sessLabel=_dashSessFilter===0?'All Sessions':'Session '+_dashSessFilter;
+
+  const sessFilterBar='<div style="display:flex;align-items:center;gap:5px;margin-bottom:10px;flex-wrap:wrap;">'
+    +'<button class="dsf-btn'+(_dashSessFilter===0?' on':'')+'" onclick="setDashSessFilter(0)">All</button>'
+    +[1,2,3,4,5,6].map(s=>'<button class="dsf-btn'+(_dashSessFilter===s?' on':'')+'" onclick="setDashSessFilter('+s+')">S'+s+'</button>').join('')
+    +'</div>';
+
+  const alertCards=alerts.map(a=>{
+    const nameHtml=a.masterIdx>=0
+      ?'<span onclick="openPlayerCard('+a.masterIdx+')" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" title="Open player card">'+a.name+'</span>'
+      :'<span>'+a.name+'</span>';
+    return '<div style="background:var(--surf2);border:1px solid rgba(240,112,80,.4);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">'
+      +'<div><div style="font-size:13px;font-weight:500;">'+nameHtml+'</div>'
+      +'<div style="font-size:11px;color:var(--dim);">'+lvBadge(a.level)+' S'+a.session+' '+a.grp+'</div></div>'
+      +'<div style="font-size:18px;font-weight:700;color:#F07050;">'+a.pct+'%</div></div>';
+  }).join('');
+
+  div.innerHTML='<div style="padding:0 0 28px;">'
+    +'<div class="toolbar"><div class="toolbar-left">Program Dashboard</div><div style="display:flex;gap:6px;"><button class="btn-sm" onclick="exportEmailList()">Export Emails</button><button class="btn-sm" onclick="printRoster()">Print Roster</button></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;"><div class="dash-stat-big"><div class="dash-big-num">'+all.length+'</div><div class="dash-big-lbl">Total</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:#5CCC88;">'+act+'</div><div class="dash-big-lbl">Active</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:var(--dim);">'+inact+'</div><div class="dash-big-lbl">Inactive</div></div><div class="dash-stat-big"><div class="dash-big-num" style="color:#F07050;">'+lost+'</div><div class="dash-big-lbl">Lost</div></div></div>'
+    +(wbad?'<div style="background:rgba(240,112,80,.1);border:1px solid rgba(240,112,80,.4);border-radius:8px;padding:10px 16px;margin-bottom:20px;font-size:13px;color:#F07050;">! '+wbad+' athlete'+(wbad!==1?'s':'')+' with missing waivers &middot; '+wok+' received</div>':'')
+    +(allAlerts.length
+      ?'<div style="margin-bottom:24px;">'
+        +'<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">'
+        +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#F07050;">! Low Attendance (under 60%)</div>'
+        +'<div style="font-size:11px;color:var(--dim);">&mdash; '+sessLabel+'</div></div>'
+        +sessFilterBar
+        +(alerts.length
+          ?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">'+alertCards+'</div>'
+          :'<div style="font-size:12px;color:var(--dim);padding:6px 0;">No low-attendance athletes in this session.</div>')
+        +'</div>'
+      :'')
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px;">'
+    +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);">Sessions</div>'
+    +'<div style="font-size:11px;color:var(--dim);">Click a session to filter attendance &uarr;</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;">'+cards+'</div>'
+    +'</div>';
+}
+
+function setDashSessFilter(s){
+  _dashSessFilter=s;
+  renderDashboard();
 }
 // ── GEAR SOURCE PARSING ──
 // Storage format: "Rink Rat Rental" | "Jaguar Gear Rental — <bag id>" | "Other — <bag id>"
