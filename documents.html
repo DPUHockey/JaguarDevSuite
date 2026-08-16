@@ -307,7 +307,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v2.3.0</div>
+<div class="ver">v2.4.0</div>
 
 <script>
 // ============================================================
@@ -574,13 +574,15 @@ function setupSend() {
       if (docMode === 'body' && selectedDocId) {
         var d = docs.find(function(x){ return x.id===selectedDocId; });
         if (d) {
-          var txt = extractDocxText(d);
-          if (txt) {
-            document.getElementById('e-body').value = txt;
-            toast('Document text loaded — edit before sending.', 'ok');
-          } else {
-            toast('Could not extract text — use Download & Attach instead.', 'err');
-          }
+          toast('Extracting document text...', '');
+          extractDocxText(d).then(function(txt) {
+            if (txt) {
+              document.getElementById('e-body').value = txt;
+              toast('Document text loaded — edit before sending.', 'ok');
+            } else {
+              toast('Could not extract text — use Download & Attach instead.', 'err');
+            }
+          });
         }
       }
       // If switching AWAY from body mode and body still has the doc text, clear it
@@ -655,11 +657,15 @@ function renderSendDocs() {
           document.getElementById('dl-btn').style.display = docMode==='attach' ? '' : 'none';
           // auto-load into body if mode is already body
           if (docMode === 'body') {
-            var txt = extractDocxText(d);
-            if (txt) {
-              document.getElementById('e-body').value = txt;
-              toast('Document text loaded — edit before sending.', 'ok');
-            }
+            toast('Extracting document text...', '');
+            extractDocxText(d).then(function(txt) {
+              if (txt) {
+                document.getElementById('e-body').value = txt;
+                toast('Document text loaded — edit before sending.', 'ok');
+              } else {
+                toast('Could not extract text — switch to Download & Attach.', 'err');
+              }
+            });
           }
         }
       }
@@ -904,33 +910,62 @@ function copyEmails() {
 }
 
 // best-effort sync docx text extraction (method=0 stored entries only)
+// Async docx extractor — handles deflate-compressed entries via DecompressionStream
 function extractDocxText(d) {
-  if (!d || d.type !== 'docx') return null;
-  try {
-    var b64  = d.dataUrl.split(',')[1];
-    var bin  = atob(b64);
-    var len  = bin.length;
-    var bytes = new Uint8Array(len);
-    for (var i=0; i<len; i++) bytes[i] = bin.charCodeAt(i);
-    var i = 0;
-    while (i < bytes.length - 30) {
-      if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
-        var method   = bytes[i+8]|(bytes[i+9]<<8);
-        var csize    = bytes[i+18]|(bytes[i+19]<<8)|(bytes[i+20]<<16)|(bytes[i+21]<<24);
-        var fnlen    = bytes[i+26]|(bytes[i+27]<<8);
-        var exlen    = bytes[i+28]|(bytes[i+29]<<8);
-        var fn       = new TextDecoder().decode(bytes.slice(i+30, i+30+fnlen));
-        var dstart   = i+30+fnlen+exlen;
-        if (fn === 'word/document.xml' && method === 0) {
-          var xml = new TextDecoder().decode(bytes.slice(dstart, dstart+csize));
-          return xmlToText(xml);
-        }
-        i = dstart + Math.max(csize, 0);
-        if (csize === 0) i++;
-      } else { i++; }
-    }
-  } catch(e) {}
-  return null;
+  if (!d || d.type !== 'docx') return Promise.resolve(null);
+  return new Promise(function(resolve) {
+    try {
+      var b64   = d.dataUrl.split(',')[1];
+      var bin   = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+      // Walk ZIP local file headers
+      var i = 0;
+      while (i < bytes.length - 30) {
+        if (bytes[i]===0x50 && bytes[i+1]===0x4B && bytes[i+2]===0x03 && bytes[i+3]===0x04) {
+          var method = bytes[i+8]  | (bytes[i+9]  << 8);
+          var csize  = bytes[i+18] | (bytes[i+19] << 8) | (bytes[i+20] << 16) | (bytes[i+21] << 24);
+          var fnlen  = bytes[i+26] | (bytes[i+27] << 8);
+          var exlen  = bytes[i+28] | (bytes[i+29] << 8);
+          var fn     = new TextDecoder().decode(bytes.slice(i+30, i+30+fnlen));
+          var dstart = i + 30 + fnlen + exlen;
+          if (fn === 'word/document.xml') {
+            var chunk = bytes.slice(dstart, dstart + csize);
+            if (method === 0) {
+              // stored — no compression
+              resolve(xmlToText(new TextDecoder().decode(chunk)));
+            } else if (method === 8 && typeof DecompressionStream !== 'undefined') {
+              // deflate-compressed
+              var ds     = new DecompressionStream('deflate-raw');
+              var writer = ds.writable.getWriter();
+              var reader = ds.readable.getReader();
+              var parts  = [];
+              function pump() {
+                reader.read().then(function(r) {
+                  if (r.done) {
+                    var out = new Uint8Array(parts.reduce(function(a,p){ return a+p.length; }, 0));
+                    var off = 0;
+                    parts.forEach(function(p){ out.set(p, off); off += p.length; });
+                    resolve(xmlToText(new TextDecoder().decode(out)));
+                  } else { parts.push(r.value); pump(); }
+                }).catch(function(){ resolve(null); });
+              }
+              pump();
+              writer.write(chunk);
+              writer.close();
+            } else {
+              resolve(null);
+            }
+            return;
+          }
+          i = dstart + Math.max(csize, 0);
+          if (csize === 0) i++;
+        } else { i++; }
+      }
+      resolve(null);
+    } catch(e) { resolve(null); }
+  });
 }
 
 function xmlToText(xml) {
