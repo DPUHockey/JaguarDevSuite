@@ -307,7 +307,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v2.1.0</div>
+<div class="ver">v2.3.0</div>
 
 <script>
 // ============================================================
@@ -560,15 +560,33 @@ function setupSend() {
   // doc mode buttons
   document.querySelectorAll('[data-mode]').forEach(function(btn) {
     btn.addEventListener('click', function() {
+      var prevMode = docMode;
       docMode = btn.dataset.mode;
       document.querySelectorAll('[data-mode]').forEach(function(b){ b.classList.toggle('on', b.dataset.mode===docMode); });
       var hints = {
-        body:   'Document text will be appended to your message body.',
-        attach: 'Document will be downloaded to your computer to attach manually.',
-        none:   'Document will not be included.'
+        body:   'Document text loaded into the message body below — edit freely before sending.',
+        attach: 'Document will download when you click Open in Mail. Drag it into Gmail before sending.',
+        none:   'Document will not be included — compose your message freely.'
       };
       document.getElementById('mode-hint').textContent = hints[docMode];
       document.getElementById('dl-btn').style.display = docMode==='attach' ? '' : 'none';
+      // If switching TO body mode, load the doc text into the textarea now
+      if (docMode === 'body' && selectedDocId) {
+        var d = docs.find(function(x){ return x.id===selectedDocId; });
+        if (d) {
+          var txt = extractDocxText(d);
+          if (txt) {
+            document.getElementById('e-body').value = txt;
+            toast('Document text loaded — edit before sending.', 'ok');
+          } else {
+            toast('Could not extract text — use Download & Attach instead.', 'err');
+          }
+        }
+      }
+      // If switching AWAY from body mode and body still has the doc text, clear it
+      if (prevMode === 'body' && docMode !== 'body') {
+        // only clear if user hasn't edited (we can't know for sure, so just leave it)
+      }
     });
   });
 
@@ -629,8 +647,20 @@ function renderSendDocs() {
         if (d) {
           document.getElementById('doc-mode-name').textContent = d.name;
           document.getElementById('doc-mode-area').style.display = '';
-          document.getElementById('mode-hint').textContent = 'Document text will be appended to your message body.';
+          document.getElementById('mode-hint').textContent = docMode === 'body'
+            ? 'Document text loaded into the message body below — edit freely before sending.'
+            : docMode === 'attach'
+            ? 'Document will download when you click Open in Mail.'
+            : 'Document will not be included.';
           document.getElementById('dl-btn').style.display = docMode==='attach' ? '' : 'none';
+          // auto-load into body if mode is already body
+          if (docMode === 'body') {
+            var txt = extractDocxText(d);
+            if (txt) {
+              document.getElementById('e-body').value = txt;
+              toast('Document text loaded — edit before sending.', 'ok');
+            }
+          }
         }
       }
       // re-render rows to update selection highlight
@@ -839,8 +869,8 @@ function openInMail() {
         triggerDl(d.dataUrl, d.originalName || d.name+'.'+(d.type||'docx'));
         body += (body ? '\n\n' : '') + '[See attached: ' + d.name + ']';
       } else if (docMode === 'body') {
-        var txt = extractDocxText(d);
-        body += (body ? '\n\n' : '') + (txt || '[' + d.name + ']');
+        // body textarea already has the doc text (loaded when user selected doc/mode)
+        // body var was already set from e-body above — nothing extra needed
       }
     }
   }
@@ -904,12 +934,22 @@ function extractDocxText(d) {
 }
 
 function xmlToText(xml) {
-  return xml
-    .replace(/<w:p[ >][^>]*>/g, '\n')
-    .replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, '$1')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')
-    .replace(/\n{3,}/g,'\n\n').trim();
+  // preserve explicit line breaks
+  xml = xml.replace(/<w:br[^/]*/g, '<w:br').replace(/<w:br\/>/g, '\n');
+  // tabs -> spaces
+  xml = xml.replace(/<w:tab\/>/g, '    ');
+  // each paragraph opening -> newline before it
+  xml = xml.replace(/<w:p[ >\/][^>]*>/g, '\n');
+  // extract text runs
+  xml = xml.replace(/<w:t[^>]*xml:space[^>]*>([\s\S]*?)<\/w:t>/g, '$1');
+  xml = xml.replace(/<w:t[^>]*>([^<]*)<\/w:t>/g, '$1');
+  // strip remaining tags
+  xml = xml.replace(/<[^>]+>/g, '');
+  // decode entities
+  xml = xml.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ');
+  // normalize: no more than 2 consecutive blank lines
+  xml = xml.replace(/\n{3,}/g, '\n\n');
+  return xml.trim();
 }
 
 // ============================================================
