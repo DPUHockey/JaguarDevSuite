@@ -313,6 +313,63 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 <div class="toast" id="toast"></div>
 <div class="ver">v2.5.0</div>
 
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+const firebaseConfig = {
+  apiKey: "AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",
+  authDomain: "jaguardevsuite.firebaseapp.com",
+  databaseURL: "https://jaguardevsuite-default-rtdb.firebaseio.com",
+  projectId: "jaguardevsuite",
+  storageBucket: "jaguardevsuite.firebasestorage.app",
+  messagingSenderId: "383805859949",
+  appId: "1:383805859949:web:e33d21ee74036e75b43764"
+};
+const fbApp = initializeApp(firebaseConfig);
+const fbDb  = getDatabase(fbApp);
+window._fbDb  = fbDb;
+window._fbRef = ref;
+window._fbSet = set;
+window._fbGet = get;
+
+// Load documents from Firebase on startup
+// Docs are stored as individual nodes: jaguar_db/documents/<id>
+// Each node has all doc fields including dataUrl (base64 file)
+get(ref(fbDb,'jaguar_db/documents')).then(snap=>{
+  const data=snap.val();
+  if(data){
+    try{
+      // Firebase stores as object keyed by id — convert to array
+      const arr=Object.values(data).sort((a,b)=>b.id-a.id);
+      localStorage.setItem('jds_docs_v1',JSON.stringify(arr));
+      window.dispatchEvent(new Event('docs-fb-loaded'));
+    }catch(e){}
+  }
+  window._docsFbReady=true;
+  window.dispatchEvent(new Event('docs-fb-ready'));
+}).catch(()=>{
+  window._docsFbReady=true;
+  window.dispatchEvent(new Event('docs-fb-ready'));
+});
+
+// Live listener — another device added/removed a doc
+onValue(ref(fbDb,'jaguar_db/documents'),snap=>{
+  if(window._docsLocalWrite)return;
+  const data=snap.val();
+  if(!data)return;
+  try{
+    const arr=Object.values(data).sort((a,b)=>b.id-a.id);
+    localStorage.setItem('jds_docs_v1',JSON.stringify(arr));
+    if(window._docsFbReady&&window.loadDocs){
+      window.loadDocs();
+      if(window.renderLibrary)window.renderLibrary();
+      const t=document.getElementById('toast');
+      if(t){t.textContent='Library updated from another device';t.className='toast show ok';clearTimeout(t._to);t._to=setTimeout(()=>{t.className='toast';},3000);}
+    }
+  }catch(e){}
+});
+</script>
+
 <script>
 // ============================================================
 // AUTH
@@ -367,8 +424,25 @@ var docs = [];
 function loadDocs() {
   try { docs = JSON.parse(localStorage.getItem(DOCS_KEY)) || []; } catch(e) { docs = []; }
 }
+window.loadDocs = loadDocs;
+window.renderLibrary = function(){ if(typeof renderLibrary === 'function') renderLibrary(); };
 function saveDocs() {
   try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch(e) { toast('Storage full', 'err'); }
+  // Sync to Firebase — store each doc under its id so devices can merge
+  if(window._fbDb && window._fbRef && window._fbSet) {
+    try {
+      window._docsLocalWrite = true;
+      // Build object keyed by doc id
+      var fbDocs = {};
+      docs.forEach(function(d){ fbDocs['doc_'+d.id] = d; });
+      // Skip Firebase sync if total payload > 8MB to avoid RTDB write limit
+      var payloadSize=JSON.stringify(fbDocs).length;
+      if(payloadSize > 8*1024*1024){ toast('Library too large to sync (>8MB) — stored locally only','err'); window._docsLocalWrite=false; return; }
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), fbDocs)
+        .then(function(){ setTimeout(function(){ window._docsLocalWrite=false; }, 1500); })
+        .catch(function(){ window._docsLocalWrite=false; });
+    } catch(e) { window._docsLocalWrite=false; }
+  }
 }
 
 // ============================================================
