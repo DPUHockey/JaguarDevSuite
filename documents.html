@@ -176,12 +176,14 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
       <div class="card">
         <div class="card-title">Upload Document</div>
         <div class="card-sub">Store .docx or .xlsx form letters here to use when sending emails. Files stay in your browser storage.</div>
-        <div class="upload-zone" id="upload-zone">
-          <div style="font-size:2.5rem;margin-bottom:.5rem;">&#128196;</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.3rem;">Drop file here or click to browse</div>
-          <div style="font-size:.78rem;color:var(--muted);">Accepts .docx and .xlsx &mdash; max 5 MB</div>
-        </div>
-        <input type="file" id="file-input" accept=".docx,.doc,.xlsx,.xls" multiple/>
+        <label for="file-input" style="display:block;cursor:pointer;">
+          <div class="upload-zone" id="upload-zone">
+            <div style="font-size:2.5rem;margin-bottom:.5rem;">&#128196;</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.1em;color:var(--gold);margin-bottom:.3rem;">Drop file here or click to browse</div>
+            <div style="font-size:.78rem;color:var(--muted);">Accepts .docx and .xlsx &mdash; max 5 MB</div>
+          </div>
+        </label>
+        <input type="file" id="file-input" accept=".docx,.doc,.xlsx,.xls" multiple style="display:none;"/>
         <div id="upload-form" style="display:none;margin-top:1.2rem;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem;">
             <div>
@@ -337,12 +339,38 @@ window._fbGet = get;
 // Each node has all doc fields including dataUrl (base64 file)
 get(ref(fbDb,'jaguar_db/documents')).then(snap=>{
   const data=snap.val();
-  if(data){
+  if(data && Object.keys(data).length > 0){
     try{
-      // Firebase stores as object keyed by id — convert to array
-      const arr=Object.values(data).sort((a,b)=>b.id-a.id);
+      // Merge Firebase docs with local docs — union by id, Firebase wins on conflict
+      const fbArr=Object.values(data);
+      let localArr=[];
+      try{ localArr=JSON.parse(localStorage.getItem('jds_docs_v1'))||[]; }catch(e){}
+      const merged={};
+      localArr.forEach(d=>{ merged[d.id]=d; });
+      fbArr.forEach(d=>{ merged[d.id]=d; }); // Firebase overwrites local on same id
+      const arr=Object.values(merged).sort((a,b)=>b.id-a.id);
       localStorage.setItem('jds_docs_v1',JSON.stringify(arr));
+      // If we have local docs Firebase doesn't know about yet, push them up
+      const localOnly=localArr.filter(d=>!data['doc_'+d.id]);
+      if(localOnly.length>0){
+        // push local-only docs to Firebase so all devices get them
+        const toWrite={};
+        arr.forEach(d=>{ toWrite['doc_'+d.id]=d; });
+        const sz=JSON.stringify(toWrite).length;
+        if(sz<8*1024*1024) set(ref(fbDb,'jaguar_db/documents'),toWrite).catch(()=>{});
+      }
       window.dispatchEvent(new Event('docs-fb-loaded'));
+    }catch(e){}
+  } else if(!data || Object.keys(data).length===0) {
+    // Firebase is empty — push local docs up to seed it
+    try{
+      const localArr=JSON.parse(localStorage.getItem('jds_docs_v1'))||[];
+      if(localArr.length>0){
+        const toWrite={};
+        localArr.forEach(d=>{ toWrite['doc_'+d.id]=d; });
+        const sz=JSON.stringify(toWrite).length;
+        if(sz<8*1024*1024) set(ref(fbDb,'jaguar_db/documents'),toWrite).catch(()=>{});
+      }
     }catch(e){}
   }
   window._docsFbReady=true;
@@ -356,9 +384,15 @@ get(ref(fbDb,'jaguar_db/documents')).then(snap=>{
 onValue(ref(fbDb,'jaguar_db/documents'),snap=>{
   if(window._docsLocalWrite)return;
   const data=snap.val();
-  if(!data)return;
+  if(!data||Object.keys(data).length===0)return; // never wipe local on empty Firebase
   try{
-    const arr=Object.values(data).sort((a,b)=>b.id-a.id);
+    const fbArr=Object.values(data);
+    let localArr=[];
+    try{ localArr=JSON.parse(localStorage.getItem('jds_docs_v1'))||[]; }catch(e){}
+    const merged={};
+    localArr.forEach(d=>{ merged[d.id]=d; });
+    fbArr.forEach(d=>{ merged[d.id]=d; });
+    const arr=Object.values(merged).sort((a,b)=>b.id-a.id);
     localStorage.setItem('jds_docs_v1',JSON.stringify(arr));
     if(window._docsFbReady&&window.loadDocs){
       window.loadDocs();
@@ -583,7 +617,11 @@ function setupUpload() {
   var zone  = document.getElementById('upload-zone');
   var input = document.getElementById('file-input');
 
-  zone.addEventListener('click', function(){ input.click(); });
+  zone.addEventListener('click', function(e){
+    if(e.target === input) return; // don't recurse
+    input.value=''; // reset so same file can be re-selected
+    input.click();
+  });
   zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
   zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFiles(Array.from(e.dataTransfer.files)); });
