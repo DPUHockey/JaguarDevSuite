@@ -284,7 +284,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v3.2.0</div>
+<div class="ver">v3.3.0</div>
 
 <!-- ═══════════ FIREBASE ═══════════ -->
 <script type="module">
@@ -318,47 +318,60 @@ const docsRef = ref(fbDb, 'jaguar_db/documents');
 // Pull once first so we can merge before the live listener fires
 get(docsRef).then(snap => {
   const fbData = snap.val();
+  console.log('[DOCS FB] initial get - fbData keys:', fbData ? Object.keys(fbData).length : 0);
   let local = [];
   try { local = JSON.parse(localStorage.getItem('jds_docs_v1')) || []; } catch(e) {}
+  console.log('[DOCS FB] local docs:', local.length);
 
   if (fbData && Object.keys(fbData).length > 0) {
-    // Merge: local + Firebase, Firebase wins on conflict
     const merged = {};
     local.forEach(d => { merged[d.id] = d; });
     Object.values(fbData).forEach(d => { merged[d.id] = d; });
     const arr = Object.values(merged).sort((a,b) => b.id - a.id);
     try { localStorage.setItem('jds_docs_v1', JSON.stringify(arr)); } catch(e) {}
-    // Push any local-only docs up to Firebase
     const localOnly = local.filter(d => !fbData['doc_'+d.id]);
+    console.log('[DOCS FB] local-only docs not in Firebase:', localOnly.length);
     if (localOnly.length > 0) {
       const toWrite = {};
       arr.forEach(d => { toWrite['doc_'+d.id] = d; });
-      if (JSON.stringify(toWrite).length < 8*1024*1024) {
+      const sz = JSON.stringify(toWrite).length;
+      console.log('[DOCS FB] pushing merged set, size:', sz);
+      if (sz < 8*1024*1024) {
         window._fbLocalWrite = true;
-        set(docsRef, toWrite).finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+        set(docsRef, toWrite)
+          .then(() => console.log('[DOCS FB] push succeeded'))
+          .catch(e => console.error('[DOCS FB] push failed:', e))
+          .finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+      } else {
+        console.warn('[DOCS FB] payload too large, skipping push:', sz);
       }
     }
     window._setSyncStatus('Synced ✔ ('+arr.length+' docs)', '#5CCC88');
   } else if (local.length > 0) {
-    // Firebase empty — seed it with all local docs
     const toWrite = {};
     local.forEach(d => { toWrite['doc_'+d.id] = d; });
-    if (JSON.stringify(toWrite).length < 8*1024*1024) {
-      window._setSyncStatus('Uploading '+local.length+' docs to cloud…', '#C9A84C');
+    const sz = JSON.stringify(toWrite).length;
+    console.log('[DOCS FB] Firebase empty, seeding with local docs, size:', sz);
+    if (sz < 8*1024*1024) {
+      window._setSyncStatus('Uploading '+local.length+' docs to cloud...', '#C9A84C');
       window._fbLocalWrite = true;
       set(docsRef, toWrite)
-        .then(() => { window._setSyncStatus('Synced ✔ ('+local.length+' docs)', '#5CCC88'); })
-        .catch(() => { window._setSyncStatus('Upload failed', '#F07050'); })
+        .then(() => { console.log('[DOCS FB] seed succeeded'); window._setSyncStatus('Synced ✔ ('+local.length+' docs)', '#5CCC88'); })
+        .catch(e => { console.error('[DOCS FB] seed failed:', e); window._setSyncStatus('Upload failed: '+e.message, '#F07050'); })
         .finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+    } else {
+      console.warn('[DOCS FB] local payload too large:', sz);
+      window._setSyncStatus('Library >8MB - cannot sync', '#F07050');
     }
   } else {
-    window._setSyncStatus('Cloud empty — upload a doc to sync', '#888');
+    window._setSyncStatus('Cloud empty - upload a doc to sync', '#888');
   }
 
   window._fbReady = true;
   document.dispatchEvent(new Event('fb-ready'));
 }).catch(e => {
-  window._setSyncStatus('Cloud unavailable', '#F07050');
+  console.error('[DOCS FB] initial get failed:', e);
+  window._setSyncStatus('Cloud unavailable: '+e.message, '#F07050');
   window._fbReady = true;
   document.dispatchEvent(new Event('fb-ready'));
 });
@@ -366,8 +379,10 @@ get(docsRef).then(snap => {
 // ── LIVE LISTENER — fires on connect AND on every remote change ──
 // This is the same pattern db.html uses for real-time cross-device sync
 onValue(docsRef, snap => {
+  console.log('[DOCS FB] onValue fired, _fbLocalWrite:', window._fbLocalWrite, '_fbReady:', window._fbReady);
   if (window._fbLocalWrite) return; // skip our own writes
   const fbData = snap.val();
+  console.log('[DOCS FB] onValue data keys:', fbData ? Object.keys(fbData).length : 0);
   if (!fbData || Object.keys(fbData).length === 0) return;
 
   if (!window._fbReady) return; // wait until initial load done
