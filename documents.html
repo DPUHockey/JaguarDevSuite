@@ -284,7 +284,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v3.5.0</div>
+<div class="ver">v3.6.0</div>
 
 <!-- Early stubs so module/main scripts can call these before defining them -->
 <script>
@@ -410,7 +410,9 @@ onValue(docsRef, snap => {
   local.forEach(d => { merged[d.id] = d; });
   Object.values(fbData).forEach(d => { merged[d.id] = d; });
   const arr = Object.values(merged).sort((a,b) => b.id - a.id);
-  try { localStorage.setItem('jds_docs_v1', JSON.stringify(arr)); } catch(e) {}
+  console.log('[DOCS FB] merging - local:', local.length, 'fb:', Object.values(fbData).length, 'merged:', arr.length);
+  console.log('[DOCS FB] first merged doc keys:', arr.length ? Object.keys(arr[0]).join(',') : 'none');
+  try { localStorage.setItem('jds_docs_v1', JSON.stringify(arr)); } catch(e) { console.error('[DOCS FB] localStorage write failed:', e); }
 
   // Update the live app if it's running, otherwise data is in localStorage for startApp
   if (window._appReady && window.loadDocs && window.renderLib) {
@@ -535,6 +537,8 @@ function setFilter(f, btn) {
 
 function renderLib() {
   loadDocs();
+  console.log('[renderLib] docs count:', docs.length, 'localStorage key jds_docs_v1 length:', (localStorage.getItem('jds_docs_v1')||'').length);
+  if (docs.length > 0) console.log('[renderLib] first doc:', JSON.stringify(docs[0]).slice(0,100));
   var q = (document.getElementById('lib-q')||{}).value || '';
   q = q.toLowerCase();
   var list = docs.filter(function(d){
