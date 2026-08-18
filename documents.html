@@ -144,6 +144,10 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
     <div class="tab"     onclick="showTab('upload')">Upload</div>
     <div class="tab"     onclick="showTab('send')">Send Email</div>
   </div>
+  <div id="sync-bar" style="background:var(--bg2);border-bottom:1px solid #222;padding:.4rem 1.5rem;display:flex;align-items:center;gap:.8rem;font-size:.75rem;color:var(--dim);">
+    <span id="sync-status">&#9679; Connecting to cloud...</span>
+    <button class="btn sm sec" onclick="forcePushToCloud()" style="margin-left:auto;font-size:.68rem;padding:.25rem .65rem;">&#x2191; Sync to Cloud</button>
+  </div>
 
   <!-- LIBRARY -->
   <div id="pane-library" class="pane on">
@@ -280,12 +284,13 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v3.0.0</div>
+<div class="ver">v3.2.0</div>
 
 <!-- ═══════════ FIREBASE ═══════════ -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
 const cfg = {
   apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",
   authDomain:"jaguardevsuite.firebaseapp.com",
@@ -295,43 +300,78 @@ const cfg = {
   messagingSenderId:"383805859949",
   appId:"1:383805859949:web:e33d21ee74036e75b43764"
 };
-const app = initializeApp(cfg);
-const db  = getDatabase(app);
-window._FB = { db, ref, set, get };
 
-// On load: pull Firebase docs, merge with local (union by id — never wipe local)
-get(ref(db,'jaguar_db/documents')).then(snap => {
+const fbApp = initializeApp(cfg);
+const fbDb  = getDatabase(fbApp);
+
+// Expose to global so main (non-module) script can write back
+window._fbDb       = fbDb;
+window._fbRef      = ref;
+window._fbSet      = set;
+window._fbGet      = get;
+window._fbReady    = false;
+window._fbLocalWrite = false;
+
+const docsRef = ref(fbDb, 'jaguar_db/documents');
+
+// ── INITIAL LOAD ──
+// Pull once first so we can merge before the live listener fires
+get(docsRef).then(snap => {
   const fbData = snap.val();
   let local = [];
   try { local = JSON.parse(localStorage.getItem('jds_docs_v1')) || []; } catch(e) {}
+
   if (fbData && Object.keys(fbData).length > 0) {
+    // Merge: local + Firebase, Firebase wins on conflict
     const merged = {};
     local.forEach(d => { merged[d.id] = d; });
     Object.values(fbData).forEach(d => { merged[d.id] = d; });
     const arr = Object.values(merged).sort((a,b) => b.id - a.id);
     try { localStorage.setItem('jds_docs_v1', JSON.stringify(arr)); } catch(e) {}
-    // If local has docs Firebase doesn't, push them up
+    // Push any local-only docs up to Firebase
     const localOnly = local.filter(d => !fbData['doc_'+d.id]);
     if (localOnly.length > 0) {
       const toWrite = {};
       arr.forEach(d => { toWrite['doc_'+d.id] = d; });
-      if (JSON.stringify(toWrite).length < 8*1024*1024) set(ref(db,'jaguar_db/documents'), toWrite).catch(()=>{});
+      if (JSON.stringify(toWrite).length < 8*1024*1024) {
+        window._fbLocalWrite = true;
+        set(docsRef, toWrite).finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+      }
     }
+    window._setSyncStatus('Synced ✔ ('+arr.length+' docs)', '#5CCC88');
   } else if (local.length > 0) {
-    // Firebase empty — seed it with local docs
+    // Firebase empty — seed it with all local docs
     const toWrite = {};
     local.forEach(d => { toWrite['doc_'+d.id] = d; });
-    if (JSON.stringify(toWrite).length < 8*1024*1024) set(ref(db,'jaguar_db/documents'), toWrite).catch(()=>{});
+    if (JSON.stringify(toWrite).length < 8*1024*1024) {
+      window._setSyncStatus('Uploading '+local.length+' docs to cloud…', '#C9A84C');
+      window._fbLocalWrite = true;
+      set(docsRef, toWrite)
+        .then(() => { window._setSyncStatus('Synced ✔ ('+local.length+' docs)', '#5CCC88'); })
+        .catch(() => { window._setSyncStatus('Upload failed', '#F07050'); })
+        .finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+    }
+  } else {
+    window._setSyncStatus('Cloud empty — upload a doc to sync', '#888');
   }
-  window._fbReady = true;
-  if (window._appReady) { loadDocs(); renderLib(); }
-}).catch(() => { window._fbReady = true; });
 
-// Live listener — another device saved docs
-onValue(ref(db,'jaguar_db/documents'), snap => {
-  if (window._fbWriting) return;
+  window._fbReady = true;
+  document.dispatchEvent(new Event('fb-ready'));
+}).catch(e => {
+  window._setSyncStatus('Cloud unavailable', '#F07050');
+  window._fbReady = true;
+  document.dispatchEvent(new Event('fb-ready'));
+});
+
+// ── LIVE LISTENER — fires on connect AND on every remote change ──
+// This is the same pattern db.html uses for real-time cross-device sync
+onValue(docsRef, snap => {
+  if (window._fbLocalWrite) return; // skip our own writes
   const fbData = snap.val();
   if (!fbData || Object.keys(fbData).length === 0) return;
+
+  if (!window._fbReady) return; // wait until initial load done
+
   let local = [];
   try { local = JSON.parse(localStorage.getItem('jds_docs_v1')) || []; } catch(e) {}
   const merged = {};
@@ -339,7 +379,16 @@ onValue(ref(db,'jaguar_db/documents'), snap => {
   Object.values(fbData).forEach(d => { merged[d.id] = d; });
   const arr = Object.values(merged).sort((a,b) => b.id - a.id);
   try { localStorage.setItem('jds_docs_v1', JSON.stringify(arr)); } catch(e) {}
-  if (window._appReady) { loadDocs(); renderLib(); toast('Library synced from another device','ok'); }
+
+  // Update the live app if it's running
+  if (window._appReady && window.loadDocs && window.renderLib) {
+    window.loadDocs();
+    window.renderLib();
+    window._showToast('Library updated from another device', 'ok');
+  }
+  window._setSyncStatus('Synced ✔ ('+arr.length+' docs)', '#5CCC88');
+}, err => {
+  window._setSyncStatus('Listener error: '+err.message, '#F07050');
 });
 </script>
 
@@ -386,21 +435,35 @@ var DOCS_KEY = 'jds_docs_v1';
 function loadDocs() {
   try { docs = JSON.parse(localStorage.getItem(DOCS_KEY)) || []; } catch(e) { docs = []; }
 }
+window.loadDocs  = loadDocs;
+window.renderLib = function(){ renderLib(); };
+
+window._setSyncStatus = function(msg, color) {
+  var el = document.getElementById('sync-status');
+  if (el) el.innerHTML = '<span style="color:'+color+';">&#9679;</span> ' + msg;
+};
+window._showToast = function(msg, type){ toast(msg, type); };
 
 function saveDocs() {
   try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch(e) {}
-  // Push to Firebase
-  if (window._FB) {
+  // Push to Firebase — same pattern as db.html
+  if (window._fbDb && window._fbRef && window._fbSet) {
     try {
       var toWrite = {};
       docs.forEach(function(d){ toWrite['doc_'+d.id] = d; });
-      var sz = JSON.stringify(toWrite).length;
-      if (sz > 8*1024*1024) { toast('Library >8MB — stored locally only','err'); return; }
-      window._fbWriting = true;
-      window._FB.set(window._FB.ref(window._FB.db,'jaguar_db/documents'), toWrite)
-        .then(function(){ setTimeout(function(){ window._fbWriting=false; }, 2000); })
-        .catch(function(){ window._fbWriting=false; });
-    } catch(e) { window._fbWriting = false; }
+      var payload = JSON.stringify(toWrite);
+      if (payload.length > 8*1024*1024) { toast('Library >8MB — stored locally only','err'); return; }
+      window._fbLocalWrite = true;
+      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), toWrite)
+        .then(function(){
+          window._setSyncStatus('Synced ✔ ('+docs.length+' docs)', '#5CCC88');
+          setTimeout(function(){ window._fbLocalWrite = false; }, 2000);
+        })
+        .catch(function(e){
+          window._setSyncStatus('Sync failed', '#F07050');
+          window._fbLocalWrite = false;
+        });
+    } catch(e) { window._fbLocalWrite = false; }
   }
 }
 
@@ -410,8 +473,14 @@ function startApp() {
   renderLib();
   renderPlayers();
   window._appReady = true;
-  // If Firebase already finished loading, re-render with merged data
+  window._setSyncStatus('Connecting...', '#C9A84C');
+  // If Firebase already finished initial load, re-render with merged data
   if (window._fbReady) { loadDocs(); renderLib(); }
+  // Listen for Firebase initial load completing after app starts
+  document.addEventListener('fb-ready', function() {
+    loadDocs();
+    renderLib();
+  });
 }
 
 // ── TABS ──────────────────────────────────────────────────────
@@ -939,7 +1008,31 @@ function xmlToTxt(xml){
     .replace(/\n{3,}/g,'\n\n').trim();
 }
 
-// ── HELPERS ───────────────────────────────────────────────────
+// ── HELPERS ─────────────────────────────────────────────────
+function forcePushToCloud() {
+  loadDocs();
+  if (!window._fbDb || !window._fbRef || !window._fbSet) { toast('Firebase not connected yet — try again in a moment','err'); return; }
+  if (!docs.length) { toast('No docs to sync','err'); return; }
+  var toWrite = {};
+  docs.forEach(function(d){ toWrite['doc_'+d.id] = d; });
+  var payload = JSON.stringify(toWrite);
+  if (payload.length > 8*1024*1024) { toast('Library >8MB — cannot sync','err'); return; }
+  window._setSyncStatus('Pushing '+docs.length+' docs...', '#C9A84C');
+  window._fbLocalWrite = true;
+  window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), toWrite)
+    .then(function(){
+      window._setSyncStatus('Synced ✔ ('+docs.length+' docs)', '#5CCC88');
+      toast(docs.length+' docs pushed to cloud!','ok');
+      setTimeout(function(){ window._fbLocalWrite = false; }, 2000);
+    })
+    .catch(function(e){
+      window._setSyncStatus('Push failed: '+e.message, '#F07050');
+      toast('Push failed: '+e.message,'err');
+      window._fbLocalWrite = false;
+    });
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────
 function triggerDl(dataUrl,filename){
   var a=document.createElement('a');
   a.href=dataUrl;a.download=filename;
