@@ -284,7 +284,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v3.6.0</div>
+<div class="ver">v3.7.0</div>
 
 <!-- Early stubs so module/main scripts can call these before defining them -->
 <script>
@@ -469,7 +469,12 @@ var docs = [];
 var DOCS_KEY = 'jds_docs_v1';
 
 function loadDocs() {
-  try { docs = JSON.parse(localStorage.getItem(DOCS_KEY)) || []; } catch(e) { docs = []; }
+  try {
+    var raw = localStorage.getItem(DOCS_KEY);
+    var parsed = JSON.parse(raw);
+    console.log('[loadDocs] raw length:', raw ? raw.length : 0, 'parsed type:', typeof parsed, 'isArray:', Array.isArray(parsed), 'keys/length:', parsed ? (Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length) : 'null');
+    docs = Array.isArray(parsed) ? parsed : (parsed ? Object.values(parsed).sort(function(a,b){return b.id-a.id;}) : []);
+  } catch(e) { console.error('[loadDocs] error:', e); docs = []; }
 }
 window.loadDocs  = loadDocs;
 window.renderLib = function(){ renderLib(); };
