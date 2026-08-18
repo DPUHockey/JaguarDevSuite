@@ -284,7 +284,23 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v3.4.0</div>
+<div class="ver">v3.5.0</div>
+
+<!-- Early stubs so module/main scripts can call these before defining them -->
+<script>
+window._setSyncStatus = function(msg, color) {
+  var el = document.getElementById('sync-status');
+  if (el) el.innerHTML = '<span style="color:'+(color||'#888')+';">&#9679;</span> ' + msg;
+};
+window._showToast = function(msg, type) {
+  var t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ t.className='toast'; }, 3000);
+};
+</script>
 
 <!-- ═══════════ FIREBASE ═══════════ -->
 <script type="module">
@@ -312,19 +328,7 @@ window._fbGet      = get;
 window._fbReady    = false;
 window._fbLocalWrite = false;
 
-// Define helpers here so they're available before main script runs
-window._setSyncStatus = function(msg, color) {
-  var el = document.getElementById('sync-status');
-  if (el) el.innerHTML = '<span style="color:'+color+';">&#9679;</span> ' + msg;
-};
-window._showToast = function(msg, type) {
-  var t = document.getElementById('toast');
-  if (!t) return;
-  t.textContent = msg;
-  t.className = 'toast show' + (type ? ' '+type : '');
-  clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(function(){ t.className='toast'; }, 3000);
-};
+// _setSyncStatus and _showToast defined in early inline script above
 
 const docsRef = ref(fbDb, 'jaguar_db/documents');
 
@@ -408,11 +412,13 @@ onValue(docsRef, snap => {
   const arr = Object.values(merged).sort((a,b) => b.id - a.id);
   try { localStorage.setItem('jds_docs_v1', JSON.stringify(arr)); } catch(e) {}
 
-  // Update the live app if it's running
+  // Update the live app if it's running, otherwise data is in localStorage for startApp
   if (window._appReady && window.loadDocs && window.renderLib) {
     window.loadDocs();
     window.renderLib();
     window._showToast('Library updated from another device', 'ok');
+  } else {
+    window._fbDataReady = true; // signal to startApp that fresh data is waiting
   }
   window._setSyncStatus('Synced ✔ ('+arr.length+' docs)', '#5CCC88');
 }, err => {
@@ -495,14 +501,13 @@ function startApp() {
   renderLib();
   renderPlayers();
   window._appReady = true;
-  window._setSyncStatus('Connecting...', '#C9A84C');
-  // If Firebase already finished initial load, re-render with merged data
-  if (window._fbReady) { loadDocs(); renderLib(); }
-  // Listen for Firebase initial load completing after app starts
-  document.addEventListener('fb-ready', function() {
-    loadDocs();
-    renderLib();
-  });
+  // If Firebase already loaded, re-render now
+  if (window._fbReady || window._fbDataReady) { loadDocs(); renderLib(); }
+  // Listen for Firebase completing after app starts
+  document.addEventListener('fb-ready', function() { loadDocs(); renderLib(); });
+  // Safety net: re-render at 1s and 3s to catch any Firebase data that arrived
+  setTimeout(function(){ loadDocs(); renderLib(); }, 1000);
+  setTimeout(function(){ loadDocs(); renderLib(); }, 3000);
 }
 
 // ── TABS ──────────────────────────────────────────────────────
