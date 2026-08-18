@@ -617,11 +617,6 @@ function setupUpload() {
   var zone  = document.getElementById('upload-zone');
   var input = document.getElementById('file-input');
 
-  zone.addEventListener('click', function(e){
-    if(e.target === input) return; // don't recurse
-    input.value=''; // reset so same file can be re-selected
-    input.click();
-  });
   zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
   zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFiles(Array.from(e.dataTransfer.files)); });
