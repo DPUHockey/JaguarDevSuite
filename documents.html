@@ -183,7 +183,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
             <div style="font-size:.78rem;color:var(--muted);">Accepts .docx and .xlsx &mdash; max 5 MB</div>
           </div>
         </label>
-        <input type="file" id="file-input" accept=".docx,.doc,.xlsx,.xls" multiple style="display:none;"/>
+        <input type="file" id="file-input" accept=".docx,.doc,.xlsx,.xls" multiple style="display:none;" onchange="handleFiles(Array.from(this.files))"/>
         <div id="upload-form" style="display:none;margin-top:1.2rem;">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:.8rem;">
             <div>
@@ -313,7 +313,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v2.5.0</div>
+<div class="ver">v2.6.0</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -446,7 +446,11 @@ document.getElementById('lock-btn').addEventListener('click', doLogout);
 if (sessionStorage.getItem(SESSION_KEY) === '1') {
   document.getElementById('gate').style.display = 'none';
   document.getElementById('app').style.display  = 'block';
-  document.addEventListener('DOMContentLoaded', appInit);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', appInit);
+  } else {
+    appInit();
+  }
 }
 
 // ============================================================
@@ -616,14 +620,19 @@ var pendingFiles = [];
 function setupUpload() {
   var zone  = document.getElementById('upload-zone');
   var input = document.getElementById('file-input');
+  if (!zone || !input) return;
 
   zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
   zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
   zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFiles(Array.from(e.dataTransfer.files)); });
   input.addEventListener('change', function(){ handleFiles(Array.from(input.files)); });
 
-  document.getElementById('up-save-btn').addEventListener('click', saveUpload);
+  var saveBtn = document.getElementById('up-save-btn');
+  if (saveBtn) saveBtn.addEventListener('click', saveUpload);
 }
+
+// Also bind via the HTML onchange attribute as a fallback — set on window so it's accessible
+window._handleFileInputChange = function(input) { handleFiles(Array.from(input.files)); };
 
 function handleFiles(files) {
   var ok = files.filter(function(f){ return /\.(docx?|xlsx?)$/i.test(f.name); });
