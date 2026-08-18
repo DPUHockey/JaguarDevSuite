@@ -284,7 +284,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v3.3.0</div>
+<div class="ver">v3.4.0</div>
 
 <!-- ═══════════ FIREBASE ═══════════ -->
 <script type="module">
@@ -311,6 +311,20 @@ window._fbSet      = set;
 window._fbGet      = get;
 window._fbReady    = false;
 window._fbLocalWrite = false;
+
+// Define helpers here so they're available before main script runs
+window._setSyncStatus = function(msg, color) {
+  var el = document.getElementById('sync-status');
+  if (el) el.innerHTML = '<span style="color:'+color+';">&#9679;</span> ' + msg;
+};
+window._showToast = function(msg, type) {
+  var t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ t.className='toast'; }, 3000);
+};
 
 const docsRef = ref(fbDb, 'jaguar_db/documents');
 
@@ -385,8 +399,7 @@ onValue(docsRef, snap => {
   console.log('[DOCS FB] onValue data keys:', fbData ? Object.keys(fbData).length : 0);
   if (!fbData || Object.keys(fbData).length === 0) return;
 
-  if (!window._fbReady) return; // wait until initial load done
-
+  // Note: don't gate on _fbReady — onValue may fire before get() resolves
   let local = [];
   try { local = JSON.parse(localStorage.getItem('jds_docs_v1')) || []; } catch(e) {}
   const merged = {};
@@ -452,12 +465,6 @@ function loadDocs() {
 }
 window.loadDocs  = loadDocs;
 window.renderLib = function(){ renderLib(); };
-
-window._setSyncStatus = function(msg, color) {
-  var el = document.getElementById('sync-status');
-  if (el) el.innerHTML = '<span style="color:'+color+';">&#9679;</span> ' + msg;
-};
-window._showToast = function(msg, type){ toast(msg, type); };
 
 function saveDocs() {
   try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch(e) {}
@@ -774,7 +781,7 @@ function renderPlayers() {
   loadPlayers();
   var q=(document.getElementById('p-q')||{}).value||'';
   q=q.toLowerCase();
-  var activeLevels=Object.keys(pfActive).filter(function(k){return pfActive[k];});
+  var activeLevels=Object.keys(pfActive||{}).filter(function(k){return pfActive[k];});
   var list=players;
   if(activeLevels.length){
     list=list.filter(function(p){
