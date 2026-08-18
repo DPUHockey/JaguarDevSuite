@@ -127,7 +127,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
   <div class="gate-box">
     <div class="gate-label">Enter Access Code</div>
     <input id="pin-input" type="password" maxlength="6" autocomplete="off" placeholder="&middot;&middot;&middot;&middot;"/>
-    <button class="gate-btn" id="gate-go">ENTER SUITE</button>
+    <button class="gate-btn" id="gate-go" onclick="checkPin()">ENTER SUITE</button>
     <div class="gate-error" id="gate-err"></div>
   </div>
 </div>
@@ -140,7 +140,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
     </div>
     <div style="display:flex;gap:.6rem;">
       <a class="hbtn" href="index.html">Home</a>
-      <button class="hbtn" id="lock-btn">Lock</button>
+      <button class="hbtn" id="lock-btn" onclick="doLogout()">Lock</button>
     </div>
   </header>
 
@@ -155,7 +155,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
     <main>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
         <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.1em;color:var(--gold);">Uploaded Documents</div>
-        <button class="btn sm" id="lib-upload-btn">+ Upload New</button>
+        <button class="btn sm" id="lib-upload-btn" onclick="switchTab('upload')">+ Upload New</button>
       </div>
       <div class="filter-bar">
         <span style="font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Filter:</span>
@@ -213,7 +213,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
             <input type="text" id="up-desc" placeholder="e.g. Sent at start of each InHouse season"/>
           </div>
           <div id="up-file-list" style="margin-bottom:.8rem;"></div>
-          <button class="btn" id="up-save-btn">Save to Library</button>
+          <button class="btn" id="up-save-btn" onclick="saveUpload()">Save to Library</button>
         </div>
       </div>
     </main>
@@ -246,8 +246,8 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
               <span id="sel-count" style="font-family:'Bebas Neue',sans-serif;color:var(--gold);font-size:.9rem;">0 selected</span>
               <div style="display:flex;gap:.4rem;">
-                <button class="btn sm sec" id="sel-all-btn">Select Visible</button>
-                <button class="btn sm sec" id="clr-btn">Clear</button>
+                <button class="btn sm sec" id="sel-all-btn" onclick="selectVisible()">Select Visible</button>
+                <button class="btn sm sec" id="clr-btn" onclick="clearSel()">Clear</button>
               </div>
             </div>
             <div class="tbl-wrap">
@@ -272,7 +272,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 
             <div style="display:flex;gap:.5rem;margin-bottom:.8rem;">
               <input type="email" id="manual-email" placeholder="Add email address..." style="flex:1;"/>
-              <button class="btn sm sec" id="add-email-btn">+ Add</button>
+              <button class="btn sm sec" id="add-email-btn" onclick="addManualEmail()">+ Add</button>
             </div>
 
             <div id="doc-mode-area" style="display:none;margin-bottom:.8rem;">
@@ -300,9 +300,9 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
             </div>
 
             <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
-              <button class="btn" id="open-mail-btn" disabled>Open in Mail</button>
-              <button class="btn sec" id="dl-btn" style="display:none;">Download Doc</button>
-              <button class="btn sec" id="copy-btn" disabled>Copy Emails</button>
+              <button class="btn" id="open-mail-btn" disabled onclick="openInMail()">Open in Mail</button>
+              <button class="btn sec" id="dl-btn" style="display:none;" onclick="dlDocById(selectedDocId)">Download Doc</button>
+              <button class="btn sec" id="copy-btn" disabled onclick="copyEmails()">Copy Emails</button>
             </div>
           </div>
         </div>
@@ -313,7 +313,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver">v2.6.0</div>
+<div class="ver">v2.8.0</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -439,9 +439,7 @@ function doLogout() {
   document.getElementById('gate-err').textContent = '';
 }
 
-document.getElementById('gate-go').addEventListener('click', checkPin);
 document.getElementById('pin-input').addEventListener('keydown', function(e){ if(e.key==='Enter') checkPin(); });
-document.getElementById('lock-btn').addEventListener('click', doLogout);
 
 if (sessionStorage.getItem(SESSION_KEY) === '1') {
   document.getElementById('gate').style.display = 'none';
@@ -627,8 +625,6 @@ function setupUpload() {
   zone.addEventListener('drop', function(e){ e.preventDefault(); zone.classList.remove('drag'); handleFiles(Array.from(e.dataTransfer.files)); });
   input.addEventListener('change', function(){ handleFiles(Array.from(input.files)); });
 
-  var saveBtn = document.getElementById('up-save-btn');
-  if (saveBtn) saveBtn.addEventListener('click', saveUpload);
 }
 
 // Also bind via the HTML onchange attribute as a fallback — set on window so it's accessible
@@ -752,22 +748,16 @@ function setupSend() {
   document.getElementById('p-search').addEventListener('input', renderPlayers);
 
   // select all / clear
-  document.getElementById('sel-all-btn').addEventListener('click', selectVisible);
-  document.getElementById('clr-btn').addEventListener('click', clearSel);
   document.getElementById('chk-all').addEventListener('change', function(e) {
     if (e.target.checked) selectVisible(); else clearSel();
   });
 
   // manual email
-  document.getElementById('add-email-btn').addEventListener('click', addManualEmail);
   document.getElementById('manual-email').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); addManualEmail(); }
   });
 
   // send buttons
-  document.getElementById('open-mail-btn').addEventListener('click', openInMail);
-  document.getElementById('dl-btn').addEventListener('click', function() { dlDocById(selectedDocId); });
-  document.getElementById('copy-btn').addEventListener('click', copyEmails);
 }
 
 function renderSendDocs() {
