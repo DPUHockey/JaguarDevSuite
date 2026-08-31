@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Budget — Jaguar Dev Suite</title>
@@ -190,7 +193,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </style>
 </head>
 <body>
-<div id="app-ver-badge">V7</div>
+<div id="app-ver-badge" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">V7</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -860,6 +863,15 @@ function startApp(){
   document.getElementById('appShell').classList.remove('hidden');
   fillForm();coaches=loadCoaches();refreshCoachData();render();renderProjectedAll();
 }
+</script>
+<script>
+// Unregister any service workers so GitHub Pages always serves fresh files
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    regs.forEach(function(r){ r.unregister(); });
+  });
+}
+// Also add no-cache headers hint via meta (belt and suspenders)
 </script>
 </body>
 </html>
