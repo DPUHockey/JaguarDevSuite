@@ -3183,8 +3183,10 @@ function sendEmailShare(){
 }
 
 function printPlanSummary(){
+  // Always rebuild fresh before printing — don't require user to click the tab first
+  buildPlanSummary();
   const content=document.getElementById('planSummaryContent');
-  if(!content||!content.innerHTML.trim()){toast('Build the summary first','terror');return;}
+  if(!content||!content.innerHTML.trim()){toast('No sessions planned yet — check dates in the Calendar tab first','terror');return;}
   const printDate=new Date().toLocaleDateString('en-US',{weekday:'short',month:'long',day:'numeric',year:'numeric'});
 
   // Reuse or create overlay
