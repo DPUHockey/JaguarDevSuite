@@ -357,29 +357,22 @@ import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebase
 const cfg={apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",authDomain:"jaguardevsuite.firebaseapp.com",databaseURL:"https://jaguardevsuite-default-rtdb.firebaseio.com",projectId:"jaguardevsuite",storageBucket:"jaguardevsuite.firebasestorage.app",messagingSenderId:"383805859949",appId:"1:383805859949:web:e33d21ee74036e75b43764"};
 const fbApp=initializeApp(cfg);
 const fbDb=getDatabase(fbApp);
-window._coachFbDb=fbDb;window._coachFbRef=ref;window._coachFbSet=set;window._coachFbWrite=false;
+window._coachFbDb=fbDb;window._coachFbRef=ref;window._coachFbSet=set;
+window._coachFbLocalWrite=false;
 onValue(ref(fbDb,'jaguar_db/coach_plan'),snap=>{
+  if(window._coachFbLocalWrite)return;
   const data=snap.val();if(!data)return;
-  // Skip if we just wrote (within 3 seconds) — avoids echo
-  if(window._coachFbWriteAt && Date.now()-window._coachFbWriteAt < 3000)return;
   try{
-    // Always write to localStorage so refresh picks it up
-    if(data.planData)     localStorage.setItem('jag_plan_data',    JSON.stringify(data.planData));
-    if(data.planConfig)   localStorage.setItem('jag_plan_cfg',     JSON.stringify(data.planConfig));
-    if(data.blockedDates) localStorage.setItem('jag_blocked_dates',JSON.stringify(data.blockedDates));
-    // Update live app if running
-    if(window._coachAppReady){
-      if(data.planData)     { window.planData=data.planData; planData=data.planData; }
-      if(data.planConfig)   { window.planConfig=Object.assign({ljSessions:6,ljClasses:6,admPractices:12,admGames:6,ihPractices:12,ihGames:6},data.planConfig); planConfig=window.planConfig; }
-      if(data.blockedDates) { window.blockedDates=new Set(data.blockedDates); blockedDates=window.blockedDates; }
-      if(window._buildPlanCalendar) window._buildPlanCalendar();
-    }
-  }catch(e){ console.error('[coach FB]',e); }
-});
+    if(data.planData)     localStorage.setItem('jag_plan_data',     JSON.stringify(data.planData));
+    if(data.planConfig)   localStorage.setItem('jag_plan_cfg',      JSON.stringify(data.planConfig));
+    if(data.blockedDates) localStorage.setItem('jag_blocked_dates', JSON.stringify(data.blockedDates));
+  }catch(e){}
+  if(window._coachPlanLoaded&&window._coachReloadAndRender) window._coachReloadAndRender();
+},err=>{console.warn('[coach FB]',err);});
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V17.3</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V17.5</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -2633,14 +2626,34 @@ function loadBlockedDates(){
 function saveBlockedDates(){localStorage.setItem('jag_blocked_dates',JSON.stringify([...blockedDates]));_coachFbPush();}
 let blockedDates=loadBlockedDates();
 window.planData=planData;window.planConfig=planConfig;window.blockedDates=blockedDates;
-window._coachAppReady=false;
+window._coachPlanLoaded=false;
+window._coachReloadAndRender=function(){
+  try{
+    const pd=localStorage.getItem('jag_plan_data');
+    if(pd){planData=JSON.parse(pd);window.planData=planData;}
+    const pc=localStorage.getItem('jag_plan_cfg');
+    if(pc){planConfig=Object.assign({ljSessions:6,ljClasses:6,admPractices:12,admGames:6,ihPractices:12,ihGames:6},JSON.parse(pc));window.planConfig=planConfig;}
+    const bd=localStorage.getItem('jag_blocked_dates');
+    if(bd){blockedDates=new Set(JSON.parse(bd));window.blockedDates=blockedDates;}
+  }catch(e){}
+  if(typeof buildPlanCalendar==='function')buildPlanCalendar();
+};
 function _coachFbPush(){
   if(!window._coachFbDb)return;
-  window.planData=planData;window.planConfig=planConfig;window.blockedDates=blockedDates;
-  window._coachFbWriteAt=Date.now(); // timestamp so listener skips echo
+  const cleanPlanData={};
+  Object.keys(planData).forEach(k=>{
+    const e=planData[k];if(!e)return;
+    const clean={checked:!!e.checked,endSession:!!e.endSession};
+    if(e.sessionNum!=null)clean.sessionNum=e.sessionNum;
+    if(e.code!=null)clean.code=e.code;
+    if(e.label!=null)clean.label=e.label;
+    cleanPlanData[k]=clean;
+  });
+  window._coachFbLocalWrite=true;
   window._coachFbSet(window._coachFbRef(window._coachFbDb,'jaguar_db/coach_plan'),
-    {planData,planConfig,blockedDates:[...blockedDates]})
-    .catch(e=>console.error('[coach FB push]',e));
+    {planData:cleanPlanData,planConfig,blockedDates:[...blockedDates]})
+    .then(()=>{window._coachFbLocalWrite=false;})
+    .catch(e=>{window._coachFbLocalWrite=false;console.error('[coach FB push]',e);});
 }
 
 function toggleBlockout(dk){
@@ -2765,8 +2778,7 @@ function computeSessionLabels(){
   return labelMap;
 }
 
-window._buildPlanCalendar=function(){if(typeof buildPlanCalendar==="function")buildPlanCalendar();};
-window._coachAppReady=true;
+window._coachPlanLoaded=true;
 // Re-render immediately in case onValue fired before we were ready
 setTimeout(function(){
   const fresh=localStorage.getItem('jag_plan_data');
