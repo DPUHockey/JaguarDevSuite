@@ -351,9 +351,32 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 .acct-total-val{font-family:'Bebas Neue';font-size:18px;color:var(--gold-light)}
 .acct-total-label{color:var(--white-dim);font-size:10px;letter-spacing:.5px;text-transform:uppercase;display:block}
 </style>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+const cfg={apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",authDomain:"jaguardevsuite.firebaseapp.com",databaseURL:"https://jaguardevsuite-default-rtdb.firebaseio.com",projectId:"jaguardevsuite",storageBucket:"jaguardevsuite.firebasestorage.app",messagingSenderId:"383805859949",appId:"1:383805859949:web:e33d21ee74036e75b43764"};
+const fbApp=initializeApp(cfg);
+const fbDb=getDatabase(fbApp);
+window._coachFbDb=fbDb;window._coachFbRef=ref;window._coachFbSet=set;window._coachFbWrite=false;
+onValue(ref(fbDb,'jaguar_db/coach_plan'),snap=>{
+  if(window._coachFbWrite)return;
+  const data=snap.val();if(!data)return;
+  try{
+    if(data.planData)     localStorage.setItem('jag_plan_data',    JSON.stringify(data.planData));
+    if(data.planConfig)   localStorage.setItem('jag_plan_cfg',     JSON.stringify(data.planConfig));
+    if(data.blockedDates) localStorage.setItem('jag_blocked_dates',JSON.stringify(data.blockedDates));
+    if(window._coachAppReady){
+      if(data.planData)     window.planData=data.planData;
+      if(data.planConfig)   window.planConfig=Object.assign({ljSessions:6,ljClasses:6,admPractices:12,admGames:6,ihPractices:12,ihGames:6},data.planConfig);
+      if(data.blockedDates) window.blockedDates=new Set(data.blockedDates);
+      if(window._buildPlanCalendar) window._buildPlanCalendar();
+    }
+  }catch(e){}
+});
+</script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V17.1</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V17.2</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -2530,14 +2553,14 @@ function checkAllSeason(){  SEASON_MONTHS.forEach(mo=>{
 function loadPlanData(){
   try{const s=localStorage.getItem('jag_plan_data');return s?JSON.parse(s):{};}catch(e){return{};}
 }
-function savePlanData(){localStorage.setItem('jag_plan_data',JSON.stringify(planData));}
+function savePlanData(){localStorage.setItem('jag_plan_data',JSON.stringify(planData));_coachFbPush();}
 let planData=loadPlanData();
 
 // Config
 function loadPlanConfig(){
   try{const s=localStorage.getItem('jag_plan_cfg');return s?JSON.parse(s):{};}catch(e){return{};}
 }
-function savePlanConfigData(cfg){localStorage.setItem('jag_plan_cfg',JSON.stringify(cfg));}
+function savePlanConfigData(cfg){localStorage.setItem('jag_plan_cfg',JSON.stringify(cfg));_coachFbPush();}
 let planConfig=Object.assign({ljSessions:6,ljClasses:6,admPractices:12,admGames:6,ihPractices:12,ihGames:6},loadPlanConfig());
 
 let planCurrentMonth=SEASON_MONTHS[0].key;
@@ -2604,8 +2627,19 @@ function switchPlanTab(n){
 function loadBlockedDates(){
   try{const s=localStorage.getItem('jag_blocked_dates');return s?new Set(JSON.parse(s)):new Set();}catch(e){return new Set();}
 }
-function saveBlockedDates(){localStorage.setItem('jag_blocked_dates',JSON.stringify([...blockedDates]));}
+function saveBlockedDates(){localStorage.setItem('jag_blocked_dates',JSON.stringify([...blockedDates]));_coachFbPush();}
 let blockedDates=loadBlockedDates();
+window.planData=planData;window.planConfig=planConfig;window.blockedDates=blockedDates;
+window._coachAppReady=false;
+function _coachFbPush(){
+  if(!window._coachFbDb)return;
+  window.planData=planData;window.planConfig=planConfig;window.blockedDates=blockedDates;
+  window._coachFbWrite=true;
+  window._coachFbSet(window._coachFbRef(window._coachFbDb,'jaguar_db/coach_plan'),
+    {planData,planConfig,blockedDates:[...blockedDates]})
+    .then(()=>setTimeout(()=>{window._coachFbWrite=false;},2000))
+    .catch(()=>{window._coachFbWrite=false;});
+}
 
 function toggleBlockout(dk){
   const dayDef=SCHEDULE.find(s=>Object.entries(DAY_DOW).some(([day,dow])=>s.day===day&&new Date(dk+'T12:00:00').getDay()===dow));
@@ -2729,6 +2763,8 @@ function computeSessionLabels(){
   return labelMap;
 }
 
+window._buildPlanCalendar=function(){if(typeof buildPlanCalendar==="function")buildPlanCalendar();};
+window._coachAppReady=true;
 function buildPlanCalendar(){
   buildPlanMonthNav();
   const grid=document.getElementById('planCalendarGrid');
