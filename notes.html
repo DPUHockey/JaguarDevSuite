@@ -193,7 +193,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </style>
 </head>
 <body>
-<div id="app-ver-badge" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">V7</div>
+<div id="app-ver-badge" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">V8</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -442,52 +442,21 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-const firebaseConfig = {
-  apiKey: "AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",
-  authDomain: "jaguardevsuite.firebaseapp.com",
-  databaseURL: "https://jaguardevsuite-default-rtdb.firebaseio.com",
-  projectId: "jaguardevsuite",
-  storageBucket: "jaguardevsuite.firebasestorage.app",
-  messagingSenderId: "383805859949",
-  appId: "1:383805859949:web:e33d21ee74036e75b43764"
-};
-const fbApp = initializeApp(firebaseConfig);
-const fbDb  = getDatabase(fbApp);
-window._fbDb  = fbDb;
-window._fbRef = ref;
-window._fbSet = set;
-window._fbGet = get;
-get(ref(fbDb,'jaguar_db/budget')).then(snap=>{
-  const data=snap.val();
-  if(data){
-    try{
-      if(data.budget)    localStorage.setItem('jag_budget_data',      JSON.stringify(data.budget));
-      if(data.scenarios) localStorage.setItem('jag_budget_scenarios', JSON.stringify(data.scenarios));
-    }catch(e){}
-  }
-  window._budgetFbReady=true;
-  window.dispatchEvent(new Event('budget-fb-ready'));
-}).catch(()=>{ window._budgetFbReady=true; window.dispatchEvent(new Event('budget-fb-ready')); });
+import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+const cfg={apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",authDomain:"jaguardevsuite.firebaseapp.com",databaseURL:"https://jaguardevsuite-default-rtdb.firebaseio.com",projectId:"jaguardevsuite",storageBucket:"jaguardevsuite.firebasestorage.app",messagingSenderId:"383805859949",appId:"1:383805859949:web:e33d21ee74036e75b43764"};
+const fbApp=initializeApp(cfg);
+const fbDb=getDatabase(fbApp);
+window._notesFbDb=fbDb;window._notesFbRef=ref;window._notesFbSet=set;
+window._notesFbLocalWrite=false;
 onValue(ref(fbDb,'jaguar_db/budget'),snap=>{
-  if(window._budgetLocalWrite)return;
+  if(window._notesFbLocalWrite)return;
   const data=snap.val();if(!data)return;
   try{
     if(data.budget)    localStorage.setItem('jag_budget_data',      JSON.stringify(data.budget));
     if(data.scenarios) localStorage.setItem('jag_budget_scenarios', JSON.stringify(data.scenarios));
-    if(window._budgetFbReady){
-      if(window.budget!==undefined){window.budget=JSON.parse(localStorage.getItem('jag_budget_data')||'null')||window.budget;}
-      if(window.render)window.render();
-      showBudgetToast('Updated from another device');
-    }
   }catch(e){}
-});
-function showBudgetToast(msg){
-  let t=document.getElementById('_fb_toast');
-  if(!t){t=document.createElement('div');t.id='_fb_toast';t.style.cssText='position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e1e1e;border:1px solid #8B6914;color:#C9A84C;font-size:.78rem;font-weight:600;padding:.5rem 1.2rem;border-radius:8px;z-index:999;pointer-events:none;opacity:0;transition:opacity .3s;';document.body.appendChild(t);}
-  t.textContent=msg;t.style.opacity='1';clearTimeout(t._to);t._to=setTimeout(()=>{t.style.opacity='0';},3000);
-}
-window.showBudgetToast=showBudgetToast;
+  if(window._notesReady&&window._notesReloadAndRender)window._notesReloadAndRender();
+},err=>{console.warn('[notes FB]',err);});
 </script>
 
 <script>
@@ -558,17 +527,28 @@ function loadBudget(){
 }
 function saveBudgetData(b){
   localStorage.setItem(BUDGET_KEY,JSON.stringify(b));
-  if(window._fbDb&&window._fbRef&&window._fbSet){
-    try{
-      window._budgetLocalWrite=true;
-      const sc=loadScenariosState();
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/budget'),{budget:b,scenarios:sc})
-        .then(()=>setTimeout(()=>{window._budgetLocalWrite=false;},1500))
-        .catch(()=>{window._budgetLocalWrite=false;});
-    }catch(e){window._budgetLocalWrite=false;}
-  }
+  _notesFbPush(b,null);
 }
 let budget=loadBudget();
+window._notesReady=false;
+window._notesReloadAndRender=function(){
+  try{
+    const b=localStorage.getItem('jag_budget_data');
+    if(b){budget=JSON.parse(b);window.budget=budget;if(typeof fillForm==='function')fillForm();}
+    const s=localStorage.getItem('jag_budget_scenarios');
+    if(s){scenariosState=JSON.parse(s);}
+  }catch(e){}
+  if(typeof render==='function')render();
+};
+function _notesFbPush(bOverride,scOverride){
+  if(!window._notesFbDb)return;
+  const b=bOverride||loadBudget();
+  const sc=scOverride||scenariosState;
+  window._notesFbLocalWrite=true;
+  window._notesFbSet(window._notesFbRef(window._notesFbDb,'jaguar_db/budget'),{budget:b,scenarios:sc})
+    .then(()=>{window._notesFbLocalWrite=false;})
+    .catch(e=>{window._notesFbLocalWrite=false;console.error('[notes FB push]',e);});
+}
 
 function fillForm(){
   PROGRAMS.forEach(p=>{document.getElementById('cc-'+p.id).value=budget.classCosts[p.id];});
@@ -654,15 +634,7 @@ function loadScenariosState(){
 }
 function saveScenariosState(){
   localStorage.setItem(SCENARIOS_KEY,JSON.stringify(scenariosState));
-  if(window._fbDb&&window._fbRef&&window._fbSet){
-    try{
-      window._budgetLocalWrite=true;
-      const b=loadBudget();
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/budget'),{budget:b,scenarios:scenariosState})
-        .then(()=>setTimeout(()=>{window._budgetLocalWrite=false;},1500))
-        .catch(()=>{window._budgetLocalWrite=false;});
-    }catch(e){window._budgetLocalWrite=false;}
-  }
+  _notesFbPush(null,scenariosState);
 }
 let scenariosState=loadScenariosState();
 function activeScenario(){return scenariosState.scenarios.find(s=>s.id===scenariosState.activeId)||scenariosState.scenarios[0];}
@@ -862,6 +834,7 @@ function startApp(){
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appShell').classList.remove('hidden');
   fillForm();coaches=loadCoaches();refreshCoachData();render();renderProjectedAll();
+  window._notesReady=true;
 }
 </script>
 <script>
