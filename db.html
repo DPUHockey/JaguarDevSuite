@@ -304,9 +304,14 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 .empty-state p{font-family:'Barlow Condensed',sans-serif;font-size:15px;letter-spacing:1px;text-transform:uppercase;}
 
 /* TABLE */
-.table-outer{overflow:auto;border:1px solid var(--border);border-radius:10px;max-height:calc(100vh - 280px);}
-.data-table{width:100%;border-collapse:collapse;font-size:12px;min-width:600px;}
+.table-outer{overflow:auto;border:1px solid var(--border);border-radius:10px;max-height:calc(100vh - 280px);width:100%;}
+.data-table{border-collapse:collapse;font-size:12px;min-width:1600px;width:100%;}
 .data-table thead th{background:var(--surf2);padding:6px 7px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);position:sticky;top:0;white-space:nowrap;}
+.data-table td.sticky-col,.data-table th.sticky-col{position:sticky;z-index:2;background:var(--surf2);white-space:nowrap;}
+.data-table td.sticky-col:first-child,.data-table th.sticky-col:first-child{left:0;min-width:72px;max-width:90px;border-right:none;}
+.data-table td.sticky-col:nth-child(2),.data-table th.sticky-col:nth-child(2){left:90px;min-width:90px;border-right:1px solid var(--border);}
+.data-table tbody td.sticky-col{background:var(--surf);}
+.data-table tbody tr:hover td.sticky-col{background:var(--surf3);}
 .data-table thead th:hover{color:var(--wht);}
 .data-table tbody td{padding:5px 7px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--wht);vertical-align:top;}
 .data-table tbody tr:hover td{background:var(--faint);}
@@ -443,7 +448,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V50</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V51</div>
 
 <nav>
   <div class="nav-left">
@@ -980,7 +985,8 @@ const LABELS=['First Name','Last Name','Birthdate','Level','Gear','Gear Returned
 function normDay(val){
   const n=(val||'').toString().toUpperCase().replace(/[\s\/\-\.]/g,'');
   if(n==='W'||n==='S'||n==='SW')return n;
-  if(n==='WS')return'SW';
+  if(n==='WS'||n==='B'||n==='BOTH')return'SW';  // B = Both days
+  if(n==='M'||n==='MON'||n==='MONDAY')return'W'; // M treated as Wednesday/weekday
   if(n.startsWith('SATWED')||n.startsWith('WEDSAT'))return'SW';
   if(n.startsWith('WED'))return'W';
   if(n.startsWith('SAT'))return'S';
@@ -1139,7 +1145,12 @@ function confirmImport(){
   });
   saveDB();closeModal();
   const unrec=pending.filter(r=>!isLJ(r)&&!isPH(r)).length;
-  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess}`+(unrec?` — ${unrec} with levels outside LJ1–PH3, listed under "Other / Unassigned Level"`:''),unrec?'info':'ok');
+  const ljCount=pending.filter(r=>isLJ(r)).length;
+  const phCount=pending.filter(r=>isPH(r)).length;
+  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH)`+(unrec?` — ${unrec} unrecognized level`:''),unrec?'info':'ok');
+  // Auto-switch to the appropriate sub-tab based on what was imported
+  const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
+  activeSubTab[key]=autoSubTab;
   pending=null;pendingName='';
   renderAll();updateStats();switchTab(key);
 }
@@ -1336,7 +1347,8 @@ function renderAllSubTab(sNum){
   const otherR=indexed.filter(({r})=>{const g=getLevel(r);return !g.startsWith('LJ')&&!g.startsWith('PH');});
   function sect(gRows,color,label){
     if(!gRows.length)return'';
-    const hd='<thead><tr>'+th('first_name','First')+th('last_name','Last')+th('birthdate','Birthdate')+th('level','Level')+'<th style="width:28px;" title="Promoted">★</th><th style="width:105px;">Next Level</th>'+th('gear','Gear')+th('gear_returned','Gear Ret.')+th('class_registered','Class')+th('day','Day')+th('address','Address')+th('city','City')+th('state','State')+th('zip','Zip')+th('parent1_name','P1 Name')+th('parent1_email','P1 Email')+th('parent1_phone','P1 Phone')+th('parent2_name','P2 Name')+th('parent2_email','P2 Email')+th('parent2_phone','P2 Phone')+'<th style="width:70px;">Actions</th></tr></thead>';
+    function thSticky(c,l){const s=sortState[sk]||{col:null,dir:'asc'};const arr=(s.col===c)?' '+(s.dir==='asc'?'▲':'▼'):'';return '<th class="sticky-col" style="cursor:pointer;" onclick="sortTab('+JSON.stringify(sk)+','+JSON.stringify(c)+')">'+l+arr+'</th>';}
+    const hd='<thead><tr>'+thSticky('first_name','First')+thSticky('last_name','Last')+th('birthdate','Birthdate')+th('level','Level')+'<th style="width:28px;" title="Promoted">★</th><th style="width:105px;">Next Level</th>'+th('gear','Gear')+th('gear_returned','Gear Ret.')+th('class_registered','Class')+th('day','Day')+th('address','Address')+th('city','City')+th('state','State')+th('zip','Zip')+th('parent1_name','P1 Name')+th('parent1_email','P1 Email')+th('parent1_phone','P1 Phone')+th('parent2_name','P2 Name')+th('parent2_email','P2 Email')+th('parent2_phone','P2 Phone')+'<th style="width:70px;">Actions</th></tr></thead>';
     const bd='<tbody>'+gRows.map(({r,i})=>{
       const lvl=(r.level||'').toUpperCase().replace(/\s/g,''),nl=nextLevel(lvl);
       const pk=r.first_name+'|'+r.last_name+'|'+(r.birthdate||''),promo=promoSet.has(pk);
@@ -1356,7 +1368,7 @@ function renderAllSubTab(sNum){
         ?`<span title="Confirmed promotion to ${promoToLvl}" style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:3px;padding:1px 4px;">✓ ${promoToLvl}</span>`
         :'';
       const rowBg=isPending?' style="background:rgba(255,200,50,.06);"':isConfirmed?' style="background:rgba(92,204,136,.04);"':'';
-      return'<tr'+rowBg+'><td>'+(r.first_name||'')+'</td><td style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\''+sk+'\','+i+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);">'+(r.birthdate||'')+'</td><td>'+lvBadge(r.level)+'</td><td style="text-align:center;">'+promoBadge+'</td>'+nc+'<td style="text-align:center;">'+(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO'?'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Edit gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:4px;padding:1px 6px;cursor:pointer;">YES — '+r.gear+'</span>':'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Issue gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;">NO</span>')+'</td>'+'<td style="text-align:center;">'+(r.gear_returned&&r.gear_returned.match(/\d/)?'<span onclick="gearReturnOpen(null,\''+sk+'\','+i+')" title="Click to view/edit return" style="font-size:11px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">'+r.gear_returned+'</span>':'<input type="checkbox" onclick="gearReturnOpen(this,\''+sk+'\','+i+')" style="cursor:pointer;accent-color:#5CCC88;width:14px;height:14px;">')+'</td>'+'</td><td style="font-size:11px;">'+(r.class_registered||'')+'</td>'+dayCell+'<td style="font-size:11px;">'+(r.address||'')+'</td><td style="font-size:11px;">'+(r.city||'')+'</td><td style="font-size:11px;">'+(r.state||'')+'</td><td style="font-size:11px;">'+(r.zip||'')+'</td><td style="font-size:11px;">'+(r.parent1_name||'')+'</td><td style="font-size:11px;">'+(r.parent1_email||'')+'</td><td style="font-size:11px;">'+(r.parent1_phone||'')+'</td><td style="font-size:11px;">'+(r.parent2_name||'')+'</td><td style="font-size:11px;">'+(r.parent2_email||'')+'</td><td style="font-size:11px;">'+(r.parent2_phone||'')+'</td><td><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+i+')">Del</button></td></tr>';
+      return'<tr'+rowBg+'><td class="sticky-col">'+(r.first_name||'')+'</td><td class="sticky-col" style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\''+sk+'\','+i+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);">'+(r.birthdate||'')+'</td><td>'+lvBadge(r.level)+'</td><td style="text-align:center;">'+promoBadge+'</td>'+nc+'<td style="text-align:center;">'+(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO'?'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Edit gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:4px;padding:1px 6px;cursor:pointer;">YES — '+r.gear+'</span>':'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Issue gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;">NO</span>')+'</td>'+'<td style="text-align:center;">'+(r.gear_returned&&r.gear_returned.match(/\d/)?'<span onclick="gearReturnOpen(null,\''+sk+'\','+i+')" title="Click to view/edit return" style="font-size:11px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">'+r.gear_returned+'</span>':'<input type="checkbox" onclick="gearReturnOpen(this,\''+sk+'\','+i+')" style="cursor:pointer;accent-color:#5CCC88;width:14px;height:14px;">')+'</td>'+'</td><td style="font-size:11px;">'+(r.class_registered||'')+'</td>'+dayCell+'<td style="font-size:11px;">'+(r.address||'')+'</td><td style="font-size:11px;">'+(r.city||'')+'</td><td style="font-size:11px;">'+(r.state||'')+'</td><td style="font-size:11px;">'+(r.zip||'')+'</td><td style="font-size:11px;">'+(r.parent1_name||'')+'</td><td style="font-size:11px;">'+(r.parent1_email||'')+'</td><td style="font-size:11px;">'+(r.parent1_phone||'')+'</td><td style="font-size:11px;">'+(r.parent2_name||'')+'</td><td style="font-size:11px;">'+(r.parent2_email||'')+'</td><td style="font-size:11px;">'+(r.parent2_phone||'')+'</td><td><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+i+')">Del</button></td></tr>';
     }).join('')+'</tbody>';
     return'<div style="margin-bottom:28px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:'+color+';margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid '+color+'33;">'+label+' -- '+gRows.length+' athlete'+(gRows.length!==1?'s':'')+'</div><div class="table-outer"><table class="data-table">'+hd+bd+'</table></div></div>';
   }
