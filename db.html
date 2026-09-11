@@ -443,7 +443,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V53</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V54</div>
 
 <nav>
   <div class="nav-left">
@@ -1142,7 +1142,9 @@ function confirmImport(){
   const unrec=pending.filter(r=>!isLJ(r)&&!isPH(r)).length;
   const ljCount=pending.filter(r=>isLJ(r)).length;
   const phCount=pending.filter(r=>isPH(r)).length;
-  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH)`+(unrec?` — ${unrec} unrecognized level`:''),unrec?'info':'ok');
+  // Sample the actual level values for debugging
+  const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
+  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other) — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
   // Auto-switch to the appropriate sub-tab based on what was imported
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
