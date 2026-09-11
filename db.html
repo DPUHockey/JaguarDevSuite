@@ -74,7 +74,8 @@ onValue(rootRef, snapshot => {
   let changed = false;
 
   if (data.master) {
-    const newMaster = data.master;
+    // Firebase returns arrays as objects {0:…,1:…} — convert back to real arrays
+    const newMaster = Array.isArray(data.master) ? data.master : Object.values(data.master);
     if (JSON.stringify(newMaster) !== JSON.stringify(window.DB?.master)) {
       if (window.DB) window.DB.master = newMaster;
       changed = true;
@@ -84,8 +85,9 @@ onValue(rootRef, snapshot => {
     const SFIELDS = window.SEASON_FIELDS_GLOBAL || [];
     SFIELDS.forEach(k => {
       if (data.season[k] && window.DB) {
-        if (JSON.stringify(data.season[k]) !== JSON.stringify(window.DB[k])) {
-          window.DB[k] = data.season[k];
+        const newVal = Array.isArray(data.season[k]) ? data.season[k] : Object.values(data.season[k]);
+        if (JSON.stringify(newVal) !== JSON.stringify(window.DB[k])) {
+          window.DB[k] = newVal;
           changed = true;
         }
       }
@@ -418,7 +420,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V47</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V48</div>
 
 <nav>
   <div class="nav-left">
@@ -731,18 +733,26 @@ function loadDB(){
   _mergeFirebaseData();
 }
 
+// Firebase stores JS arrays as {0:…,1:…,2:…} objects. Convert them back to real
+// arrays wherever we pull data from Firebase, or .length is always undefined and
+// every merge silently fails.
+function _fbToArray(val){
+  if(!val) return [];
+  if(Array.isArray(val)) return val;
+  if(typeof val==='object') return Object.values(val);
+  return [];
+}
 function _mergeFirebaseData(){
   try{
     if(window._DB_master_fb){
-      // Firebase wins if it has more records, otherwise keep local
-      if(window._DB_master_fb.length >= DB.master.length){
-        DB.master = window._DB_master_fb;
-      }
+      const fb=_fbToArray(window._DB_master_fb);
+      if(fb.length >= DB.master.length) DB.master = fb;
     }
     if(window._DB_season_fb){
       SEASON_FIELDS.forEach(k=>{
-        if(window._DB_season_fb[k] && window._DB_season_fb[k].length >= (DB[k]||[]).length){
-          DB[k]=window._DB_season_fb[k];
+        if(window._DB_season_fb[k]){
+          const fb=_fbToArray(window._DB_season_fb[k]);
+          if(fb.length >= (DB[k]||[]).length) DB[k]=fb;
         }
       });
     }
