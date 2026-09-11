@@ -443,7 +443,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V52</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V53</div>
 
 <nav>
   <div class="nav-left">
@@ -1043,7 +1043,7 @@ function normLevelString(s){
   v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^5SKILLS?$/,'5Skill');
   return v;
 }
-function isValidLevelCode(v){return /^(LJ[123]|PH[123]|5Skill)$/.test(v);}
+function isValidLevelCode(v){return /^(LJ[123]?|PH[123]?|5Skill)$/.test(v);}
 function mapRow(headers,vals){
   const row={};
   headers.forEach((h,i)=>{
@@ -1089,8 +1089,8 @@ function getLevel(row){
   v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH');
   return v;
 }
-function isLJ(row){return /^LJ[123]$/.test(getLevel(row));}
-function isPH(row){return /^PH[123]$/.test(getLevel(row));}
+function isLJ(row){return /^LJ[123]?$/.test(getLevel(row));}
+function isPH(row){return /^PH[123]?$/.test(getLevel(row));}
 function subLevel(row){return getLevel(row);}
 function birthYear(row){const m=(row.birthdate||'').match(/(\d{4})/);return m?m[1]:'';}
 
@@ -1268,7 +1268,9 @@ function getSessionSubData(sNum){
   rows.forEach((r,i)=>{
     const sl=subLevel(r),t=Object.assign({},r,{_origIdx:i});
     if(sl==='LJ1')lj1.push(t);else if(sl==='LJ2')lj2.push(t);else if(sl==='LJ3')lj3.push(t);
+    else if(sl==='LJ')lj1.push(t); // bare 'LJ' → lj1 bucket
     else if(sl==='PH1')ph1.push(t);else if(sl==='PH2')ph2.push(t);else if(sl==='PH3')ph3.push(t);
+    else if(sl==='PH')ph1.push(t); // bare 'PH' → ph1 bucket
   });
   return{lj1,lj2,lj3,ph1,ph2,ph3};
 }
