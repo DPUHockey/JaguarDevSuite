@@ -123,10 +123,17 @@ onValue(rootRef, snapshot => {
     }
   }
   if (changed) {
-    // Show a subtle toast so users know data updated
+    // Re-sync DB plain-object keys to the (now updated) year slot
+    if (window._dbSyncYear) window._dbSyncYear();
+    // Persist to localStorage so a refresh on this device also has the data
+    try{
+      if(window.DB)localStorage.setItem('jaguar_master_v1',JSON.stringify({master:window.DB.master}));
+      if(window.DB_YEARS)localStorage.setItem('jaguar_season_v1',JSON.stringify({years:window.DB_YEARS,activeYear:window.DB_ACTIVE_YEAR}));
+    }catch(e){}
     if (window.showAlert) window.showAlert('↻ Updated from another device', 'info');
     if (window.renderAll) window.renderAll();
     if (window.updateStats) window.updateStats();
+    if (window.renderYearBar) window.renderYearBar();
   }
 }, error => {
   console.warn('Firebase listener error:', error);
@@ -443,7 +450,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V55</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V56</div>
 
 <nav>
   <div class="nav-left">
@@ -716,6 +723,9 @@ window.DB_YEARS = DB_YEARS;
 window.SEASON_FIELDS_GLOBAL = SEASON_FIELDS;
 window._appInitialized = false;
 window._dbMakeYearSlot = _dbMakeYearSlot;
+window._dbSyncYear = _dbSyncYear;
+window.DB_ACTIVE_YEAR = DB_ACTIVE_YEAR;
+window.renderYearBar = function(){ if(typeof renderYearBar==='function')renderYearBar(); };
 
 function saveDB(){
   _dbWriteBackToSlot(); // commit live DB arrays into the year slot before serializing
