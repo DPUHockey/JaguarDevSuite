@@ -454,7 +454,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V58</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V59</div>
 
 <nav>
   <div class="nav-left">
@@ -482,6 +482,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
       <button class="btn-sm gold" onclick="exportAllCSV()">&#x2193; Export All</button>
       <button class="btn-sm" id="fb-push-btn" onclick="pushAllToFirebase()" style="border-color:#7EC8E3;color:#7EC8E3;" title="Push all local data to Firebase so other devices sync">&#x2191; Push to Cloud</button>
       <button class="btn-sm" id="fb-pull-btn" onclick="pullFromCloud()" style="border-color:#90C9A0;color:#90C9A0;" title="Pull latest data from Firebase right now">&#x2193; Pull from Cloud</button>
+      <button class="btn-sm" onclick="diagFirebase()" style="border-color:#C9A84C;color:#C9A84C;" title="Show what is in Firebase">&#x1F50D; Diag</button>
     </div>
     <div class="stat-pills" id="stat-pills">
       <div class="pill"><span id="stat-total">0</span> Total</div>
@@ -3685,6 +3686,34 @@ function pushAllToFirebase(){
         showAlert('Firebase write error: '+e.message,'err');
       });
   });
+}
+
+// ── DIAGNOSTIC ──
+function diagFirebase(){
+  if(!window._fbDb||!window._fbRef||!window._fbGet){showAlert('Firebase not ready','err');return;}
+  window._fbGet(window._fbRef(window._fbDb,'jaguar_db')).then(snapshot=>{
+    const data=snapshot.val();
+    if(!data){showAlert('Firebase is EMPTY — nothing pushed yet','err');return;}
+    const keys=Object.keys(data);
+    const masterLen=data.master?(Array.isArray(data.master)?data.master.length:Object.keys(data.master).length):0;
+    let msg='Firebase keys: '+keys.join(', ')+' | master: '+masterLen+' records';
+    if(data.seasonYears&&data.seasonYears.years){
+      const years=Object.keys(data.seasonYears.years);
+      msg+=' | seasonYears: '+years.join(', ')+' (active:'+data.seasonYears.activeYear+')';
+      years.forEach(y=>{
+        const slot=data.seasonYears.years[y];
+        const s1=slot.session1?(Array.isArray(slot.session1)?slot.session1.length:Object.keys(slot.session1).length):0;
+        msg+=' | '+y+'.session1='+s1;
+      });
+    } else if(data.season){
+      msg+=' | OLD flat season: session1='+(data.season.session1?(Array.isArray(data.season.session1)?data.season.session1.length:Object.keys(data.season.session1).length):0);
+    } else {
+      msg+=' | NO season data found';
+    }
+    msg+=' | Local DB.master='+DB.master.length+' DB.session1='+(DB.session1||[]).length+' year='+DB_ACTIVE_YEAR;
+    showAlert(msg,'info');
+    console.log('Firebase diag:',JSON.stringify(data).slice(0,500));
+  }).catch(e=>showAlert('Firebase error: '+e.message,'err'));
 }
 
 // ── PULL FROM CLOUD ──
