@@ -450,7 +450,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V56</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V57</div>
 
 <nav>
   <div class="nav-left">
@@ -477,6 +477,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
       <button class="btn-confirm" style="padding:9px 20px;font-size:13px;" onclick="openAddModal()">&#43; Add Player</button>
       <button class="btn-sm gold" onclick="exportAllCSV()">&#x2193; Export All</button>
       <button class="btn-sm" id="fb-push-btn" onclick="pushAllToFirebase()" style="border-color:#7EC8E3;color:#7EC8E3;" title="Push all local data to Firebase so other devices sync">&#x2191; Push to Cloud</button>
+      <button class="btn-sm" id="fb-pull-btn" onclick="pullFromCloud()" style="border-color:#90C9A0;color:#90C9A0;" title="Pull latest data from Firebase right now">&#x2193; Pull from Cloud</button>
     </div>
     <div class="stat-pills" id="stat-pills">
       <div class="pill"><span id="stat-total">0</span> Total</div>
@@ -3671,6 +3672,74 @@ function pushAllToFirebase(){
         if(btn){btn.textContent='↑ Push to Cloud';btn.style.opacity='';}
         showAlert('Firebase write error: '+e.message,'err');
       });
+  });
+}
+
+// ── PULL FROM CLOUD ──
+function pullFromCloud(){
+  if(!window._fbDb||!window._fbRef||!window._fbGet){
+    showAlert('Firebase not connected yet — try again in a moment','err');return;
+  }
+  const btn=document.getElementById('fb-pull-btn');
+  if(btn){btn.textContent='Pulling…';btn.style.opacity='.5';}
+  window._fbGet(window._fbRef(window._fbDb,'jaguar_db')).then(snapshot=>{
+    const data=snapshot.val();
+    if(!data){
+      showAlert('Nothing in Firebase yet — import a roster and Push to Cloud first','err');
+      if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
+      return;
+    }
+    // Load master
+    if(data.master){
+      const m=_fbToArray(data.master);
+      if(m.length)DB.master=m;
+    }
+    // Load year-scoped season data (new format)
+    if(data.seasonYears&&data.seasonYears.years){
+      const sy=data.seasonYears;
+      Object.keys(sy.years).forEach(y=>{
+        if(!DB_YEARS[y])DB_YEARS[y]=_dbMakeYearSlot();
+        const src=sy.years[y];
+        SEASON_FIELDS.forEach(k=>{
+          if(src&&src[k]){
+            const arr=_fbToArray(src[k]);
+            if(arr.length)DB_YEARS[y][k]=arr;
+          }
+        });
+      });
+      if(sy.activeYear&&DB_YEARS[sy.activeYear])DB_ACTIVE_YEAR=sy.activeYear;
+    } else if(data.season){
+      // Legacy flat format
+      const slot=dbEnsureYear(DB_ACTIVE_YEAR);
+      SEASON_FIELDS.forEach(k=>{
+        if(data.season[k]){
+          const arr=_fbToArray(data.season[k]);
+          if(arr.length)slot[k]=arr;
+        }
+      });
+    }
+    if(data.attendance)window.attendData=data.attendance;
+    if(data.manualDates)window.manualDates=data.manualDates;
+    // Resync DB keys and save locally
+    _dbSyncYear();
+    normalizeStoredDates();
+    try{
+      localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
+      localStorage.setItem(SEASON_KEY,JSON.stringify({years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}));
+    }catch(e){}
+    renderYearBar();
+    renderAll();
+    updateStats();
+    if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
+    showAlert('✓ Pulled from Firebase — '+DB.master.length+' athletes, '+
+      Object.keys(DB_YEARS).map(y=>{
+        const s=DB_YEARS[y];
+        const tot=SEASON_FIELDS.filter(k=>k.startsWith('session')).reduce((n,k)=>n+(s[k]||[]).length,0);
+        return y+': '+tot+' session records';
+      }).join(', '),'ok');
+  }).catch(e=>{
+    showAlert('Pull failed: '+e.message,'err');
+    if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
   });
 }
 
