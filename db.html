@@ -454,7 +454,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V60</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V61</div>
 
 <nav>
   <div class="nav-left">
@@ -994,7 +994,7 @@ const ALIASES={
   first_name:['firstname','first','fname','given'],
   last_name:['lastname','last','lname','surname','family'],
   birthdate:['birthdate','dob','dateofbirth','birth','birthday'],
-  level:['level','lvl','classlevel','grouplevel'],
+  level:['level','lvl','classlevel','grouplevel','group','class','division','program','levelname','playerlevel','skilllevel'],
   gear:['gear','equipment','gearissued'],
   gear_returned:['gearreturned','gearreturn','returned','gearin'],
   class_registered:['classregistered','class','registered','classreg','registration'],
@@ -1077,8 +1077,10 @@ function todayISO(){
 // separate Level field. If Level comes in blank, derive it from Class using the same
 // normalization rules as getLevel() below, so promotions/next-level logic still works.
 function normLevelString(s){
-  let v=(s||'').toUpperCase().replace(/\s/g,'');
-  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^5SKILLS?$/,'5Skill');
+  let v=(s||'').toUpperCase().replace(/[\s\-_]/g,'').replace(/^"|"$/g,'');
+  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^LITTLEJAG?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREHOCKEY/,'PH').replace(/^5SKILLS?$/,'5Skill');
+  // handle "LJ 1", "LJ-1", "PH 2", "PH-2" etc.
+  v=v.replace(/^(LJ)(\d)$/,'$1$2').replace(/^(PH)(\d)$/,'$1$2');
   return v;
 }
 function isValidLevelCode(v){return /^(LJ[123]?|PH[123]?|5Skill)$/.test(v);}
@@ -1096,9 +1098,17 @@ function mapRow(headers,vals){
   // blanking these fields the first time someone opens Edit on this player.
   if(row.birthdate)row.birthdate=toISODate(row.birthdate)||row.birthdate;
   if(row.date_added)row.date_added=toISODate(row.date_added)||row.date_added;
-  if(!row.level&&row.class_registered){
-    const derived=normLevelString(row.class_registered);
-    if(isValidLevelCode(derived))row.level=derived;
+  // if level column empty or not a valid code, try class_registered
+  if(!row.level||!isValidLevelCode(normLevelString(row.level))){
+    const fromLevel=normLevelString(row.level||'');
+    if(isValidLevelCode(fromLevel)){
+      row.level=fromLevel;
+    } else if(row.class_registered){
+      const derived=normLevelString(row.class_registered);
+      if(isValidLevelCode(derived))row.level=derived;
+    }
+  } else {
+    row.level=normLevelString(row.level);
   }
   // canonicalize class_registered too (e.g. "LJ 2" -> "LJ2") so the Class Registered
   // dropdown correctly shows the selected value when editing an imported player
@@ -1122,9 +1132,8 @@ function parseCSV(text){
 
 // ── LEVEL DETECTION ──
 function getLevel(row){
-  let v=(row.level||'').toUpperCase().replace(/\s/g,'');
-  // normalize common spelled-out variants from registration exports
-  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH');
+  let v=(row.level||'').toUpperCase().replace(/[\s\-_]/g,'').replace(/^"|"$/g,'');
+  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^LITTLEJAG?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREHOCKEY/,'PH');
   return v;
 }
 function isLJ(row){return /^LJ[123]?$/.test(getLevel(row));}
