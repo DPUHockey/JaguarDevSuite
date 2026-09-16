@@ -1217,7 +1217,7 @@ function confirmImport(){
   const ljCount=pending.filter(r=>isLJ(r)).length;
   const phCount=pending.filter(r=>isPH(r)).length;
   const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
-  const skipMsg=skipped>0?\` (${skipped} duplicate${skipped!==1?'s':''} skipped)`:'';
+  const skipMsg=skipped>0?` (${skipped} duplicate${skipped!==1?'s':''} skipped)`:'';;
   showAlert(`✓ ${added} record${added!==1?'s':''} added from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other)${skipMsg} — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
