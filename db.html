@@ -454,7 +454,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V61</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V62</div>
 
 <nav>
   <div class="nav-left">
@@ -814,6 +814,8 @@ function loadDB(){
   }catch(e){}
   _mergeFirebaseData();
   _dbSyncYear(); // point DB keys at the loaded active year
+  // Rebuild lj/ph sub-arrays in case they weren't persisted or came from old format
+  if(typeof _rebuildLjPh==='function')_rebuildLjPh();
 }
 
 // Firebase stores JS arrays as {0:…,1:…,2:…} objects. Convert them back to real
@@ -1163,36 +1165,54 @@ function pickSession(n){
   document.querySelectorAll('.sess-opt').forEach((b,i)=>b.classList.toggle('selected',i===n-1));
   document.getElementById('btn-confirm').disabled=false;
 }
+function _rebuildLjPh(){
+  // Wipe and rebuild lj/ph sub-arrays from all session data so they're never stale
+  DB.lj=[];DB.lj1=[];DB.lj2=[];DB.lj3=[];
+  DB.ph=[];DB.ph1=[];DB.ph2=[];DB.ph3=[];
+  for(let s=1;s<=6;s++){
+    const rows=DB['session'+s]||[];
+    rows.forEach(row=>{
+      const mini={first_name:row.first_name,last_name:row.last_name,birth_year:birthYear(row),level:row.level,session:'Session '+s};
+      if(isLJ(row)){
+        DB.lj.push(mini);
+        const sl=subLevel(row);
+        if(sl==='LJ1'||sl==='LJ')DB.lj1.push(mini);
+        else if(sl==='LJ2')DB.lj2.push(mini);
+        else if(sl==='LJ3')DB.lj3.push(mini);
+      }
+      if(isPH(row)){
+        DB.ph.push(mini);
+        const sl=subLevel(row);
+        if(sl==='PH1'||sl==='PH')DB.ph1.push(mini);
+        else if(sl==='PH2')DB.ph2.push(mini);
+        else if(sl==='PH3')DB.ph3.push(mini);
+      }
+    });
+  }
+}
 function confirmImport(){
   if(!selSess||!pending)return;
   const key='session'+selSess;
-  const mini_lj_cols=['first_name','last_name','birth_year','level','session'];
+  // Deduplicate: build a set of existing keys for this session
+  const existingKeys=new Set((DB[key]||[]).map(r=>masterKey(r)));
+  let added=0,skipped=0;
   pending.forEach(row=>{
+    const mk=masterKey(row);
+    if(existingKeys.has(mk)){skipped++;return;}
+    existingKeys.add(mk);
     DB[key].push(row);
     upsertMaster(row,selSess);
-    const mini={first_name:row.first_name,last_name:row.last_name,birth_year:birthYear(row),level:row.level,session:'Session '+selSess};
-    if(isLJ(row)){
-      DB.lj.push(mini);
-      const sl=subLevel(row);
-      if(sl==='LJ1')DB.lj1.push(mini);
-      else if(sl==='LJ2')DB.lj2.push(mini);
-      else if(sl==='LJ3')DB.lj3.push(mini);
-    }
-    if(isPH(row)){
-      DB.ph.push(mini);
-      const sl=subLevel(row);
-      if(sl==='PH1')DB.ph1.push(mini);
-      else if(sl==='PH2')DB.ph2.push(mini);
-    }
+    added++;
   });
+  // Rebuild lj/ph sub-arrays cleanly from all session data
+  _rebuildLjPh();
   saveDB();closeModal();
   const unrec=pending.filter(r=>!isLJ(r)&&!isPH(r)).length;
   const ljCount=pending.filter(r=>isLJ(r)).length;
   const phCount=pending.filter(r=>isPH(r)).length;
-  // Sample the actual level values for debugging
   const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
-  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other) — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
-  // Auto-switch to the appropriate sub-tab based on what was imported
+  const skipMsg=skipped>0?\` (${skipped} duplicate${skipped!==1?'s':''} skipped)`:'';
+  showAlert(`✓ ${added} record${added!==1?'s':''} added from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other)${skipMsg} — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
   pending=null;pendingName='';
@@ -1317,9 +1337,9 @@ function getSessionSubData(sNum){
   rows.forEach((r,i)=>{
     const sl=subLevel(r),t=Object.assign({},r,{_origIdx:i});
     if(sl==='LJ1')lj1.push(t);else if(sl==='LJ2')lj2.push(t);else if(sl==='LJ3')lj3.push(t);
-    else if(sl==='LJ')lj1.push(t); // bare 'LJ' → lj1 bucket
+    else if(isLJ(r))lj1.push(t); // bare 'LJ' or any LJ variant → lj1 bucket
     else if(sl==='PH1')ph1.push(t);else if(sl==='PH2')ph2.push(t);else if(sl==='PH3')ph3.push(t);
-    else if(sl==='PH')ph1.push(t); // bare 'PH' → ph1 bucket
+    else if(isPH(r))ph1.push(t); // bare 'PH' or any PH variant → ph1 bucket
   });
   return{lj1,lj2,lj3,ph1,ph2,ph3};
 }
