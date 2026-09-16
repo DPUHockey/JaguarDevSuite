@@ -836,6 +836,12 @@ function _mergeFirebaseData(){
     // Try new year-scoped format first
     if(window._DB_seasonyears_fb&&window._DB_seasonyears_fb.years){
       const sy=window._DB_seasonyears_fb;
+      // Set active year FIRST so _dbSyncYear points at the right slot
+      if(sy.activeYear){
+        if(!DB_YEARS[sy.activeYear])DB_YEARS[sy.activeYear]=_dbMakeYearSlot();
+        DB_ACTIVE_YEAR=sy.activeYear;
+        window.DB_ACTIVE_YEAR=sy.activeYear;
+      }
       Object.keys(sy.years).forEach(y=>{
         if(!DB_YEARS[y])DB_YEARS[y]=_dbMakeYearSlot();
         const src=sy.years[y];
