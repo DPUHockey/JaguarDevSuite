@@ -135,6 +135,7 @@ onValue(rootRef, snapshot => {
       if(window.DB_YEARS)localStorage.setItem('jaguar_season_v1',JSON.stringify({years:window.DB_YEARS,activeYear:window.DB_ACTIVE_YEAR}));
     }catch(e){}
     if (window.showAlert) window.showAlert('↻ Updated from another device', 'info');
+    if (window._rebuildLjPh) window._rebuildLjPh();
     if (window.renderAll) window.renderAll();
     if (window.updateStats) window.updateStats();
     if (window.renderYearBar) window.renderYearBar();
@@ -454,7 +455,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V62</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V63</div>
 
 <nav>
   <div class="nav-left">
@@ -1144,8 +1145,8 @@ function getLevel(row){
   v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^LITTLEJAG?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREHOCKEY/,'PH');
   return v;
 }
-function isLJ(row){return /^LJ[123]?$/.test(getLevel(row));}
-function isPH(row){return /^PH[123]?$/.test(getLevel(row));}
+function isLJ(row){const g=getLevel(row);return /^LJ/.test(g)&&!/^LJ[123][A-Z]/.test(g);}
+function isPH(row){const g=getLevel(row);return /^PH/.test(g)&&!/^PH[123][A-Z]/.test(g);}
 function subLevel(row){return getLevel(row);}
 function birthYear(row){const m=(row.birthdate||'').match(/(\d{4})/);return m?m[1]:'';}
 
@@ -1217,7 +1218,7 @@ function confirmImport(){
   const ljCount=pending.filter(r=>isLJ(r)).length;
   const phCount=pending.filter(r=>isPH(r)).length;
   const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
-  const skipMsg=skipped>0?` (${skipped} duplicate${skipped!==1?'s':''} skipped)`:'';;
+  const skipMsg=skipped>0?` (${skipped} duplicate${skipped!==1?'s':''} skipped)`:'';
   showAlert(`✓ ${added} record${added!==1?'s':''} added from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other)${skipMsg} — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
@@ -3821,6 +3822,7 @@ function pullFromCloud(){
 window.renderAll = renderAll;
 window.updateStats = updateStats;
 window.showAlert = showAlert;
+window._rebuildLjPh = function(){ if(typeof _rebuildLjPh==='function')_rebuildLjPh(); };
 
 function _startApp(){
   loadDB();
