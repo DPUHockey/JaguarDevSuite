@@ -454,7 +454,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V64</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V67</div>
 
 <nav>
   <div class="nav-left">
@@ -812,6 +812,17 @@ function loadDB(){
   }catch(e){}
   _mergeFirebaseData();
   _dbSyncYear(); // point DB keys at the loaded active year
+  // Auto-dedup sessions on every load (cleans up any dupes from previous imports)
+  try{
+    for(var _ds=1;_ds<=6;_ds++){
+      var _dk='session'+_ds,_dArr=DB[_dk],_dSeen={},_dOut=[];
+      if(!_dArr||!_dArr.length)continue;
+      _dArr.forEach(function(r){var k=masterKey(r);if(!_dSeen[k]){_dSeen[k]=1;_dOut.push(r);}});
+      DB[_dk]=_dOut;
+      var _slot=DB_YEARS[DB_ACTIVE_YEAR||window.DB_ACTIVE_YEAR];
+      if(_slot)_slot[_dk]=_dOut;
+    }
+  }catch(e){}
 }
 
 // Firebase stores JS arrays as {0:…,1:…,2:…} objects. Convert them back to real
@@ -1170,8 +1181,16 @@ function pickSession(n){
 function confirmImport(){
   if(!selSess||!pending)return;
   const key='session'+selSess;
+  // Deduplicate by first+last+birthdate before pushing
+  var _existKeys={};
+  (DB[key]||[]).forEach(function(r){_existKeys[masterKey(r)]=1;});
+  var _added=0,_skipped=0;
   const mini_lj_cols=['first_name','last_name','birth_year','level','session'];
   pending.forEach(row=>{
+    var _mk=masterKey(row);
+    if(_existKeys[_mk]){_skipped++;return;}
+    _existKeys[_mk]=1;
+    _added++;
     DB[key].push(row);
     upsertMaster(row,selSess);
     const mini={first_name:row.first_name,last_name:row.last_name,birth_year:birthYear(row),level:row.level,session:'Session '+selSess};
@@ -1195,7 +1214,8 @@ function confirmImport(){
   const ljCount=pending.filter(r=>isLJ(r)).length;
   const phCount=pending.filter(r=>isPH(r)).length;
   const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
-  showAlert('✓ Added '+pending.length+' record'+(pending.length!==1?'s':'')+' from "'+pendingName+'" → Session '+selSess+' ('+ljCount+' LJ, '+phCount+' PH, '+unrec+' other) — levels: '+lvSample,unrec&&!ljCount&&!phCount?'err':'ok');
+  var _skipMsg=_skipped>0?' ('+_skipped+' duplicate'+(_skipped!==1?'s':'')+' skipped)':'';
+  showAlert('Added '+_added+' of '+pending.length+' records from "'+pendingName+'" to Session '+selSess+' ('+ljCount+' LJ, '+phCount+' PH, '+unrec+' other)'+_skipMsg+' -- levels: '+lvSample,unrec&&!ljCount&&!phCount?'err':'ok');
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
   pending=null;pendingName='';
