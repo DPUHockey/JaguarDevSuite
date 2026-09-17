@@ -738,8 +738,6 @@ window._appInitialized = false;
 window._dbMakeYearSlot = _dbMakeYearSlot;
 window._dbSyncYear = _dbSyncYear;
 window.DB_ACTIVE_YEAR = DB_ACTIVE_YEAR;
-window.renderYearBar = function(){ if(typeof renderYearBar==='function')renderYearBar(); };
-
 function saveDB(){
   _dbWriteBackToSlot(); // commit live DB arrays into the year slot before serializing
   try{
