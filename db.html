@@ -454,7 +454,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V67</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V68</div>
 
 <nav>
   <div class="nav-left">
@@ -1104,7 +1104,10 @@ function mapRow(headers,vals){
   headers.forEach((h,i)=>{
     const n=norm(h);let matched=null;
     for(const[k,alts] of Object.entries(ALIASES)){if(alts.includes(n)||n===k){matched=k;break;}}
-    row[matched||n]=vals[i]||'';
+    const fk=matched||n;
+    // First match wins — don't overwrite a field that's already been set
+    // (handles CSVs with duplicate column headers like two "Level" columns)
+    if(row[fk]===undefined||row[fk]==='')row[fk]=vals[i]||'';
   });
   COLS.forEach(c=>{if(row[c]===undefined)row[c]='';});
   row.day=normDay(row.day);
