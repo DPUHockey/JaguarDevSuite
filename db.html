@@ -454,7 +454,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V68</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V59</div>
 
 <nav>
   <div class="nav-left">
@@ -738,6 +738,8 @@ window._appInitialized = false;
 window._dbMakeYearSlot = _dbMakeYearSlot;
 window._dbSyncYear = _dbSyncYear;
 window.DB_ACTIVE_YEAR = DB_ACTIVE_YEAR;
+window.renderYearBar = function(){ if(typeof renderYearBar==='function')renderYearBar(); };
+
 function saveDB(){
   _dbWriteBackToSlot(); // commit live DB arrays into the year slot before serializing
   try{
@@ -812,17 +814,6 @@ function loadDB(){
   }catch(e){}
   _mergeFirebaseData();
   _dbSyncYear(); // point DB keys at the loaded active year
-  // Auto-dedup sessions on every load (cleans up any dupes from previous imports)
-  try{
-    for(var _ds=1;_ds<=6;_ds++){
-      var _dk='session'+_ds,_dArr=DB[_dk],_dSeen={},_dOut=[];
-      if(!_dArr||!_dArr.length)continue;
-      _dArr.forEach(function(r){var k=masterKey(r);if(!_dSeen[k]){_dSeen[k]=1;_dOut.push(r);}});
-      DB[_dk]=_dOut;
-      var _slot=DB_YEARS[DB_ACTIVE_YEAR||window.DB_ACTIVE_YEAR];
-      if(_slot)_slot[_dk]=_dOut;
-    }
-  }catch(e){}
 }
 
 // Firebase stores JS arrays as {0:…,1:…,2:…} objects. Convert them back to real
@@ -843,12 +834,6 @@ function _mergeFirebaseData(){
     // Try new year-scoped format first
     if(window._DB_seasonyears_fb&&window._DB_seasonyears_fb.years){
       const sy=window._DB_seasonyears_fb;
-      // Set active year FIRST so _dbSyncYear points at the right slot
-      if(sy.activeYear){
-        if(!DB_YEARS[sy.activeYear])DB_YEARS[sy.activeYear]=_dbMakeYearSlot();
-        DB_ACTIVE_YEAR=sy.activeYear;
-        window.DB_ACTIVE_YEAR=sy.activeYear;
-      }
       Object.keys(sy.years).forEach(y=>{
         if(!DB_YEARS[y])DB_YEARS[y]=_dbMakeYearSlot();
         const src=sy.years[y];
@@ -1009,7 +994,7 @@ const ALIASES={
   first_name:['firstname','first','fname','given'],
   last_name:['lastname','last','lname','surname','family'],
   birthdate:['birthdate','dob','dateofbirth','birth','birthday'],
-  level:['level','lvl','classlevel','grouplevel','group','class','division','program','levelname','playerlevel','skilllevel'],
+  level:['level','lvl','classlevel','grouplevel'],
   gear:['gear','equipment','gearissued'],
   gear_returned:['gearreturned','gearreturn','returned','gearin'],
   class_registered:['classregistered','class','registered','classreg','registration'],
@@ -1041,7 +1026,7 @@ function normDay(val){
   return'';
 }
 
-function norm(s){return s.toLowerCase().replace(/[\s_\-\.]/g,'');}
+function norm(s){return s.replace(/^[\uFEFF\u200B\u00A0]+/,'').toLowerCase().replace(/[\s_\-\.]/g,'');}
 // Registration/CSV exports store dates in all kinds of formats (9/1/2025, Excel serial
 // numbers, "Sep 1, 2025", etc). The native <input type="date"> picker used for
 // Birthdate/Date Added REQUIRES exact YYYY-MM-DD -- anything else, it silently shows
@@ -1092,10 +1077,8 @@ function todayISO(){
 // separate Level field. If Level comes in blank, derive it from Class using the same
 // normalization rules as getLevel() below, so promotions/next-level logic still works.
 function normLevelString(s){
-  let v=(s||'').toUpperCase().replace(/[\s\-_]/g,'').replace(/^"|"$/g,'');
-  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^LITTLEJAG?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREHOCKEY/,'PH').replace(/^5SKILLS?$/,'5Skill');
-  // handle "LJ 1", "LJ-1", "PH 2", "PH-2" etc.
-  v=v.replace(/^(LJ)(\d)$/,'$1$2').replace(/^(PH)(\d)$/,'$1$2');
+  let v=(s||'').replace(/^[\uFEFF\u200B\u00A0]+/,'').toUpperCase().replace(/\s/g,'');
+  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^5SKILLS?$/,'5Skill');
   return v;
 }
 function isValidLevelCode(v){return /^(LJ[123]?|PH[123]?|5Skill)$/.test(v);}
@@ -1104,10 +1087,7 @@ function mapRow(headers,vals){
   headers.forEach((h,i)=>{
     const n=norm(h);let matched=null;
     for(const[k,alts] of Object.entries(ALIASES)){if(alts.includes(n)||n===k){matched=k;break;}}
-    const fk=matched||n;
-    // First match wins — don't overwrite a field that's already been set
-    // (handles CSVs with duplicate column headers like two "Level" columns)
-    if(row[fk]===undefined||row[fk]==='')row[fk]=vals[i]||'';
+    row[matched||n]=vals[i]||'';
   });
   COLS.forEach(c=>{if(row[c]===undefined)row[c]='';});
   row.day=normDay(row.day);
@@ -1116,17 +1096,9 @@ function mapRow(headers,vals){
   // blanking these fields the first time someone opens Edit on this player.
   if(row.birthdate)row.birthdate=toISODate(row.birthdate)||row.birthdate;
   if(row.date_added)row.date_added=toISODate(row.date_added)||row.date_added;
-  // if level column empty or not a valid code, try class_registered
-  if(!row.level||!isValidLevelCode(normLevelString(row.level))){
-    const fromLevel=normLevelString(row.level||'');
-    if(isValidLevelCode(fromLevel)){
-      row.level=fromLevel;
-    } else if(row.class_registered){
-      const derived=normLevelString(row.class_registered);
-      if(isValidLevelCode(derived))row.level=derived;
-    }
-  } else {
-    row.level=normLevelString(row.level);
+  if(!row.level&&row.class_registered){
+    const derived=normLevelString(row.class_registered);
+    if(isValidLevelCode(derived))row.level=derived;
   }
   // canonicalize class_registered too (e.g. "LJ 2" -> "LJ2") so the Class Registered
   // dropdown correctly shows the selected value when editing an imported player
@@ -1137,6 +1109,7 @@ function mapRow(headers,vals){
   return row;
 }
 function parseCSV(text){
+  text=text.replace(/^\uFEFF/,''); // strip BOM (Excel on Mac/Windows adds this)
   const lines=text.split(/\r?\n/).filter(l=>l.trim());
   if(lines.length<2)return[];
   const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
@@ -1150,12 +1123,13 @@ function parseCSV(text){
 
 // ── LEVEL DETECTION ──
 function getLevel(row){
-  let v=(row.level||'').toUpperCase().replace(/[\s\-_]/g,'').replace(/^"|"$/g,'');
-  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^LITTLEJAG?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREHOCKEY/,'PH');
+  let v=(row.level||'').toUpperCase().replace(/\s/g,'');
+  // normalize common spelled-out variants from registration exports
+  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH');
   return v;
 }
-function isLJ(row){const g=getLevel(row);return /^LJ/.test(g)&&!/^LJ[123][A-Z]/.test(g);}
-function isPH(row){const g=getLevel(row);return /^PH/.test(g)&&!/^PH[123][A-Z]/.test(g);}
+function isLJ(row){return /^LJ[123]?$/.test(getLevel(row));}
+function isPH(row){return /^PH[123]?$/.test(getLevel(row));}
 function subLevel(row){return getLevel(row);}
 function birthYear(row){const m=(row.birthdate||'').match(/(\d{4})/);return m?m[1]:'';}
 
@@ -1184,41 +1158,33 @@ function pickSession(n){
 function confirmImport(){
   if(!selSess||!pending)return;
   const key='session'+selSess;
-  // Deduplicate by first+last+birthdate before pushing
-  var _existKeys={};
-  (DB[key]||[]).forEach(function(r){_existKeys[masterKey(r)]=1;});
-  var _added=0,_skipped=0;
   const mini_lj_cols=['first_name','last_name','birth_year','level','session'];
   pending.forEach(row=>{
-    var _mk=masterKey(row);
-    if(_existKeys[_mk]){_skipped++;return;}
-    _existKeys[_mk]=1;
-    _added++;
     DB[key].push(row);
     upsertMaster(row,selSess);
     const mini={first_name:row.first_name,last_name:row.last_name,birth_year:birthYear(row),level:row.level,session:'Session '+selSess};
     if(isLJ(row)){
       DB.lj.push(mini);
       const sl=subLevel(row);
-      if(sl==='LJ1'||sl==='LJ')DB.lj1.push(mini);
+      if(sl==='LJ1')DB.lj1.push(mini);
       else if(sl==='LJ2')DB.lj2.push(mini);
       else if(sl==='LJ3')DB.lj3.push(mini);
     }
     if(isPH(row)){
       DB.ph.push(mini);
       const sl=subLevel(row);
-      if(sl==='PH1'||sl==='PH')DB.ph1.push(mini);
+      if(sl==='PH1')DB.ph1.push(mini);
       else if(sl==='PH2')DB.ph2.push(mini);
-      else if(sl==='PH3')DB.ph3.push(mini);
     }
   });
   saveDB();closeModal();
   const unrec=pending.filter(r=>!isLJ(r)&&!isPH(r)).length;
   const ljCount=pending.filter(r=>isLJ(r)).length;
   const phCount=pending.filter(r=>isPH(r)).length;
+  // Sample the actual level values for debugging
   const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
-  var _skipMsg=_skipped>0?' ('+_skipped+' duplicate'+(_skipped!==1?'s':'')+' skipped)':'';
-  showAlert('Added '+_added+' of '+pending.length+' records from "'+pendingName+'" to Session '+selSess+' ('+ljCount+' LJ, '+phCount+' PH, '+unrec+' other)'+_skipMsg+' -- levels: '+lvSample,unrec&&!ljCount&&!phCount?'err':'ok');
+  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other) — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
+  // Auto-switch to the appropriate sub-tab based on what was imported
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
   pending=null;pendingName='';
@@ -1343,9 +1309,9 @@ function getSessionSubData(sNum){
   rows.forEach((r,i)=>{
     const sl=subLevel(r),t=Object.assign({},r,{_origIdx:i});
     if(sl==='LJ1')lj1.push(t);else if(sl==='LJ2')lj2.push(t);else if(sl==='LJ3')lj3.push(t);
-    else if(isLJ(r))lj1.push(t); // bare 'LJ' or any LJ variant → lj1 bucket
+    else if(sl==='LJ')lj1.push(t); // bare 'LJ' → lj1 bucket
     else if(sl==='PH1')ph1.push(t);else if(sl==='PH2')ph2.push(t);else if(sl==='PH3')ph3.push(t);
-    else if(isPH(r))ph1.push(t); // bare 'PH' or any PH variant → ph1 bucket
+    else if(sl==='PH')ph1.push(t); // bare 'PH' → ph1 bucket
   });
   return{lj1,lj2,lj3,ph1,ph2,ph3};
 }
@@ -3765,42 +3731,40 @@ function pullFromCloud(){
       if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
       return;
     }
-    // ── Load master ──
+    // Load master
     if(data.master){
       const m=_fbToArray(data.master);
-      if(m.length){DB.master=m;window.DB.master=m;}
+      if(m.length)DB.master=m;
     }
-    // ── Load session/promo data — try new year format, fall back to old flat ──
+    // Load year-scoped season data (new format)
     if(data.seasonYears&&data.seasonYears.years){
       const sy=data.seasonYears;
       Object.keys(sy.years).forEach(y=>{
         if(!DB_YEARS[y])DB_YEARS[y]=_dbMakeYearSlot();
         const src=sy.years[y];
         SEASON_FIELDS.forEach(k=>{
-          if(src&&src[k]){const arr=_fbToArray(src[k]);if(arr.length)DB_YEARS[y][k]=arr;}
+          if(src&&src[k]){
+            const arr=_fbToArray(src[k]);
+            if(arr.length)DB_YEARS[y][k]=arr;
+          }
         });
       });
-      if(sy.activeYear){
-        DB_ACTIVE_YEAR=sy.activeYear;
-        window.DB_ACTIVE_YEAR=sy.activeYear;
-        dbEnsureYear(sy.activeYear);
-      }
+      if(sy.activeYear&&DB_YEARS[sy.activeYear])DB_ACTIVE_YEAR=sy.activeYear;
     } else if(data.season){
-      // Old flat format — load directly into DB session arrays AND into year slot
+      // Legacy flat format
       const slot=dbEnsureYear(DB_ACTIVE_YEAR);
       SEASON_FIELDS.forEach(k=>{
         if(data.season[k]){
           const arr=_fbToArray(data.season[k]);
-          if(arr.length){slot[k]=arr;DB[k]=arr;}  // assign directly to both
+          if(arr.length)slot[k]=arr;
         }
       });
     }
     if(data.attendance)window.attendData=data.attendance;
     if(data.manualDates)window.manualDates=data.manualDates;
-    // Sync DB plain keys to active year slot
+    // Resync DB keys and save locally
     _dbSyncYear();
     normalizeStoredDates();
-    // Save to localStorage
     try{
       localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
       localStorage.setItem(SEASON_KEY,JSON.stringify({years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}));
@@ -3809,8 +3773,12 @@ function pullFromCloud(){
     renderAll();
     updateStats();
     if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
-    const sessTotal=SEASON_FIELDS.filter(k=>k.startsWith('session')).reduce((n,k)=>n+(DB[k]||[]).length,0);
-    showAlert('✓ Pulled — master:'+DB.master.length+' athletes, sessions:'+sessTotal+' records, year:'+DB_ACTIVE_YEAR,'ok');
+    showAlert('✓ Pulled from Firebase — '+DB.master.length+' athletes, '+
+      Object.keys(DB_YEARS).map(y=>{
+        const s=DB_YEARS[y];
+        const tot=SEASON_FIELDS.filter(k=>k.startsWith('session')).reduce((n,k)=>n+(s[k]||[]).length,0);
+        return y+': '+tot+' session records';
+      }).join(', '),'ok');
   }).catch(e=>{
     showAlert('Pull failed: '+e.message,'err');
     if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
