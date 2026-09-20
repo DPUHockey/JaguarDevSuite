@@ -1115,17 +1115,17 @@ function parseCSV(text){
   const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
   return lines.slice(1).map(line=>{
     const vals=[];let cur='',inQ=false;
-    for(const c of line){if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){vals.push(cur.trim());cur='';}else{cur+=c;}}
-    vals.push(cur.trim());
+    for(const c of line){if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){vals.push(cur.trim().replace(/^"|"$/g,''));cur='';}else{cur+=c;}}
+    vals.push(cur.trim().replace(/^"|"$/g,''));
     return mapRow(headers,vals);
   }).filter(r=>r.first_name||r.last_name);
 }
 
 // ── LEVEL DETECTION ──
 function getLevel(row){
-  let v=(row.level||'').toUpperCase().replace(/\s/g,'');
-  // normalize common spelled-out variants from registration exports
-  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH');
+  // Strip BOM, zero-width chars, quotes, and all whitespace variants
+  let v=(row.level||'').replace(/[\uFEFF\u200B\u00A0\"']/g,'').trim().toUpperCase().replace(/[\s]/g,'');
+  v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREJRHOCKEY$/,'PH').replace(/^LJ$/,'LJ').replace(/^PH$/,'PH');
   return v;
 }
 function isLJ(row){return /^LJ[123]?$/.test(getLevel(row));}
@@ -1183,7 +1183,10 @@ function confirmImport(){
   const phCount=pending.filter(r=>isPH(r)).length;
   // Sample the actual level values for debugging
   const lvSample=[...new Set(pending.map(r=>r.level||'(empty)'))].slice(0,5).join(', ');
-  showAlert(`✓ Added ${pending.length} record${pending.length!==1?'s':''} from "${pendingName}" → Session ${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other) — levels: ${lvSample}`,unrec&&!ljCount&&!phCount?'err':'ok');
+  // Show hex codes of first level value to catch invisible chars
+  const firstLv=(pending[0]&&pending[0].level)||'';
+  const lvHex=[...firstLv].map(c=>c.charCodeAt(0).toString(16)).join(' ');
+  showAlert(`✓ Added ${pending.length} records → S${selSess} (${ljCount} LJ, ${phCount} PH, ${unrec} other) — levels: ${lvSample} | hex: ${lvHex}`,unrec&&!ljCount&&!phCount?'err':'ok');
   // Auto-switch to the appropriate sub-tab based on what was imported
   const autoSubTab=ljCount>0&&phCount===0?'lj':phCount>0&&ljCount===0?'ph':'all';
   activeSubTab[key]=autoSubTab;
