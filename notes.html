@@ -193,7 +193,7 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 </style>
 </head>
 <body>
-<div id="app-ver-badge" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">V8</div>
+<div id="app-ver-badge" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">V9</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -442,13 +442,13 @@ table.grid-enroll input{width:56px;text-align:center;background:var(--gray-mid);
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, goOffline, goOnline } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 const cfg={apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",authDomain:"jaguardevsuite.firebaseapp.com",databaseURL:"https://jaguardevsuite-default-rtdb.firebaseio.com",projectId:"jaguardevsuite",storageBucket:"jaguardevsuite.firebasestorage.app",messagingSenderId:"383805859949",appId:"1:383805859949:web:e33d21ee74036e75b43764"};
 const fbApp=initializeApp(cfg);
 const fbDb=getDatabase(fbApp);
 window._notesFbDb=fbDb;window._notesFbRef=ref;window._notesFbSet=set;
 window._notesFbLocalWrite=false;
-onValue(ref(fbDb,'jaguar_db/budget'),snap=>{
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){try{goOffline(fbDb);goOnline(fbDb);}catch(e){}}});onValue(ref(fbDb,'jaguar_db/budget'),snap=>{
   if(window._notesFbLocalWrite)return;
   const data=snap.val();if(!data)return;
   try{
@@ -544,10 +544,12 @@ function _notesFbPush(bOverride,scOverride){
   if(!window._notesFbDb)return;
   const b=bOverride||loadBudget();
   const sc=scOverride||scenariosState;
+  // echo of our own write fires synchronously inside set(); guard only that instant so real remote updates are never dropped
   window._notesFbLocalWrite=true;
-  window._notesFbSet(window._notesFbRef(window._notesFbDb,'jaguar_db/budget'),{budget:b,scenarios:sc})
-    .then(()=>{window._notesFbLocalWrite=false;})
-    .catch(e=>{window._notesFbLocalWrite=false;console.error('[notes FB push]',e);});
+  try{
+    window._notesFbSet(window._notesFbRef(window._notesFbDb,'jaguar_db/budget'),{budget:b,scenarios:sc})
+      .catch(e=>{console.error('[notes FB push]',e);});
+  }finally{window._notesFbLocalWrite=false;}
 }
 
 function fillForm(){
