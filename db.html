@@ -42,6 +42,29 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 // Flag so we don't re-trigger render from our own writes
 window._fbLocalWrite = false;
 
+// ── CLOUD STATUS PILL (bottom-right, just left of the version badge) ──
+// Makes sync visible: a failed save is no longer silent.
+window._fbStatus = function(state, msg){
+  try{
+    let el = document.getElementById('fb-status');
+    if(!el){
+      el = document.createElement('div'); el.id = 'fb-status';
+      el.style.cssText = "position:fixed;bottom:6px;right:52px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;pointer-events:none;";
+      document.body.appendChild(el);
+    }
+    const t = new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
+    const C = {connected:['#5CCC88','\u2601 Connected'], saving:['#C9A84C','\u2601 Saving\u2026'], synced:['#5CCC88','\u2601 Synced '+t],
+               offline:['#F0A050','\u2601 Offline \u2014 will sync when back online'], error:['#F07050','\u2601 NOT SAVED TO CLOUD'+(msg?': '+msg:'')]};
+    const c = C[state] || C.connected;
+    el.style.color = c[0]; el.textContent = c[1]; el.title = msg || '';
+    window._fbLastState = state;
+  }catch(e){}
+};
+onValue(ref(fbDb, '.info/connected'), s => {
+  if (s.val() === true) { if (window._fbLastState !== 'error' && window._fbLastState !== 'saving') window._fbStatus('connected'); }
+  else window._fbStatus('offline');
+});
+
 // ── INITIAL LOAD FROM FIREBASE ──
 // Pull master + season data from Firebase once on load, then set up live listener
 const rootRef = ref(fbDb, 'jaguar_db');
@@ -53,6 +76,7 @@ get(rootRef).then(snapshot => {
     else if (data.season) window._DB_season_fb = data.season; // legacy fallback
     if (data.attendance) window._DB_attend_fb = data.attendance;
     if (data.manualDates) window._DB_manual_fb = data.manualDates;
+    if (data.syncMeta) { window._DB_syncmeta_fb = data.syncMeta; window._fbCloudRev = data.syncMeta.rev || 0; }
   }
   window._fbReady = true;
   // Signal the main script that Firebase data is available
@@ -79,14 +103,32 @@ onValue(rootRef, snapshot => {
 
   let changed = false;
 
-  if (data.master) {
+  // VERSIONED SYNC: every save stamps the cloud with {rev, by}. When another device has saved something newer than
+  // what this device last saw, take the cloud copy in full -- no size guessing, so a change on one device shows on all.
+  const cm = data.syncMeta, versioned = !!(cm && cm.rev);
+  // While the "which copy is correct?" question is open, nothing from the cloud may replace this device's data.
+  const pending = !!window._fbFirstSync;
+  if (pending && !versioned) { window._DB_master_fb = data.master; window._DB_seasonyears_fb = data.seasonYears; }
+  if (versioned) {
+    window._fbCloudRev = Math.max(window._fbCloudRev || 0, cm.rev);
+    const lm = window._dbLocalSync();
+    if (window._fbFirstSync) {
+      if (cm.rev >= window._fbFirstSync.rev) { window._DB_master_fb = data.master; window._DB_seasonyears_fb = data.seasonYears; window._fbFirstSync = cm; }
+    } else if (cm.by !== window._dbDeviceId() && (cm.rev > lm.rev || (cm.rev === lm.rev && cm.by !== lm.by))) {
+      window._dbAdoptCloud(data);
+      window._dbSetLocalSync({rev: cm.rev, by: cm.by});
+      changed = true;
+    }
+  }
+
+  if (!versioned && !pending && data.master) {
     const newMaster = Array.isArray(data.master) ? data.master : Object.values(data.master);
     if (JSON.stringify(newMaster) !== JSON.stringify(window.DB?.master) && !(_firstEvt && newMaster.length < ((window.DB && window.DB.master) || []).length)) {
       if (window.DB) window.DB.master = newMaster;
       changed = true;
     }
   }
-  if (data.seasonYears && data.seasonYears.years) {
+  if (!versioned && !pending && data.seasonYears && data.seasonYears.years) {
     const sy = data.seasonYears;
     const SFIELDS = window.SEASON_FIELDS_GLOBAL || [];
     Object.keys(sy.years).forEach(y => {
@@ -107,7 +149,7 @@ onValue(rootRef, snapshot => {
       // Keep local var in sync — _dbSyncYear reads the local var, not window.DB_ACTIVE_YEAR
       if (typeof DB_ACTIVE_YEAR !== 'undefined') try { DB_ACTIVE_YEAR = sy.activeYear; } catch(e) {}
     }
-  } else if (data.season) {
+  } else if (!versioned && !pending && data.season) {
     const SFIELDS = window.SEASON_FIELDS_GLOBAL || [];
     const slot = window.DB_YEARS && window.DB_ACTIVE_YEAR ? (window.DB_YEARS[window.DB_ACTIVE_YEAR] || {}) : {};
     SFIELDS.forEach(k => {
@@ -460,7 +502,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V62</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V63</div>
 
 <nav>
   <div class="nav-left">
@@ -747,45 +789,141 @@ window.DB_ACTIVE_YEAR = DB_ACTIVE_YEAR;
 // (removed) `window.renderYearBar = function(){ renderYearBar(); }` overwrote the real function with one that
 // called itself forever -> stack overflow on every startup. Global functions are already reachable on window.
 
+// ── VERSIONED CLOUD SYNC ──
+// Every save stamps the cloud with {rev, by, at}. A device takes the cloud copy whenever the cloud's stamp is newer than
+// the one it last saw, so a change made on any device appears on every other device. (Replaces "whichever list is
+// bigger wins", which is how a stale device could keep old levels forever.)
+function _dbDeviceId(){
+  let id='';try{id=localStorage.getItem('jaguar_device_id')||'';}catch(e){}
+  if(!id){id='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);try{localStorage.setItem('jaguar_device_id',id);}catch(e){}}
+  return id;
+}
+function _dbLocalSync(){try{const x=JSON.parse(localStorage.getItem('jaguar_sync_v1')||'null');if(x&&x.rev)return{rev:+x.rev,by:String(x.by||'')};}catch(e){}return{rev:0,by:''};}
+function _dbSetLocalSync(m){try{localStorage.setItem('jaguar_sync_v1',JSON.stringify({rev:m.rev,by:m.by}));}catch(e){}}
+// Take the cloud copy as this device's data. The previous local copy is kept in localStorage ('jaguar_prev_local_v1')
+// so nothing is ever unrecoverable.
+function _dbAdoptCloud(data){
+  _dbWriteBackToSlot();
+  try{localStorage.setItem('jaguar_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),master:DB.master,years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}));}catch(e){}
+  if(data.master)DB.master=_fbToArray(data.master);
+  const sy=data.seasonYears;
+  if(sy&&sy.years){
+    Object.keys(sy.years).forEach(y=>{
+      const slot=dbEnsureYear(y),src=sy.years[y]||{};
+      SEASON_FIELDS.forEach(k=>{slot[k]=src[k]?_fbToArray(src[k]):[];}); // the cloud drops empty lists, so a missing list means empty
+    });
+    if(sy.activeYear&&DB_YEARS[sy.activeYear]){DB_ACTIVE_YEAR=sy.activeYear;window.DB_ACTIVE_YEAR=sy.activeYear;}
+  }
+  _dbSyncYear();
+  normalizeStoredDates();
+  try{
+    localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
+    localStorage.setItem(SEASON_KEY,JSON.stringify({years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}));
+  }catch(e){}
+}
+function _dbCanon(v){ // same normalisation the cloud applies (drops null / empty), keys sorted -> comparable
+  if(v===null||v===undefined)return undefined;
+  if(Array.isArray(v)){const o=v.map(_dbCanon).filter(x=>x!==undefined);return o.length?o:undefined;}
+  if(typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>{if(k.charAt(0)==='_')return;const c=_dbCanon(v[k]);if(c!==undefined)o[k]=c;});return Object.keys(o).length?o:undefined;}
+  return v;
+}
+function _dbSameAsCloud(mFb,syFb){
+  try{
+    if(JSON.stringify(_dbCanon(DB.master))!==JSON.stringify(_dbCanon(_fbToArray(mFb))))return false;
+    const ys=(syFb&&syFb.years)||{};
+    for(const y of Object.keys(ys)){
+      const slot=DB_YEARS[y]||{};
+      for(const k of SEASON_FIELDS){
+        if(JSON.stringify(_dbCanon(slot[k]||[]))!==JSON.stringify(_dbCanon(ys[y][k]?_fbToArray(ys[y][k]):[])))return false;
+      }
+    }
+    return true;
+  }catch(e){return false;}
+}
+function _dbAskFirstSync(){
+  const cm=window._fbFirstSync;
+  if(!cm||document.getElementById('jag-firstsync-ov'))return;
+  const ov=document.createElement('div');
+  ov.id='jag-firstsync-ov';ov.className='modal-overlay';ov.style.zIndex='950';ov.style.display='flex';
+  const btn='width:100%;padding:12px 10px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:\'Barlow\',sans-serif;line-height:1.35;';
+  ov.innerHTML='<div class="modal" style="text-align:center;max-width:470px;">'
+    +'<div style="font-family:\'Bebas Neue\',sans-serif;font-size:26px;letter-spacing:2px;color:var(--gold);margin-bottom:8px;">First sync on this device</div>'
+    +'<div style="font-size:14px;color:var(--wht);line-height:1.6;margin-bottom:18px;">The cloud already holds data saved from another device '+(cm.legacy?'(saved before version tracking)':'(version '+cm.rev+(cm.at?', '+new Date(cm.at).toLocaleString():'')+')')+'. This device also has its own data that was never synced.<br><br><b>Which copy is correct?</b></div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<button id="jag-fs-cloud" style="'+btn+'background:var(--surf2);color:var(--wht);border:1px solid var(--border);">Use the cloud copy<br><small style="font-weight:400;color:var(--dim);">replaces this device\'s data (a backup is kept)</small></button>'
+    +'<button id="jag-fs-keep" style="'+btn+'background:#7a1f1f;color:#fff;border:none;">Keep THIS device\'s data<br><small style="font-weight:400;opacity:.85;">sends it to the cloud and to your other devices</small></button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  const done=()=>{window._fbFirstSync=null;ov.remove();};
+  document.getElementById('jag-fs-cloud').onclick=()=>{
+    const c=window._fbFirstSync||cm;
+    _dbAdoptCloud({master:window._DB_master_fb,seasonYears:window._DB_seasonyears_fb});
+    _dbSetLocalSync({rev:c.rev,by:c.by});
+    done();renderAll();updateStats();renderYearBar();
+    showAlert('\u2713 Now using the cloud copy on this device','ok');
+  };
+  document.getElementById('jag-fs-keep').onclick=()=>{
+    done();saveDB();
+    showAlert('\u2713 This device\'s data sent to the cloud \u2014 your other devices will update','ok');
+  };
+}
+function _dbCloudFail(e){
+  const msg=String((e&&e.message)||e).slice(0,90);
+  console.warn('[DB cloud save FAILED]',e);
+  const first=window._fbLastState!=='error';
+  if(window._fbStatus)window._fbStatus('error',msg);
+  if(first&&window.showAlert)window.showAlert('\u26A0 NOT saved to the cloud \u2014 your other devices will not get this change. '+msg,'err');
+}
+// One versioned save of master + all season data (+ optional extra nodes such as attendance). Returns the write's promise.
+function _dbPushToCloud(extra){
+  if(!(window._fbDb&&window._fbRef&&window._fbUpdate))return null;
+  let payload;
+  try{
+    _dbWriteBackToSlot();
+    const meta={rev:Math.max(_dbLocalSync().rev,window._fbCloudRev||0)+1,by:_dbDeviceId(),at:Date.now()};
+    // The JSON round-trip strips `undefined` values -- the cloud SDK rejects an ENTIRE save if any single field is undefined.
+    payload=JSON.parse(JSON.stringify({master:DB.master,seasonYears:{years:DB_YEARS,activeYear:DB_ACTIVE_YEAR},syncMeta:meta}));
+    if(extra)Object.assign(payload,JSON.parse(JSON.stringify(extra)));
+  }catch(e){_dbCloudFail(e);return null;}
+  _dbSetLocalSync(payload.syncMeta);window._fbCloudRev=payload.syncMeta.rev;
+  let p=null;
+  window._fbLocalWrite=true; // our own write echoes back synchronously inside the call, so the guard only spans the call
+  try{
+    if(window._fbStatus)window._fbStatus('saving');
+    // update() touches ONLY these keys (set() on the parent used to wipe every other app's data)
+    p=window._fbUpdate(window._fbRef(window._fbDb,'jaguar_db'),payload);
+  }catch(e){_dbCloudFail(e);}
+  finally{window._fbLocalWrite=false;}
+  if(p)p.then(()=>{if(window._fbStatus)window._fbStatus('synced');}).catch(_dbCloudFail);
+  return p;
+}
+function _dbWriteNode(path,val){
+  if(!(window._fbDb&&window._fbRef&&window._fbSet))return;
+  let p=null;
+  window._fbLocalWrite=true;
+  try{p=window._fbSet(window._fbRef(window._fbDb,path),JSON.parse(JSON.stringify(val===undefined?null:val)));}
+  catch(e){_dbCloudFail(e);}
+  finally{window._fbLocalWrite=false;}
+  if(p)p.then(()=>{if(window._fbStatus)window._fbStatus('synced');}).catch(_dbCloudFail);
+}
+
 function saveDB(){
   _dbWriteBackToSlot(); // commit live DB arrays into the year slot before serializing
   try{
     localStorage.setItem(MASTER_KEY,JSON.stringify({master:DB.master}));
     localStorage.setItem(SEASON_KEY,JSON.stringify({years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}));
   }catch(e){}
-  if(window._fbDb&&window._fbRef&&window._fbSet){
-    try{
-      const payload={master:DB.master,seasonYears:{years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}};
-      // update() touches ONLY master + seasonYears. set() here used to replace the whole
-      // jaguar_db node and wipe every other app's data (adm, ih, coach_plan, documents, budget, playerdb).
-      // Own-write echo fires synchronously inside the call, so the guard only needs to span the call itself.
-      window._fbLocalWrite=true;
-      try{ window._fbUpdate(window._fbRef(window._fbDb,'jaguar_db'),payload).catch(e=>{console.warn('[DB FB write]',e);}); }
-      finally{ window._fbLocalWrite=false; }
-    }catch(e){console.warn('[DB FB write]',e);}
-  }
+  _dbPushToCloud();
 }
 
 function saveAttendDataAndSync(){
   saveAttendData();
-  if(window._fbDb && window._fbRef && window._fbSet){
-    try{
-      window._fbLocalWrite=true;
-      try{ window._fbSet(window._fbRef(window._fbDb,'jaguar_db/attendance'),window.attendData).catch(e=>{console.warn('[DB FB attendance]',e);}); }
-      finally{ window._fbLocalWrite=false; }
-    }catch(e){ console.warn('[DB FB attendance]',e); }
-  }
+  _dbWriteNode('jaguar_db/attendance',window.attendData);
 }
 
 function saveManualDatesAndSync(){
   saveManualDates();
-  if(window._fbDb && window._fbRef && window._fbSet){
-    try{
-      window._fbLocalWrite=true;
-      try{ window._fbSet(window._fbRef(window._fbDb,'jaguar_db/manualDates'),window.manualDates).catch(e=>{console.warn('[DB FB manualDates]',e);}); }
-      finally{ window._fbLocalWrite=false; }
-    }catch(e){ console.warn('[DB FB manualDates]',e); }
-  }
+  _dbWriteNode('jaguar_db/manualDates',window.manualDates);
 }
 
 function loadDB(){
@@ -834,6 +972,52 @@ function _fbToArray(val){
 }
 function _mergeFirebaseData(){
   try{
+    const cm=window._DB_syncmeta_fb;
+    if(cm&&cm.rev){
+      // Versioned cloud: the cloud copy wins if it is newer than what this device last saw (or this device never synced).
+      const lm=_dbLocalSync();
+      if(lm.rev===0){
+        // This device has never synced with a versioned cloud.
+        const hasLocal=(DB.master||[]).length>0||Object.values(DB_YEARS).some(sl=>SEASON_FIELDS.some(k=>(sl[k]||[]).length>0));
+        if(!hasLocal){
+          _dbAdoptCloud({master:window._DB_master_fb,seasonYears:window._DB_seasonyears_fb});
+          _dbSetLocalSync({rev:cm.rev,by:cm.by});
+        }else if(_dbSameAsCloud(window._DB_master_fb,window._DB_seasonyears_fb)){
+          _dbSetLocalSync({rev:cm.rev,by:cm.by}); // identical to the cloud already
+        }else{
+          window._fbFirstSync=cm; // different data on both sides: ask which is correct once the page has drawn
+        }
+      }else if(cm.rev>lm.rev||(cm.rev===lm.rev&&cm.by!==lm.by)){
+        _dbAdoptCloud({master:window._DB_master_fb,seasonYears:window._DB_seasonyears_fb});
+        _dbSetLocalSync({rev:cm.rev,by:cm.by});
+      }else if(cm.rev<lm.rev){
+        window._fbNeedPush=true; // this device saved something the cloud never received (offline / failed save): re-send it once running
+      }
+      if(window._DB_attend_fb)window.attendData=window._DB_attend_fb;
+      if(window._DB_manual_fb)window.manualDates=window._DB_manual_fb;
+      normalizeStoredDates();
+      _dbSyncYear();
+      return;
+    }
+    if(_dbLocalSync().rev>0){
+      // This device has saved before but the cloud holds no version stamp (empty, wiped, or the save never arrived): re-send it.
+      window._fbNeedPush=true;
+      if(window._DB_attend_fb)window.attendData=window._DB_attend_fb;
+      if(window._DB_manual_fb)window.manualDates=window._DB_manual_fb;
+      return;
+    }
+    // Older cloud with no version stamp yet. If this device ALSO has data and the two differ, the old "bigger list wins" rule
+    // could silently replace the correct copy with a stale one (same row count, old levels) -- so ask instead.
+    if(window._DB_master_fb||(window._DB_seasonyears_fb&&window._DB_seasonyears_fb.years)){
+      const hasLocal=(DB.master||[]).length>0||Object.values(DB_YEARS).some(sl=>SEASON_FIELDS.some(k=>(sl[k]||[]).length>0));
+      if(hasLocal&&!_dbSameAsCloud(window._DB_master_fb,window._DB_seasonyears_fb)){
+        window._fbFirstSync={rev:0,by:'',at:0,legacy:true};
+        if(window._DB_attend_fb)window.attendData=window._DB_attend_fb;
+        if(window._DB_manual_fb)window.manualDates=window._DB_manual_fb;
+        return;
+      }
+    }
+    // (older cloud, nothing to lose: previous behaviour)
     if(window._DB_master_fb){
       const fb=_fbToArray(window._DB_master_fb);
       if(fb.length>=DB.master.length)DB.master=fb;
@@ -3681,16 +3865,12 @@ function pushAllToFirebase(){
     let coachData=null,planData=null;
     try{const r=localStorage.getItem('jag_coaches');if(r)coachData=JSON.parse(r);}catch(e){}
     try{const r=localStorage.getItem('jag_plan_data');if(r)planData=JSON.parse(r);}catch(e){}
-    _dbWriteBackToSlot();
-    const payload={
-      master:DB.master,
-      seasonYears:{years:DB_YEARS,activeYear:DB_ACTIVE_YEAR},
-      attendance:window.attendData,
-      manualDates:window.manualDates,
-    };
-    // Push DB data
-    let p1; window._fbLocalWrite=true;
-    try{ p1=window._fbUpdate(window._fbRef(window._fbDb,'jaguar_db'),payload); }finally{ window._fbLocalWrite=false; }
+    // Same versioned push as every normal save (plus attendance + manual dates)
+    const p1=_dbPushToCloud({attendance:window.attendData,manualDates:window.manualDates});
+    if(!p1){
+      if(btn){btn.textContent='\u2191 Push to Cloud';btn.style.opacity='';}
+      showAlert('Cloud not connected yet \u2014 try again in a moment','err');return;
+    }
     // Push coach + plan data to shared nodes other apps read
     const promises=[p1];
     if(coachData) promises.push(window._fbSet(window._fbRef(window._fbDb,'jag_coaches'),coachData));
@@ -3730,6 +3910,14 @@ function diagFirebase(){
       msg+=' | NO season data found';
     }
     msg+=' | Local DB.master='+DB.master.length+' DB.session1='+(DB.session1||[]).length+' year='+DB_ACTIVE_YEAR;
+    try{
+      const isLP=r=>/^(LJ|PH)/i.test(String((r&&r.level)||'').replace(/\s/g,''));
+      const ay=(data.seasonYears&&data.seasonYears.activeYear)||DB_ACTIVE_YEAR,cs=(((data.seasonYears||{}).years||{})[ay]||{}).session1;
+      const cRows=cs?(Array.isArray(cs)?cs:Object.values(cs)):[],lRows=DB.session1||[];
+      msg+=' | Session 1 rows with an LJ/PH level \u2014 cloud: '+cRows.filter(isLP).length+'/'+cRows.length+', this device: '+lRows.filter(isLP).length+'/'+lRows.length;
+      const cm=data.syncMeta;
+      msg+=cm&&cm.rev?(' | cloud version '+cm.rev+' saved '+new Date(cm.at).toLocaleString()+(cm.by===_dbDeviceId()?' by THIS device':' by ANOTHER device')+'; this device has seen version '+_dbLocalSync().rev):' | cloud has no version stamp yet';
+    }catch(e){}
     showAlert(msg,'info');
     console.log('Firebase diag:',JSON.stringify(data).slice(0,500));
   }).catch(e=>showAlert('Firebase error: '+e.message,'err'));
@@ -3749,6 +3937,7 @@ function pullFromCloud(){
       if(btn){btn.textContent='↓ Pull from Cloud';btn.style.opacity='';}
       return;
     }
+    if(data.syncMeta&&data.syncMeta.rev){_dbAdoptCloud(data);_dbSetLocalSync({rev:data.syncMeta.rev,by:data.syncMeta.by});window._fbCloudRev=data.syncMeta.rev;}
     // Load master
     if(data.master){
       const m=_fbToArray(data.master);
@@ -3817,6 +4006,8 @@ function _startApp(){
   renderAll();
   try{ updateStats(); }catch(e){ console.error('[updateStats]',e); }
   window._appInitialized = true;
+  if(window._fbNeedPush){ window._fbNeedPush=false; try{ saveDB(); }catch(e){ console.error('[re-send]',e); } }
+  if(window._fbFirstSync){ try{ _dbAskFirstSync(); }catch(e){ console.error('[first-sync]',e); } }
 }
 
 if(window._fbReady){
