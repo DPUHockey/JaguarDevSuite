@@ -88,7 +88,7 @@ table.data-table tbody tr:hover{background:rgba(201,168,76,.04);}
 </style>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, onValue, goOffline, goOnline } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 const cfg={apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",authDomain:"jaguardevsuite.firebaseapp.com",databaseURL:"https://jaguardevsuite-default-rtdb.firebaseio.com",projectId:"jaguardevsuite",storageBucket:"jaguardevsuite.firebasestorage.app",messagingSenderId:"383805859949",appId:"1:383805859949:web:e33d21ee74036e75b43764"};
 const fbApp=initializeApp(cfg);
 const fbDb=getDatabase(fbApp);
@@ -96,7 +96,7 @@ window._pdbFbDb=fbDb;
 window._pdbFbRef=ref;
 window._pdbFbSet=set;
 window._pdbFbLocalWrite=false;
-onValue(ref(fbDb,'jaguar_db/playerdb'),snap=>{
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){try{goOffline(fbDb);goOnline(fbDb);}catch(e){}}});onValue(ref(fbDb,'jaguar_db/playerdb'),snap=>{
   if(window._pdbFbLocalWrite)return;
   const data=snap.val();
   if(!data||!Array.isArray(data.players)||data.players.length===0)return;
@@ -106,7 +106,7 @@ onValue(ref(fbDb,'jaguar_db/playerdb'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V2</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;">V3</div>
 
 <nav>
   <div class="nav-left">
@@ -220,10 +220,12 @@ function savePDB(){
   try{localStorage.setItem(PDB_KEY,JSON.stringify(PDB));}catch(e){}
   // Push to Firebase
   if(window._pdbFbDb&&window._pdbFbRef&&window._pdbFbSet){
+    // echo of our own write fires synchronously inside set(); guard only that instant so real remote updates are never dropped
     window._pdbFbLocalWrite=true;
-    window._pdbFbSet(window._pdbFbRef(window._pdbFbDb,'jaguar_db/playerdb'),{players:PDB})
-      .then(()=>{ setTimeout(()=>{window._pdbFbLocalWrite=false;},2000); })
-      .catch(e=>{ console.warn('[PDB FB write]',e); window._pdbFbLocalWrite=false; });
+    try{
+      window._pdbFbSet(window._pdbFbRef(window._pdbFbDb,'jaguar_db/playerdb'),{players:PDB})
+        .catch(e=>{ console.warn('[PDB FB write]',e); });
+    }finally{ window._pdbFbLocalWrite=false; }
   }
 }
 function loadPDB(){
@@ -874,8 +876,7 @@ function pdbExportCSV(){
     p.parent1_name,p.parent1_email,p.parent1_phone,p.parent2_name,p.parent2_email,p.parent2_phone,
     p.address,p.city,p.state,p.zip
   ].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
-  const csv=[headers.join(','),...rows].join('
-');
+  const csv=[headers.join(','),...rows].join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
