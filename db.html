@@ -73,11 +73,15 @@ onValue(rootRef, snapshot => {
   // Only update if app is fully initialized
   if (!window._appInitialized) return;
 
+  // First update after startup: never let it SHRINK local data (this device may be newer than the cloud).
+  // Every later update applies normally.
+  const _firstEvt = !window._fbSeenFirst; window._fbSeenFirst = true;
+
   let changed = false;
 
   if (data.master) {
     const newMaster = Array.isArray(data.master) ? data.master : Object.values(data.master);
-    if (JSON.stringify(newMaster) !== JSON.stringify(window.DB?.master)) {
+    if (JSON.stringify(newMaster) !== JSON.stringify(window.DB?.master) && !(_firstEvt && newMaster.length < ((window.DB && window.DB.master) || []).length)) {
       if (window.DB) window.DB.master = newMaster;
       changed = true;
     }
@@ -91,7 +95,7 @@ onValue(rootRef, snapshot => {
       SFIELDS.forEach(k => {
         if (src && src[k]) {
           const nv = Array.isArray(src[k]) ? src[k] : Object.values(src[k]);
-          if (JSON.stringify(nv) !== JSON.stringify((window.DB_YEARS[y]||{})[k])) {
+          if (JSON.stringify(nv) !== JSON.stringify((window.DB_YEARS[y]||{})[k]) && !(_firstEvt && nv.length < (((window.DB_YEARS[y]||{})[k])||[]).length)) {
             if (window.DB_YEARS[y]) window.DB_YEARS[y][k] = nv;
             changed = true;
           }
@@ -456,7 +460,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V60</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V61</div>
 
 <nav>
   <div class="nav-left">
@@ -740,7 +744,8 @@ window._appInitialized = false;
 window._dbMakeYearSlot = _dbMakeYearSlot;
 window._dbSyncYear = _dbSyncYear;
 window.DB_ACTIVE_YEAR = DB_ACTIVE_YEAR;
-window.renderYearBar = function(){ if(typeof renderYearBar==='function')renderYearBar(); };
+// (removed) `window.renderYearBar = function(){ renderYearBar(); }` overwrote the real function with one that
+// called itself forever -> stack overflow on every startup. Global functions are already reachable on window.
 
 function saveDB(){
   _dbWriteBackToSlot(); // commit live DB arrays into the year slot before serializing
@@ -1126,7 +1131,7 @@ function parseCSV(text){
 // ── LEVEL DETECTION ──
 function getLevel(row){
   // Strip BOM, zero-width chars, quotes, and all whitespace variants
-  let v=(row.level||'').replace(/[\uFEFF\u200B\u00A0\"']/g,'').trim().toUpperCase().replace(/[\s]/g,'');
+  let v=String((row&&row.level)||'').replace(/[\uFEFF\u200B\u00A0\"']/g,'').trim().toUpperCase().replace(/[\s]/g,'');
   v=v.replace(/^LITTLEJAGUARS?/,'LJ').replace(/^PRE-?HOCKEY/,'PH').replace(/^PREJRHOCKEY$/,'PH').replace(/^LJ$/,'LJ').replace(/^PH$/,'PH');
   return v;
 }
@@ -1408,7 +1413,7 @@ function renderAllSubTab(sNum){
         ?`<span title="Confirmed promotion to ${promoToLvl}" style="font-family:'Barlow Condensed',sans-serif;font-size:9px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:3px;padding:1px 4px;">✓ ${promoToLvl}</span>`
         :'';
       const rowBg=isPending?' style="background:rgba(255,200,50,.06);"':isConfirmed?' style="background:rgba(92,204,136,.04);"':'';
-      return'<tr'+rowBg+'><td>'+(r.first_name||'')+'</td><td style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\''+sk+'\','+i+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);">'+(r.birthdate||'')+'</td><td>'+lvBadge(r.level)+'</td><td style="text-align:center;">'+promoBadge+'</td>'+nc+'<td style="text-align:center;">'+(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO'?'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Edit gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:4px;padding:1px 6px;cursor:pointer;">YES — '+r.gear+'</span>':'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Issue gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;">NO</span>')+'</td>'+'<td style="text-align:center;">'+(r.gear_returned&&r.gear_returned.match(/\d/)?'<span onclick="gearReturnOpen(null,\''+sk+'\','+i+')" title="Click to view/edit return" style="font-size:11px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">'+r.gear_returned+'</span>':'<input type="checkbox" onclick="gearReturnOpen(this,\''+sk+'\','+i+')" style="cursor:pointer;accent-color:#5CCC88;width:14px;height:14px;">')+'</td>'+'</td><td style="font-size:11px;">'+(r.class_registered||'')+'</td>'+dayCell+'<td style="font-size:11px;">'+(r.address||'')+'</td><td style="font-size:11px;">'+(r.city||'')+'</td><td style="font-size:11px;">'+(r.state||'')+'</td><td style="font-size:11px;">'+(r.zip||'')+'</td><td style="font-size:11px;">'+(r.parent1_name||'')+'</td><td style="font-size:11px;">'+(r.parent1_email||'')+'</td><td style="font-size:11px;">'+(r.parent1_phone||'')+'</td><td style="font-size:11px;">'+(r.parent2_name||'')+'</td><td style="font-size:11px;">'+(r.parent2_email||'')+'</td><td style="font-size:11px;">'+(r.parent2_phone||'')+'</td><td><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+i+')">Del</button></td></tr>';
+      return'<tr'+rowBg+'><td>'+(r.first_name||'')+'</td><td style="cursor:pointer;color:var(--gold2);text-decoration:underline dotted;" onclick="openAddModal(\''+sk+'\','+i+')" title="Click to edit">'+(r.last_name||'')+'</td><td style="font-size:11px;color:var(--dim);">'+(r.birthdate||'')+'</td><td>'+lvBadge(r.level)+'</td><td style="text-align:center;">'+promoBadge+'</td>'+nc+'<td style="text-align:center;">'+(r.gear&&r.gear!=='No'&&r.gear!=='no'&&r.gear!=='NO'?'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Edit gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:#5CCC88;border:1px solid #5CCC88;border-radius:4px;padding:1px 6px;cursor:pointer;">YES — '+r.gear+'</span>':'<span onclick="gearIssueOpen(\''+sk+'\','+i+')" title="Issue gear" style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;letter-spacing:1px;color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;">NO</span>')+'</td>'+'<td style="text-align:center;">'+(r.gear_returned&&String(r.gear_returned).match(/\d/)?'<span onclick="gearReturnOpen(null,\''+sk+'\','+i+')" title="Click to view/edit return" style="font-size:11px;color:#5CCC88;cursor:pointer;text-decoration:underline dotted;">'+r.gear_returned+'</span>':'<input type="checkbox" onclick="gearReturnOpen(this,\''+sk+'\','+i+')" style="cursor:pointer;accent-color:#5CCC88;width:14px;height:14px;">')+'</td>'+'</td><td style="font-size:11px;">'+(r.class_registered||'')+'</td>'+dayCell+'<td style="font-size:11px;">'+(r.address||'')+'</td><td style="font-size:11px;">'+(r.city||'')+'</td><td style="font-size:11px;">'+(r.state||'')+'</td><td style="font-size:11px;">'+(r.zip||'')+'</td><td style="font-size:11px;">'+(r.parent1_name||'')+'</td><td style="font-size:11px;">'+(r.parent1_email||'')+'</td><td style="font-size:11px;">'+(r.parent1_phone||'')+'</td><td style="font-size:11px;">'+(r.parent2_name||'')+'</td><td style="font-size:11px;">'+(r.parent2_email||'')+'</td><td style="font-size:11px;">'+(r.parent2_phone||'')+'</td><td><button class="tbl-del" onclick="deletePlayer(\''+sk+'\','+i+')">Del</button></td></tr>';
     }).join('')+'</tbody>';
     return'<div style="margin-bottom:28px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:'+color+';margin-bottom:8px;padding-bottom:5px;border-bottom:2px solid '+color+'33;">'+label+' -- '+gRows.length+' athlete'+(gRows.length!==1?'s':'')+'</div><div class="table-outer"><table class="data-table">'+hd+bd+'</table></div></div>';
   }
@@ -1950,9 +1955,15 @@ function switchSubTab(sk, subKey){
   renderSessionPanel(sNum);
 }
 
+function _panelError(id,label,e){
+  console.error('['+label+']',e);
+  const d=document.getElementById(id);
+  if(d)d.innerHTML='<div class="empty-state"><p>'+label+' could not be drawn: '+String((e&&e.message)||e).replace(/</g,'&lt;')+'<br>Your data is not lost \u2014 tell Claude this message.</p></div>';
+}
 function renderAll(){
-  for(let i=1;i<=6;i++) renderSessionPanel(i);
-  renderMasterTab();
+  // Each panel is isolated: one bad record can no longer stop the other panels, the tab counts, or app startup.
+  for(let i=1;i<=6;i++){ try{ renderSessionPanel(i); }catch(e){ _panelError('panel-session'+i,'Session '+i,e); } }
+  try{ renderMasterTab(); }catch(e){ _panelError('panel-master','Master File',e); }
 }
 
 function updateStats(){
@@ -3463,7 +3474,7 @@ function gearReturnOpen(cb, sk, idx){
   if(cb)cb.checked=false; // don't let checkbox stay checked
   const r=DB[sk][idx];
   if(!r) return;
-  const isEdit=!!(r.gear_returned&&r.gear_returned.match(/\d/));
+  const isEdit=!!(r.gear_returned&&String(r.gear_returned).match(/\d/));
   const existingStatus=r.gear_return_status||'returned';
   // Parse existing notes from "Jun 1, 2026 — some note"
   const existingNotes=r.gear_returned&&r.gear_returned.includes(' — ')
@@ -3797,12 +3808,13 @@ window.updateStats = updateStats;
 window.showAlert = showAlert;
 
 function _startApp(){
-  loadDB();
-  loadAttendData();
-  loadPromoComplete();
-  renderYearBar();
+  // Every step guarded so startup always completes (tab counts drawn, live sync switched on).
+  try{ loadDB(); }catch(e){ console.error('[loadDB]',e); }
+  try{ loadAttendData(); }catch(e){ console.error('[loadAttendData]',e); }
+  try{ loadPromoComplete(); }catch(e){ console.error('[loadPromoComplete]',e); }
+  try{ renderYearBar(); }catch(e){ console.error('[renderYearBar]',e); }
   renderAll();
-  updateStats();
+  try{ updateStats(); }catch(e){ console.error('[updateStats]',e); }
   window._appInitialized = true;
 }
 
