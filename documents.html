@@ -287,7 +287,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">v3.7.0</div>
+<div class="ver" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">v3.7.1</div>
 
 <!-- Early stubs so module/main scripts can call these before defining them -->
 <script>
@@ -308,7 +308,7 @@ window._showToast = function(msg, type) {
 <!-- ═══════════ FIREBASE ═══════════ -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, get, onValue, goOffline, goOnline } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const cfg = {
   apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",
@@ -330,6 +330,7 @@ window._fbSet      = set;
 window._fbGet      = get;
 window._fbReady    = false;
 window._fbLocalWrite = false;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){try{goOffline(fbDb);goOnline(fbDb);}catch(e){}}});
 
 // _setSyncStatus and _showToast defined in early inline script above
 
@@ -359,10 +360,11 @@ get(docsRef).then(snap => {
       console.log('[DOCS FB] pushing merged set, size:', sz);
       if (sz < 8*1024*1024) {
         window._fbLocalWrite = true;
-        set(docsRef, toWrite)
-          .then(() => console.log('[DOCS FB] push succeeded'))
-          .catch(e => console.error('[DOCS FB] push failed:', e))
-          .finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+        try {
+          set(docsRef, toWrite)
+            .then(() => console.log('[DOCS FB] push succeeded'))
+            .catch(e => console.error('[DOCS FB] push failed:', e));
+        } finally { window._fbLocalWrite = false; }
       } else {
         console.warn('[DOCS FB] payload too large, skipping push:', sz);
       }
@@ -376,10 +378,11 @@ get(docsRef).then(snap => {
     if (sz < 8*1024*1024) {
       window._setSyncStatus('Uploading '+local.length+' docs to cloud...', '#C9A84C');
       window._fbLocalWrite = true;
-      set(docsRef, toWrite)
-        .then(() => { console.log('[DOCS FB] seed succeeded'); window._setSyncStatus('Synced ✔ ('+local.length+' docs)', '#5CCC88'); })
-        .catch(e => { console.error('[DOCS FB] seed failed:', e); window._setSyncStatus('Upload failed: '+e.message, '#F07050'); })
-        .finally(() => { setTimeout(() => { window._fbLocalWrite = false; }, 2000); });
+      try {
+        set(docsRef, toWrite)
+          .then(() => { console.log('[DOCS FB] seed succeeded'); window._setSyncStatus('Synced ✔ ('+local.length+' docs)', '#5CCC88'); })
+          .catch(e => { console.error('[DOCS FB] seed failed:', e); window._setSyncStatus('Upload failed: '+e.message, '#F07050'); });
+      } finally { window._fbLocalWrite = false; }
     } else {
       console.warn('[DOCS FB] local payload too large:', sz);
       window._setSyncStatus('Library >8MB - cannot sync', '#F07050');
@@ -492,16 +495,12 @@ function saveDocs() {
       var payload = JSON.stringify(toWrite);
       if (payload.length > 8*1024*1024) { toast('Library >8MB — stored locally only','err'); return; }
       window._fbLocalWrite = true;
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), toWrite)
-        .then(function(){
-          window._setSyncStatus('Synced ✔ ('+docs.length+' docs)', '#5CCC88');
-          setTimeout(function(){ window._fbLocalWrite = false; }, 2000);
-        })
-        .catch(function(e){
-          window._setSyncStatus('Sync failed', '#F07050');
-          window._fbLocalWrite = false;
-        });
-    } catch(e) { window._fbLocalWrite = false; }
+      try {
+        window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), toWrite)
+          .then(function(){ window._setSyncStatus('Synced ✔ ('+docs.length+' docs)', '#5CCC88'); })
+          .catch(function(e){ window._setSyncStatus('Sync failed', '#F07050'); });
+      } finally { window._fbLocalWrite = false; }
+    } catch(e) { console.warn('[DOCS FB] write error', e); }
   }
 }
 
@@ -1058,17 +1057,17 @@ function forcePushToCloud() {
   if (payload.length > 8*1024*1024) { toast('Library >8MB — cannot sync','err'); return; }
   window._setSyncStatus('Pushing '+docs.length+' docs...', '#C9A84C');
   window._fbLocalWrite = true;
-  window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), toWrite)
-    .then(function(){
-      window._setSyncStatus('Synced ✔ ('+docs.length+' docs)', '#5CCC88');
-      toast(docs.length+' docs pushed to cloud!','ok');
-      setTimeout(function(){ window._fbLocalWrite = false; }, 2000);
-    })
-    .catch(function(e){
-      window._setSyncStatus('Push failed: '+e.message, '#F07050');
-      toast('Push failed: '+e.message,'err');
-      window._fbLocalWrite = false;
-    });
+  try {
+    window._fbSet(window._fbRef(window._fbDb,'jaguar_db/documents'), toWrite)
+      .then(function(){
+        window._setSyncStatus('Synced ✔ ('+docs.length+' docs)', '#5CCC88');
+        toast(docs.length+' docs pushed to cloud!','ok');
+      })
+      .catch(function(e){
+        window._setSyncStatus('Push failed: '+e.message, '#F07050');
+        toast('Push failed: '+e.message,'err');
+      });
+  } finally { window._fbLocalWrite = false; }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────────
