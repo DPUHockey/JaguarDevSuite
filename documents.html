@@ -287,7 +287,7 @@ input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);cursor:poin
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="ver" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">v3.7.1</div>
+<div class="ver" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh" style="cursor:pointer;">v3.7.2</div>
 
 <!-- Early stubs so module/main scripts can call these before defining them -->
 <script>
@@ -483,7 +483,8 @@ function loadDocs() {
   } catch(e) { console.error('[loadDocs] error:', e); docs = []; }
 }
 window.loadDocs  = loadDocs;
-window.renderLib = function(){ renderLib(); };
+// (removed) `window.renderLib = function(){ renderLib(); }` overwrote the real function with one that called itself
+// forever -> startApp() crashed before finishing. renderLib is already a global function.
 
 function saveDocs() {
   try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch(e) {}
