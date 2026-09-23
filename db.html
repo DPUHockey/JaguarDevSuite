@@ -14,7 +14,7 @@
 <script type="module">
 // ── FIREBASE SYNC ──
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, update, onValue, get, goOffline, goOnline } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",
@@ -33,9 +33,11 @@ const fbDb = getDatabase(fbApp);
 window._fbDb = fbDb;
 window._fbRef = ref;
 window._fbSet = set;
+window._fbUpdate = update;
 window._fbOnValue = onValue;
 window._fbGet = get;
 window._fbReady = false;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){try{goOffline(fbDb);goOnline(fbDb);}catch(e){}}});
 
 // Flag so we don't re-trigger render from our own writes
 window._fbLocalWrite = false;
@@ -454,7 +456,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V59</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V60</div>
 
 <nav>
   <div class="nav-left">
@@ -749,11 +751,13 @@ function saveDB(){
   if(window._fbDb&&window._fbRef&&window._fbSet){
     try{
       const payload={master:DB.master,seasonYears:{years:DB_YEARS,activeYear:DB_ACTIVE_YEAR}};
+      // update() touches ONLY master + seasonYears. set() here used to replace the whole
+      // jaguar_db node and wipe every other app's data (adm, ih, coach_plan, documents, budget, playerdb).
+      // Own-write echo fires synchronously inside the call, so the guard only needs to span the call itself.
       window._fbLocalWrite=true;
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db'),payload)
-        .then(()=>{setTimeout(()=>{window._fbLocalWrite=false;},1000);})
-        .catch(e=>{window._fbLocalWrite=false;});
-    }catch(e){window._fbLocalWrite=false;}
+      try{ window._fbUpdate(window._fbRef(window._fbDb,'jaguar_db'),payload).catch(e=>{console.warn('[DB FB write]',e);}); }
+      finally{ window._fbLocalWrite=false; }
+    }catch(e){console.warn('[DB FB write]',e);}
   }
 }
 
@@ -762,10 +766,9 @@ function saveAttendDataAndSync(){
   if(window._fbDb && window._fbRef && window._fbSet){
     try{
       window._fbLocalWrite=true;
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/attendance'),window.attendData)
-        .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
-        .catch(e=>{ window._fbLocalWrite=false; });
-    }catch(e){ window._fbLocalWrite=false; }
+      try{ window._fbSet(window._fbRef(window._fbDb,'jaguar_db/attendance'),window.attendData).catch(e=>{console.warn('[DB FB attendance]',e);}); }
+      finally{ window._fbLocalWrite=false; }
+    }catch(e){ console.warn('[DB FB attendance]',e); }
   }
 }
 
@@ -774,10 +777,9 @@ function saveManualDatesAndSync(){
   if(window._fbDb && window._fbRef && window._fbSet){
     try{
       window._fbLocalWrite=true;
-      window._fbSet(window._fbRef(window._fbDb,'jaguar_db/manualDates'),window.manualDates)
-        .then(()=>{ setTimeout(()=>{window._fbLocalWrite=false;},1000); })
-        .catch(e=>{ window._fbLocalWrite=false; });
-    }catch(e){ window._fbLocalWrite=false; }
+      try{ window._fbSet(window._fbRef(window._fbDb,'jaguar_db/manualDates'),window.manualDates).catch(e=>{console.warn('[DB FB manualDates]',e);}); }
+      finally{ window._fbLocalWrite=false; }
+    }catch(e){ console.warn('[DB FB manualDates]',e); }
   }
 }
 
@@ -3675,7 +3677,8 @@ function pushAllToFirebase(){
       manualDates:window.manualDates,
     };
     // Push DB data
-    const p1=window._fbSet(window._fbRef(window._fbDb,'jaguar_db'),payload);
+    let p1; window._fbLocalWrite=true;
+    try{ p1=window._fbUpdate(window._fbRef(window._fbDb,'jaguar_db'),payload); }finally{ window._fbLocalWrite=false; }
     // Push coach + plan data to shared nodes other apps read
     const promises=[p1];
     if(coachData) promises.push(window._fbSet(window._fbRef(window._fbDb,'jag_coaches'),coachData));
