@@ -502,7 +502,7 @@ nav{position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-co
 </style>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V63</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V64</div>
 
 <nav>
   <div class="nav-left">
@@ -824,7 +824,7 @@ function _dbAdoptCloud(data){
 function _dbCanon(v){ // same normalisation the cloud applies (drops null / empty), keys sorted -> comparable
   if(v===null||v===undefined)return undefined;
   if(Array.isArray(v)){const o=v.map(_dbCanon).filter(x=>x!==undefined);return o.length?o:undefined;}
-  if(typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>{if(k.charAt(0)==='_')return;const c=_dbCanon(v[k]);if(c!==undefined)o[k]=c;});return Object.keys(o).length?o:undefined;}
+  if(typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>{if(k===''||k.charAt(0)==='_')return;const c=_dbCanon(v[k]);if(c!==undefined)o[k]=c;});return Object.keys(o).length?o:undefined;}
   return v;
 }
 function _dbSameAsCloud(mFb,syFb){
@@ -867,6 +867,28 @@ function _dbAskFirstSync(){
     showAlert('\u2713 This device\'s data sent to the cloud \u2014 your other devices will update','ok');
   };
 }
+function _dbCleanKey(k){return String(k).replace(/[.$#\[\]\/\u0000-\u001f\u007f]/g,'_');}
+function _dbCleanKeys(v){ // returns a copy whose object keys are all legal for the cloud (empty names dropped)
+  if(Array.isArray(v))return v.map(_dbCleanKeys);
+  if(v&&typeof v==='object'){
+    const o={};
+    Object.keys(v).forEach(k=>{if(k==='')return;const nk=_dbCleanKey(k);if(nk&&!(nk in o))o[nk]=_dbCleanKeys(v[k]);});
+    return o;
+  }
+  return v;
+}
+function _dbPurgeBadKeys(){ // fix rows already stored with an empty/illegal field name (from earlier imports)
+  const fix=r=>{
+    if(!r||typeof r!=='object')return;
+    Object.keys(r).forEach(k=>{
+      const nk=_dbCleanKey(k);
+      if(k===''){delete r[k];}
+      else if(nk!==k){if(r[nk]===undefined)r[nk]=r[k];delete r[k];}
+    });
+  };
+  (DB.master||[]).forEach(fix);
+  Object.keys(DB_YEARS).forEach(y=>SEASON_FIELDS.forEach(k=>{const a=DB_YEARS[y][k];if(Array.isArray(a))a.forEach(fix);}));
+}
 function _dbCloudFail(e){
   const msg=String((e&&e.message)||e).slice(0,90);
   console.warn('[DB cloud save FAILED]',e);
@@ -882,8 +904,8 @@ function _dbPushToCloud(extra){
     _dbWriteBackToSlot();
     const meta={rev:Math.max(_dbLocalSync().rev,window._fbCloudRev||0)+1,by:_dbDeviceId(),at:Date.now()};
     // The JSON round-trip strips `undefined` values -- the cloud SDK rejects an ENTIRE save if any single field is undefined.
-    payload=JSON.parse(JSON.stringify({master:DB.master,seasonYears:{years:DB_YEARS,activeYear:DB_ACTIVE_YEAR},syncMeta:meta}));
-    if(extra)Object.assign(payload,JSON.parse(JSON.stringify(extra)));
+    payload=_dbCleanKeys(JSON.parse(JSON.stringify({master:DB.master,seasonYears:{years:DB_YEARS,activeYear:DB_ACTIVE_YEAR},syncMeta:meta})));
+    if(extra)Object.assign(payload,_dbCleanKeys(JSON.parse(JSON.stringify(extra))));
   }catch(e){_dbCloudFail(e);return null;}
   _dbSetLocalSync(payload.syncMeta);window._fbCloudRev=payload.syncMeta.rev;
   let p=null;
@@ -901,7 +923,7 @@ function _dbWriteNode(path,val){
   if(!(window._fbDb&&window._fbRef&&window._fbSet))return;
   let p=null;
   window._fbLocalWrite=true;
-  try{p=window._fbSet(window._fbRef(window._fbDb,path),JSON.parse(JSON.stringify(val===undefined?null:val)));}
+  try{p=window._fbSet(window._fbRef(window._fbDb,path),_dbCleanKeys(JSON.parse(JSON.stringify(val===undefined?null:val))));}
   catch(e){_dbCloudFail(e);}
   finally{window._fbLocalWrite=false;}
   if(p)p.then(()=>{if(window._fbStatus)window._fbStatus('synced');}).catch(_dbCloudFail);
@@ -1278,7 +1300,11 @@ function mapRow(headers,vals){
   headers.forEach((h,i)=>{
     const n=norm(h);let matched=null;
     for(const[k,alts] of Object.entries(ALIASES)){if(alts.includes(n)||n===k){matched=k;break;}}
-    row[matched||n]=vals[i]||'';
+    // The cloud rejects EVERY save if any field name is empty or contains . $ # [ ] /  -- so a CSV column with a blank
+    // header must not become a field at all, and unmatched headers get illegal characters replaced.
+    const key=matched||n.replace(/[.$#\[\]\/]/g,'_');
+    if(!key)return;
+    row[key]=vals[i]||'';
   });
   COLS.forEach(c=>{if(row[c]===undefined)row[c]='';});
   row.day=normDay(row.day);
@@ -4000,6 +4026,7 @@ window.showAlert = showAlert;
 function _startApp(){
   // Every step guarded so startup always completes (tab counts drawn, live sync switched on).
   try{ loadDB(); }catch(e){ console.error('[loadDB]',e); }
+  try{ _dbPurgeBadKeys(); }catch(e){ console.error('[purge]',e); }
   try{ loadAttendData(); }catch(e){ console.error('[loadAttendData]',e); }
   try{ loadPromoComplete(); }catch(e){ console.error('[loadPromoComplete]',e); }
   try{ renderYearBar(); }catch(e){ console.error('[renderYearBar]',e); }
