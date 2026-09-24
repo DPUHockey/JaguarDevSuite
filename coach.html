@@ -406,7 +406,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V24</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V25</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -2943,6 +2943,7 @@ function _cpMTShow(k,v){
   if(k==='usaHockeyLevel')return 'Level '+v;
   const t=String(v);return t.length>70?t.slice(0,70)+'\u2026':t;
 }
+function _cpSlotLabel(colId){const p=String(colId).split('_');return p.length===5?p[1]+' '+p[2]+'/'+p[3]+' (slot '+((+p[4]||0)+1)+')':String(colId);}
 function _cpGridFor(p){return p&&p.payrollCoachId?(coaches.find(g=>g.id===p.payrollCoachId)||null):null;}
 function _cpHrsTotal(g){return Math.round(Object.values((g&&g.hours)||{}).reduce((a,b)=>a+(+b||0),0)*100)/100;}
 // Work out exactly what a merge would do (used for the preview and again when applying).
@@ -2972,10 +2973,17 @@ function cpMergePlan(keepId,dropId,ch){
   // ---- hours ----
   const gS=_cpGridFor(S),gD=_cpGridFor(D),h={mode:'none',warnings:[]};
   if(gS&&gD&&gS.id!==gD.id){
-    const mh={};let overlap=0;
-    Object.keys(Object.assign({},gS.hours,gD.hours)).forEach(k=>{const x=+((gS.hours||{})[k])||0,y=+((gD.hours||{})[k])||0;if(x>0&&y>0)overlap++;const m=Math.max(x,y);if(m>0)mh[k]=m;});
-    h.mode='merge';h.gS=gS;h.gD=gD;h.mergedHours=mh;h.overlap=overlap;h.keepTotal=_cpHrsTotal(gS);h.dropTotal=_cpHrsTotal(gD);h.after=_cpHrsTotal({hours:mh});
-  }else if(!gS&&gD){h.mode='adopt';h.gD=gD;h.dropTotal=_cpHrsTotal(gD);h.after=h.dropTotal;}
+    // Same date+slot logged under BOTH names: by default the two are ADDED together (each was somebody's entry); you can switch any
+    // slot to "keep the larger" if the same hours were simply entered twice.
+    const mh={},overlaps=[];
+    Object.keys(Object.assign({},gS.hours,gD.hours)).forEach(k=>{
+      const x=+((gS.hours||{})[k])||0,y=+((gD.hours||{})[k])||0;
+      if(x>0&&y>0){const pick=(ch.slots&&ch.slots[k])||'add';overlaps.push({k:k,label:_cpSlotLabel(k),x:x,y:y,pick:pick});mh[k]=pick==='max'?Math.max(x,y):x+y;}
+      else if(x>0||y>0)mh[k]=Math.max(x,y);
+    });
+    h.mode='merge';h.gS=gS;h.gD=gD;h.mergedHours=mh;h.overlaps=overlaps;h.overlap=overlaps.length;h.keepTotal=_cpHrsTotal(gS);h.dropTotal=_cpHrsTotal(gD);h.after=_cpHrsTotal({hours:mh});
+  }else if(!gS&&gD){h.mode='adopt';h.gD=gD;h.dropTotal=_cpHrsTotal(gD);h.after=h.dropTotal;
+    if(typeof S.hoursTotal==='number'&&S.hoursTotal>0)h.warnings.push('"'+S.name+'" has '+S.hoursTotal+' saved hours but is not on the Hours Grid, so those hours cannot be added to the grid automatically.');}
   else if(gS){h.mode='keep';h.gS=gS;h.keepTotal=_cpHrsTotal(gS);h.after=h.keepTotal;
     if(!gD&&typeof D.hoursTotal==='number'&&D.hoursTotal>0)h.warnings.push('"'+D.name+'" has '+D.hoursTotal+' saved hours but is no longer on the Hours Grid, so those hours cannot be added to the grid automatically.');}
   else if(typeof D.hoursTotal==='number'&&D.hoursTotal>0)h.warnings.push('"'+D.name+'" has '+D.hoursTotal+' saved hours but is not on the Hours Grid.');
@@ -3034,16 +3042,18 @@ function cpApplyManualMerge(keepId,dropId,ch){
   return true;
 }
 // ---- the merge window ----
-window._cpMT={keep:'',drop:'',name:'keep',custom:'',fields:{}};
+window._cpMT={keep:'',drop:'',name:'keep',custom:'',fields:{},slots:{}};
 function cpOpenMergeTool(keepId){
   if(typeof canEdit==='function'&&!canEdit()){toast('Editing access required','terror');return;}
-  window._cpMT={keep:keepId||'',drop:'',name:'keep',custom:'',fields:{}};
+  window._cpMT={keep:keepId||'',drop:'',name:'keep',custom:'',fields:{},slots:{}};
   const old=document.getElementById('cpmt-ov');if(old)old.remove();
   _hrsModal('cpmt-ov','');
   _cpMTRender();
 }
-function cpMTSet(which,id){window._cpMT[which]=id;window._cpMT.fields={};window._cpMT.name='keep';_cpMTRender();}
-function cpMTSwap(){const m=window._cpMT,t=m.keep;m.keep=m.drop;m.drop=t;m.fields={};m.name='keep';_cpMTRender();}
+function cpMTSet(which,id){window._cpMT[which]=id;window._cpMT.fields={};window._cpMT.slots={};window._cpMT.name='keep';_cpMTRender();}
+function cpMTSwap(){const m=window._cpMT,t=m.keep;m.keep=m.drop;m.drop=t;m.fields={};m.slots={};m.name='keep';_cpMTRender();}
+function cpMTSlot(k,pick){window._cpMT.slots[k]=pick;_cpMTRender();}
+function cpMTAllSlots(pick){const m=window._cpMT,pl=cpMergePlan(m.keep,m.drop,m);if(pl&&pl.hours.overlaps)pl.hours.overlaps.forEach(o=>{m.slots[o.k]=pick;});_cpMTRender();}
 function cpMTPick(field,who){window._cpMT.fields[field]=who;_cpMTRender();}
 function cpMTName(who){window._cpMT.name=who;_cpMTRender();}
 function cpMTCustom(v){window._cpMT.custom=v;window._cpMT.name='custom';}
@@ -3087,8 +3097,12 @@ function _cpMTRender(){
     if(extra.length)body+='<div style="font-size:12px;color:#5CCC88;margin-top:6px;line-height:1.5;">'+extra.map(_hrsEsc).join('<br>')+'</div>';
     body+='<div style="margin:14px 0 4px;font-size:12px;letter-spacing:1px;color:#C9A84C;">HOURS</div><div id="cpmt-hours" style="font-size:13px;line-height:1.55;">';
     if(h.mode==='merge')body+='Hours Grid: <b>'+_hrsEsc(h.gS.name)+'</b> ('+_cpFmtHrs(h.keepTotal)+' hrs) + <b>'+_hrsEsc(h.gD.name)+'</b> ('+_cpFmtHrs(h.dropTotal)+' hrs) \u2192 <b style="color:#C9A84C;">'+_cpFmtHrs(h.after)+' hrs</b> on <b>'+_hrsEsc(plan.name)+'</b>.'
-      +(h.overlap?'<br><span style="color:#F0A050;">'+h.overlap+' slot'+(h.overlap!==1?'s were':' was')+' logged under both names \u2014 the larger value is kept (so nothing is double counted).</span>':'')
-      +'<br>The extra Hours Grid row for the removed record is deleted.';
+      +(h.overlaps.length?'<div id="cpmt-overlaps" style="margin:8px 0;padding:8px 10px;background:#1d2128;border-radius:8px;"><div style="color:#F0A050;margin-bottom:4px;">'+h.overlaps.length+' slot'+(h.overlaps.length!==1?'s were':' was')+' logged under BOTH names. Choose how to combine each:</div>'
+        +h.overlaps.map(o=>'<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:3px 0;border-top:1px solid #2c313a;"><span style="min-width:170px;">'+_hrsEsc(o.label)+': '+_cpFmtHrs(o.y)+' and '+_cpFmtHrs(o.x)+'</span>'
+          +'<label><input type="radio" name="cpmt-slot-'+_hrsEsc(o.k)+'" '+(o.pick==='add'?'checked':'')+' onclick="cpMTSlot(\''+_hrsEsc(o.k)+'\',\'add\')"> Add together (= '+_cpFmtHrs(o.x+o.y)+')</label>'
+          +'<label><input type="radio" name="cpmt-slot-'+_hrsEsc(o.k)+'" '+(o.pick==='max'?'checked':'')+' onclick="cpMTSlot(\''+_hrsEsc(o.k)+'\',\'max\')"> Keep the larger (= '+_cpFmtHrs(Math.max(o.x,o.y))+')</label></div>').join('')
+        +(h.overlaps.length>1?'<div style="margin-top:6px;font-size:12px;"><a href="#" onclick="cpMTAllSlots(\'add\');return false;" style="color:#C9A84C;">Add all</a> \u00b7 <a href="#" onclick="cpMTAllSlots(\'max\');return false;" style="color:#C9A84C;">Keep the larger for all</a> <span style="opacity:.7;">(use \u201clarger\u201d if the same hours were simply entered twice)</span></div>':'')+'</div>':'')
+      +'The extra Hours Grid row for the removed record is deleted.';
     else if(h.mode==='adopt')body+='<b>'+_hrsEsc(plan.S.name)+'</b> is not on the Hours Grid, so it takes over <b>'+_hrsEsc(h.gD.name)+'</b>\'s grid row ('+_cpFmtHrs(h.dropTotal)+' hrs).';
     else if(h.mode==='keep')body+='Only <b>'+_hrsEsc(plan.S.name)+'</b> is on the Hours Grid ('+_cpFmtHrs(h.keepTotal)+' hrs) \u2014 it stays as is.';
     else body+='Neither record is on the Hours Grid.';
@@ -3096,7 +3110,43 @@ function _cpMTRender(){
     body+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'cpmt-ov\').remove()">Cancel</button><button id="cpmt-go" class="btn btn-gold btn-sm" onclick="cpMTGo()">Merge \u201c'+_hrsEsc(plan.D.name)+'\u201d into \u201c'+_hrsEsc(plan.name)+'\u201d</button></div>';
   }
   if(!plan)body+='<div style="text-align:right;margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'cpmt-ov\').remove()">Cancel</button></div>';
+  body+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid #2c313a;font-size:12px;opacity:.85;">Hours look short after an earlier merge? <a href="#" onclick="document.getElementById(\'cpmt-ov\').remove();cpRepairFromMergeBackup();return false;" style="color:#C9A84C;">Repair hours from the merge backup file</a></div>';
   box.innerHTML=body;
+}
+
+
+// Hours look short after a merge? The merge downloads a backup file of both records. This reads it and offers to put back any hours
+// that the merge left out (it adds the removed record's hours to the kept coach's row, slot by slot -- you choose which).
+function cpRepairFromMergeBackup(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
+  inp.onchange=()=>{
+    const f=inp.files&&inp.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{try{_cpRepairShow(JSON.parse(r.result));}catch(e){alert('That file could not be read as a Jaguar coach merge backup.');}};
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function _cpRepairShow(d){
+  if(!d||d.app!=='jaguar-coach-merge-backup'||!d.kept||!d.removed)throw new Error('not a merge backup');
+  const gid=(d.kept.grid&&d.kept.grid.id)||(d.removed.grid&&d.removed.grid.id),g=coaches.find(x=>x.id===gid);
+  if(!g){alert('That coach is no longer on the Hours Grid, so there is nothing to repair.');return;}
+  const kh=(d.kept.grid&&d.kept.grid.hours)||{},rh=(d.removed.grid&&d.removed.grid.hours)||{},rows=[];
+  new Set(Object.keys(kh).concat(Object.keys(rh))).forEach(k=>{
+    const exp=(+kh[k]||0)+(+rh[k]||0),cur=+((g.hours||{})[k])||0;
+    if(cur<exp)rows.push({k:k,cur:cur,exp:exp,label:_cpSlotLabel(k)});
+  });
+  const nm=_hrsEsc(g.name||(d.kept.profile&&d.kept.profile.name)||'this coach');
+  if(!rows.length){_hrsModal('cprep-ov','<div style="font-size:20px;color:#C9A84C;margin-bottom:8px;">Repair merge hours</div><div style="font-size:14px;line-height:1.6;">Nothing to repair \u2014 <b>'+nm+'</b> already has all the hours from both records in that backup.</div><div style="text-align:right;margin-top:14px;"><button class="btn btn-gold btn-sm" onclick="document.getElementById(\'cprep-ov\').remove()">Close</button></div>');return;}
+  const ov=_hrsModal('cprep-ov','<div style="font-size:20px;color:#C9A84C;margin-bottom:6px;">Repair merge hours \u2014 '+nm+'</div>'
+    +'<div style="font-size:13px;line-height:1.55;margin-bottom:10px;">These slots currently show fewer hours than the two records had together. Tick the ones to put back (the backup\'s hours from both records are added):</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:14px;">'+rows.map((x,i)=>'<tr style="border-top:1px solid #2c313a;"><td style="padding:6px;"><input type="checkbox" id="cprep-'+i+'" checked></td><td style="padding:6px;">'+_hrsEsc(x.label)+'</td><td style="padding:6px;white-space:nowrap;">'+_cpFmtHrs(x.cur)+' \u2192 <b style="color:#5CCC88;">'+_cpFmtHrs(x.exp)+' hrs</b></td></tr>').join('')+'</table>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'cprep-ov\').remove()">Cancel</button><button id="cprep-go" class="btn btn-gold btn-sm">Put these hours back</button></div>');
+  document.getElementById('cprep-go').onclick=()=>{
+    let n=0;rows.forEach((x,i)=>{const cb=document.getElementById('cprep-'+i);if(cb&&cb.checked){g.hours[x.k]=x.exp;n++;}});
+    if(n){saveCoaches();try{refreshAllCoachViews();}catch(e){}try{_cpHoursRefresh();}catch(e){}}
+    ov.remove();toast(n?('Restored '+n+' slot'+(n!==1?'s':'')+' for '+(g.name||'coach')):'Nothing changed','ok');
+  };
 }
 
 /* ---- link profiles to the Hours Grid by name ---- */
