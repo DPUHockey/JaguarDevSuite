@@ -406,7 +406,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V23</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V24</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -461,6 +461,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" onclick="migrateExistingCoachesToProfiles()">Migrate Existing Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="addAllActiveToHoursGrid()">Add All Active to Hours Grid</button>
+        <button class="btn btn-outline btn-sm" onclick="cpOpenMergeTool()" title="Combine two records of the same person into one: pick which record is kept, its credentials and its hours">Merge Two Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="linkProfilesToGridReport()" title="Match each coach profile to the Hours Grid coach with the same name">Link to Hours Grid</button>
         <button class="btn btn-outline btn-sm" onclick="cpResetOrder()" title="Put the coach cards back in alphabetical order">Sort A\u2013Z</button>
         <button class="btn btn-outline btn-sm" onclick="storageCheck()" title="See how full this browser's storage is and what is using it">Storage Check</button>
@@ -2925,6 +2926,177 @@ function _cpSyncKeptHours(){
 function _cpHoursLocalEdit(){
   _cpHoursRefresh();
   clearTimeout(_cpKeptTimer);_cpKeptTimer=setTimeout(()=>{try{_cpSyncKeptHours();}catch(e){}},700);
+}
+
+
+/* =====================================================================
+   MERGE TWO COACHES (manual): pick the record to KEEP and the record to fold into it.
+   Info is combined (blanks are filled in, real disagreements are yours to pick), hours from both Hours Grid rows are combined
+   onto the kept coach (same slot logged under both names keeps the larger value -- the same rule "Merge Duplicate Coaches"
+   uses so nobody's pay is inflated by double entry), and the other record is removed everywhere.
+   ===================================================================== */
+const CP_LABELS={dob:'Birthdate',phone:'Phone',email:'Email',address:'Address',zip:'Zip',usaHockeyId:'Insurance #',usaHockeyLevel:'USAH Coaches Level',screeningUpdated:'Screening updated',screeningExpDate:'Screening expires',safeSport:'SafeSport',safeSportExpDate:'SafeSport expires',complianceSeason:'Compliance season',coachingExperience:'Coaching experience',playingExperience:'Playing experience',status:'Status',levels:'Coaching levels',currentLevels:'Current levels'};
+function _cpMTShow(k,v){
+  if(v===undefined||v===null||v==='')return '(blank)';
+  if(typeof v==='boolean')return v?'Yes':'No';
+  if(typeof v==='object')return Object.keys(v).filter(x=>v[x]).join(', ')||'(none)';
+  if(k==='usaHockeyLevel')return 'Level '+v;
+  const t=String(v);return t.length>70?t.slice(0,70)+'\u2026':t;
+}
+function _cpGridFor(p){return p&&p.payrollCoachId?(coaches.find(g=>g.id===p.payrollCoachId)||null):null;}
+function _cpHrsTotal(g){return Math.round(Object.values((g&&g.hours)||{}).reduce((a,b)=>a+(+b||0),0)*100)/100;}
+// Work out exactly what a merge would do (used for the preview and again when applying).
+function cpMergePlan(keepId,dropId,ch){
+  ch=ch||{};
+  const S=coachProfiles.find(p=>p.id===keepId),D=coachProfiles.find(p=>p.id===dropId);
+  if(!S||!D||S.id===D.id)return null;
+  const out={},conflicts=[],filled=[];
+  const skip=k=>k.charAt(0)==='_'||k==='id'||k==='order'||k==='hoursTotal'||k==='hoursTotalAt'||k==='payrollCoachId'||k==='name'||CP_BLOBS.includes(k);
+  new Set(Object.keys(S).concat(Object.keys(D))).forEach(k=>{
+    if(skip(k))return;
+    const a=S[k],b=D[k];
+    if(CP_MAPF.has(k)){const o={};new Set(Object.keys(a||{}).concat(Object.keys(b||{}))).forEach(x=>{o[x]=(a&&a[x])||(b&&b[x])||false;});out[k]=o;if(Object.keys(o).some(x=>o[x]&&!(a&&a[x])))filled.push(k);return;}
+    if(CP_BOOLF.has(k)){out[k]=!!(a||b);if(!a&&b)filled.push(k);return;}
+    const ea=_cpEmpty(a),eb=_cpEmpty(b);
+    if(ea&&eb){out[k]=a!==undefined?a:b;return;}
+    if(ea){out[k]=b;filled.push(k);return;}
+    if(eb||_cpNorm(a)===_cpNorm(b)){out[k]=a;return;}
+    let def='keep'; // both have a value and they differ: default to the kept record, except the "later/higher wins" fields
+    if(CP_DATEF.has(k))def=String(b)>String(a)?'drop':'keep';
+    if(k==='usaHockeyLevel')def=(parseInt(b,10)||0)>(parseInt(a,10)||0)?'drop':'keep';
+    if(k==='status'&&(a==='pending'||!a))def='drop';
+    const pick=(ch.fields&&ch.fields[k])||def;
+    out[k]=pick==='drop'?b:a;conflicts.push({field:k,keep:a,drop:b,pick:pick});
+  });
+  const name=ch.name==='drop'?D.name:ch.name==='custom'&&String(ch.custom||'').trim()?String(ch.custom).trim():S.name;
+  // ---- hours ----
+  const gS=_cpGridFor(S),gD=_cpGridFor(D),h={mode:'none',warnings:[]};
+  if(gS&&gD&&gS.id!==gD.id){
+    const mh={};let overlap=0;
+    Object.keys(Object.assign({},gS.hours,gD.hours)).forEach(k=>{const x=+((gS.hours||{})[k])||0,y=+((gD.hours||{})[k])||0;if(x>0&&y>0)overlap++;const m=Math.max(x,y);if(m>0)mh[k]=m;});
+    h.mode='merge';h.gS=gS;h.gD=gD;h.mergedHours=mh;h.overlap=overlap;h.keepTotal=_cpHrsTotal(gS);h.dropTotal=_cpHrsTotal(gD);h.after=_cpHrsTotal({hours:mh});
+  }else if(!gS&&gD){h.mode='adopt';h.gD=gD;h.dropTotal=_cpHrsTotal(gD);h.after=h.dropTotal;}
+  else if(gS){h.mode='keep';h.gS=gS;h.keepTotal=_cpHrsTotal(gS);h.after=h.keepTotal;
+    if(!gD&&typeof D.hoursTotal==='number'&&D.hoursTotal>0)h.warnings.push('"'+D.name+'" has '+D.hoursTotal+' saved hours but is no longer on the Hours Grid, so those hours cannot be added to the grid automatically.');}
+  else if(typeof D.hoursTotal==='number'&&D.hoursTotal>0)h.warnings.push('"'+D.name+'" has '+D.hoursTotal+' saved hours but is not on the Hours Grid.');
+  return{S:S,D:D,out:out,conflicts:conflicts,filled:filled,name:name,hours:h,
+         blobsFromDrop:CP_BLOBS.filter(k=>!S[k]&&D[k]&&k!=='resumeFileName').map(k=>k==='photo'?'photo':'resume file')};
+}
+function cpApplyManualMerge(keepId,dropId,ch){
+  const plan=cpMergePlan(keepId,dropId,ch);if(!plan)return false;
+  const S=plan.S,D=plan.D,h=plan.hours;
+  try{ // safety copy of both records (and their grid rows) as a downloaded file
+    const gS=_cpGridFor(S),gD=_cpGridFor(D),d=new Date();
+    const blob=new Blob([JSON.stringify({app:'jaguar-coach-merge-backup',v:1,exported:d.toISOString(),kept:{profile:_cpStrip(S),grid:gS},removed:{profile:_cpStrip(D),grid:gD}},null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='jaguar-coach-merge-backup-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(e){}
+  const oldNames=[];
+  Object.assign(S,plan.out);
+  if(!S.photo&&D.photo)S.photo=D.photo;
+  if(!S.resumeFileData&&D.resumeFileData){S.resumeFileData=D.resumeFileData;S.resumeFileName=D.resumeFileName||'';}
+  S.name=plan.name;
+  // ---- hours grid ----
+  let grid=null;
+  if(h.mode==='merge'){
+    const gS=coaches.find(g=>g.id===h.gS.id),gD=coaches.find(g=>g.id===h.gD.id);
+    if(gS&&gD){
+      oldNames.push(gS.name,gD.name);
+      gS.hours=h.mergedHours;
+      if(gD.startMonth&&gS.startMonth){if(gD.startMonth<gS.startMonth)gS.startMonth=gD.startMonth;}else{delete gS.startMonth;} // never hide a month that has hours
+      if(gD.desig&&gD.desig!=='volunteer'&&(!gS.desig||gS.desig==='volunteer'))gS.desig=gD.desig;
+      gS.archived=!!(gS.archived&&gD.archived);
+      coaches=coaches.filter(g=>g!==gD);grid=gS;
+    }
+  }else if(h.mode==='adopt'){
+    const gD=coaches.find(g=>g.id===h.gD.id);if(gD){oldNames.push(gD.name);grid=gD;}
+  }else if(h.mode==='keep'){
+    const gS=coaches.find(g=>g.id===h.gS.id);if(gS){oldNames.push(gS.name);grid=gS;}
+  }
+  if(grid){
+    grid.name=plan.name;S.payrollCoachId=grid.id;
+    // saved per-month coach order refers to coaches BY NAME: point the old names at the merged name
+    const orders=loadMonthOrders();let changed=false;
+    Object.keys(orders).forEach(mk=>{
+      const seen=new Set(),arr=(orders[mk]||[]).map(n=>oldNames.includes(n)||n===D.name?plan.name:n).filter(n=>{if(seen.has(n))return false;seen.add(n);return true;});
+      if(JSON.stringify(arr)!==JSON.stringify(orders[mk])){orders[mk]=arr;changed=true;}
+    });
+    if(changed)saveMonthOrders(orders);
+  }
+  coachProfiles=coachProfiles.filter(p=>p.id!==D.id);
+  if(editingCoachProfileId===D.id){editingCoachProfileId=null;try{closeModal('modalCoachProfile');}catch(e){}}
+  try{logAudit('Merged coach "'+D.name+'" into "'+plan.name+'"','edit');}catch(e){}
+  saveCoaches();saveCoachProfilesData();
+  try{_cpSyncKeptHours();}catch(e){}
+  try{refreshAllCoachViews();}catch(e){}
+  try{renderCoachProfiles();}catch(e){}
+  return true;
+}
+// ---- the merge window ----
+window._cpMT={keep:'',drop:'',name:'keep',custom:'',fields:{}};
+function cpOpenMergeTool(keepId){
+  if(typeof canEdit==='function'&&!canEdit()){toast('Editing access required','terror');return;}
+  window._cpMT={keep:keepId||'',drop:'',name:'keep',custom:'',fields:{}};
+  const old=document.getElementById('cpmt-ov');if(old)old.remove();
+  _hrsModal('cpmt-ov','');
+  _cpMTRender();
+}
+function cpMTSet(which,id){window._cpMT[which]=id;window._cpMT.fields={};window._cpMT.name='keep';_cpMTRender();}
+function cpMTSwap(){const m=window._cpMT,t=m.keep;m.keep=m.drop;m.drop=t;m.fields={};m.name='keep';_cpMTRender();}
+function cpMTPick(field,who){window._cpMT.fields[field]=who;_cpMTRender();}
+function cpMTName(who){window._cpMT.name=who;_cpMTRender();}
+function cpMTCustom(v){window._cpMT.custom=v;window._cpMT.name='custom';}
+function cpMTGo(){
+  const m=window._cpMT,plan=cpMergePlan(m.keep,m.drop,m);if(!plan)return;
+  if(!confirm('Merge "'+plan.D.name+'" into "'+plan.name+'"?\n\n"'+plan.D.name+'" will be removed everywhere, and a backup file of both records downloads first.'))return;
+  const dn=plan.D.name,ok=cpApplyManualMerge(m.keep,m.drop,m);
+  const ov=document.getElementById('cpmt-ov');if(ov)ov.remove();
+  if(ok)toast('Merged "'+dn+'" into "'+plan.name+'"','ok');
+}
+function _cpMTRender(){
+  const ov=document.getElementById('cpmt-ov');if(!ov)return;
+  const box=ov.firstChild,m=window._cpMT,plan=cpMergePlan(m.keep,m.drop,m);
+  const list=coachProfiles.slice().sort((a,b)=>{const x=_cpSortKey(a),y=_cpSortKey(b);return x<y?-1:x>y?1:0;});
+  const opt=(sel)=>'<option value="">Choose a coach\u2026</option>'+list.map(p=>{const i=cpHoursInfo(p);return'<option value="'+_hrsEsc(p.id)+'"'+(p.id===sel?' selected':'')+'>'+_hrsEsc((p.name||'(unnamed)')+' \u2014 '+(p.status||'active')+(i.total!==null?', '+_cpFmtHrs(i.total)+' hrs':''))+'</option>';}).join('');
+  const sel='width:100%;background:#0f1216;color:#f2f2f2;border:1px solid #444;border-radius:6px;padding:8px;font-size:14px;';
+  let body='<div style="font-size:22px;letter-spacing:1px;color:#C9A84C;margin-bottom:6px;">Merge two coaches</div>'
+    +'<div style="font-size:13px;opacity:.85;line-height:1.5;margin-bottom:12px;">Pick the record to <b>keep</b> \u2014 its credentials and Hours Grid row receive everything. The other record is folded into it and removed.</div>'
+    +'<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end;margin-bottom:12px;">'
+    +'<div><div style="font-size:11px;letter-spacing:1px;color:#5CCC88;margin-bottom:3px;">KEEP THIS RECORD</div><select id="cpmt-keep" style="'+sel+'" onchange="cpMTSet(\'keep\',this.value)">'+opt(m.keep)+'</select></div>'
+    +'<button class="btn btn-outline btn-sm" title="Swap" onclick="cpMTSwap()" style="margin-bottom:2px;">\u21C4</button>'
+    +'<div><div style="font-size:11px;letter-spacing:1px;color:#F0A050;margin-bottom:3px;">MERGE IN &amp; REMOVE THIS ONE</div><select id="cpmt-drop" style="'+sel+'" onchange="cpMTSet(\'drop\',this.value)">'+opt(m.drop)+'</select></div></div>';
+  if(!plan){
+    body+='<div style="padding:14px;text-align:center;opacity:.75;font-size:13px;">'+((m.keep&&m.drop&&m.keep===m.drop)?'Choose two different coaches.':'Choose the two records to combine.')+'</div>';
+  }else{
+    const h=plan.hours;
+    body+='<div style="margin:10px 0 4px;font-size:12px;letter-spacing:1px;color:#C9A84C;">NAME</div><div style="display:flex;flex-wrap:wrap;gap:12px;font-size:14px;align-items:center;">'
+      +'<label><input type="radio" name="cpmt-name" '+(m.name==='keep'?'checked':'')+' onclick="cpMTName(\'keep\')"> '+_hrsEsc(plan.S.name)+'</label>'
+      +'<label><input type="radio" name="cpmt-name" '+(m.name==='drop'?'checked':'')+' onclick="cpMTName(\'drop\')"> '+_hrsEsc(plan.D.name)+'</label>'
+      +'<label><input type="radio" name="cpmt-name" '+(m.name==='custom'?'checked':'')+' onclick="cpMTName(\'custom\')"> other: <input id="cpmt-custom" type="text" value="'+_hrsEsc(m.custom)+'" oninput="cpMTCustom(this.value)" style="background:#0f1216;color:#f2f2f2;border:1px solid #444;border-radius:6px;padding:4px 6px;width:150px;"></label></div>';
+    body+='<div style="margin:14px 0 4px;font-size:12px;letter-spacing:1px;color:#C9A84C;">CREDENTIALS &amp; INFO</div>';
+    if(plan.conflicts.length){
+      body+='<div style="font-size:12px;opacity:.8;margin-bottom:4px;">Both records have a value and they differ \u2014 choose which to keep:</div><table id="cpmt-conflicts" style="width:100%;border-collapse:collapse;font-size:13px;">'
+        +plan.conflicts.map(c=>'<tr style="border-top:1px solid #2c313a;"><td style="padding:5px 6px;white-space:nowrap;">'+_hrsEsc(CP_LABELS[c.field]||c.field)+'</td>'
+          +'<td style="padding:5px 6px;"><label><input type="radio" name="cpmf-'+_hrsEsc(c.field)+'" '+(c.pick==='keep'?'checked':'')+' onclick="cpMTPick(\''+_hrsEsc(c.field)+'\',\'keep\')"> '+_hrsEsc(_cpMTShow(c.field,c.keep))+'</label></td>'
+          +'<td style="padding:5px 6px;"><label><input type="radio" name="cpmf-'+_hrsEsc(c.field)+'" '+(c.pick==='drop'?'checked':'')+' onclick="cpMTPick(\''+_hrsEsc(c.field)+'\',\'drop\')"> '+_hrsEsc(_cpMTShow(c.field,c.drop))+'</label></td></tr>').join('')+'</table>';
+    }else body+='<div style="font-size:13px;opacity:.8;">No disagreements between the two records.</div>';
+    const extra=[];
+    if(plan.filled.length)extra.push('Filled in from the removed record: '+plan.filled.map(f=>CP_LABELS[f]||f).join(', ')+'.');
+    if(plan.blobsFromDrop.length)extra.push('Taken from the removed record: '+plan.blobsFromDrop.join(' and ')+'.');
+    if(extra.length)body+='<div style="font-size:12px;color:#5CCC88;margin-top:6px;line-height:1.5;">'+extra.map(_hrsEsc).join('<br>')+'</div>';
+    body+='<div style="margin:14px 0 4px;font-size:12px;letter-spacing:1px;color:#C9A84C;">HOURS</div><div id="cpmt-hours" style="font-size:13px;line-height:1.55;">';
+    if(h.mode==='merge')body+='Hours Grid: <b>'+_hrsEsc(h.gS.name)+'</b> ('+_cpFmtHrs(h.keepTotal)+' hrs) + <b>'+_hrsEsc(h.gD.name)+'</b> ('+_cpFmtHrs(h.dropTotal)+' hrs) \u2192 <b style="color:#C9A84C;">'+_cpFmtHrs(h.after)+' hrs</b> on <b>'+_hrsEsc(plan.name)+'</b>.'
+      +(h.overlap?'<br><span style="color:#F0A050;">'+h.overlap+' slot'+(h.overlap!==1?'s were':' was')+' logged under both names \u2014 the larger value is kept (so nothing is double counted).</span>':'')
+      +'<br>The extra Hours Grid row for the removed record is deleted.';
+    else if(h.mode==='adopt')body+='<b>'+_hrsEsc(plan.S.name)+'</b> is not on the Hours Grid, so it takes over <b>'+_hrsEsc(h.gD.name)+'</b>\'s grid row ('+_cpFmtHrs(h.dropTotal)+' hrs).';
+    else if(h.mode==='keep')body+='Only <b>'+_hrsEsc(plan.S.name)+'</b> is on the Hours Grid ('+_cpFmtHrs(h.keepTotal)+' hrs) \u2014 it stays as is.';
+    else body+='Neither record is on the Hours Grid.';
+    body+=h.warnings.map(w=>'<br><span style="color:#F0A050;">'+_hrsEsc(w)+'</span>').join('')+'</div>';
+    body+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap;"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'cpmt-ov\').remove()">Cancel</button><button id="cpmt-go" class="btn btn-gold btn-sm" onclick="cpMTGo()">Merge \u201c'+_hrsEsc(plan.D.name)+'\u201d into \u201c'+_hrsEsc(plan.name)+'\u201d</button></div>';
+  }
+  if(!plan)body+='<div style="text-align:right;margin-top:14px;"><button class="btn btn-outline btn-sm" onclick="document.getElementById(\'cpmt-ov\').remove()">Cancel</button></div>';
+  box.innerHTML=body;
 }
 
 /* ---- link profiles to the Hours Grid by name ---- */
