@@ -406,7 +406,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V22</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V23</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -667,6 +667,13 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
         <a href="https://www.usahockeyregistration.com/" target="_blank" rel="noopener" style="font-size:11px;color:var(--gold-light);">Verify on USA Hockey &#8599;</a>
       </div>
       <div class="form-group"><span class="form-label">USA Hockey Insurance Number</span><input class="form-input" id="cpInsurance" type="text"/></div>
+      <div class="form-group"><span class="form-label">USA Hockey Coaches Level</span>
+        <select class="form-input" id="cpUsahLevel" style="max-width:220px;">
+          <option value="">Not set</option><option value="1">Level 1</option><option value="2">Level 2</option><option value="3">Level 3</option><option value="4">Level 4</option><option value="5">Level 5</option>
+        </select></div>
+      <div class="form-group"><span class="form-label">Total Hours <span style="text-transform:none;color:var(--white-dim);">(from the Hours Grid \u2014 updates live)</span></span>
+        <div id="cpHoursTotal" style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;color:var(--gold-light);line-height:1.1;">\u2014</div>
+        <div id="cpHoursDetail" style="font-size:11px;color:var(--white-dim);margin-top:2px;"></div></div>
       <div class="form-group"><span class="form-label">Zip Code <span style="text-transform:none;color:var(--white-dim);">(needed with DOB to verify on USA Hockey)</span></span><input class="form-input" id="cpZip" type="text" inputmode="numeric" maxlength="10" style="max-width:140px;"/></div>
       <div class="form-group">
         <span class="form-label">Screening Updated</span>
@@ -1031,7 +1038,7 @@ function loadCoaches(){
   }catch(e){}
   coaches=[];
 }
-function saveCoaches(){_lsSet('jag_coaches',JSON.stringify(coaches));_hrsMarkDirty();}
+function saveCoaches(){_lsSet('jag_coaches',JSON.stringify(coaches));_hrsMarkDirty();_cpHoursLocalEdit();}
 // Coaches are only ever identified by a randomly-generated id, never by name -- so
 // there's nothing stopping the same person from being added twice if their name gets
 // typed into one of the always-present blank "add coach" rows more than once (e.g. in
@@ -1120,6 +1127,7 @@ function findOrphanedCoachHours(){
 // one the person is NOT currently looking at will keep showing stale numbers until
 // they happen to click away and back.
 function refreshAllCoachViews(){
+  try{_cpHoursRefresh();}catch(e){}
   try{buildTable();}catch(e){}
   try{buildYearlySummary();}catch(e){}
   try{buildMatrixView();}catch(e){}
@@ -1152,7 +1160,7 @@ function mkCoachProfile(){
     id:'cp'+Date.now()+Math.random().toString(36).slice(2,6),
     name:'',dob:'',phone:'',email:'',address:'',zip:'',photo:'',
     levels:{},currentLevels:{},
-    usaHockeyId:'',screeningUpdated:false,screeningExpDate:'',safeSport:false,safeSportExpDate:'',complianceSeason:'',
+    usaHockeyId:'',usaHockeyLevel:'',screeningUpdated:false,screeningExpDate:'',safeSport:false,safeSportExpDate:'',complianceSeason:'',
     coachingExperience:'',playingExperience:'',
     resumeFileName:'',resumeFileData:'',
     status:'pending', // 'active' | 'pending' | 'rejected' | 'archived'
@@ -1302,6 +1310,7 @@ function renderCoachProfiles(){
           `<span class="cp-badge ok">\u2713 On Hours Grid</span>`
         :`<span class="cp-badge bad" style="margin-right:6px;">Not on Hours Grid</span><button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:10px;" onclick="event.stopPropagation();quickAddToHoursGrid('${c.id}')">+ Add Now</button>`
       }</div>`:''}
+      ${_cpTileExtras(c)}
       <div style="font-size:10px;color:var(--gold-light);margin-bottom:4px;">${CURRENT_LEVELS.filter(l=>c.currentLevels&&c.currentLevels[l]).map(l=>l.toUpperCase()).join(' \u00b7 ')||'No current levels set'}</div>
       <div class="cp-levels">
         ${COACH_LEVELS.map(l=>`<span class="cp-level-pill ${c.levels&&c.levels[l]?'done':'notdone'}">${l.toUpperCase()}</span>`).join('')}
@@ -1404,6 +1413,8 @@ function openCoachProfileModal(id){
   document.getElementById('cpAddress').value=c.address||'';
   document.getElementById('cpZip').value=c.zip||'';
   document.getElementById('cpInsurance').value=c.usaHockeyId||'';
+  document.getElementById('cpUsahLevel').value=c.usaHockeyLevel||'';
+  _cpFillHoursField(c);
   document.getElementById('cpCoachingExp').value=c.coachingExperience||'';
   document.getElementById('cpPlayingExp').value=c.playingExperience||'';
   document.getElementById('cpComplianceLabel').textContent=`Annual USA Hockey Compliance \u2014 ${currentSeasonLabel()} Season`;
@@ -1523,6 +1534,7 @@ function gatherCoachProfileFormFields(c){
   c.levels=Object.assign({},cpLevelState);
   c.currentLevels=Object.assign({},cpCurrentLevelState);
   c.usaHockeyId=document.getElementById('cpInsurance').value.trim();
+  c.usaHockeyLevel=document.getElementById('cpUsahLevel').value;
   c.screeningUpdated=!!cpYNState.screeningUpdated;
   c.screeningExpDate=document.getElementById('cpScreeningExp').value;
   c.safeSport=!!cpYNState.safeSport;
@@ -2749,7 +2761,7 @@ if(window._cpEarly){const _c=window._cpEarly;window._cpEarly=null;setTimeout(()=
 /* ---- the merge ---- */
 function _cpEmpty(v){return v===undefined||v===null||v===''||(typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===0);}
 function _cpNorm(v){return typeof v==='string'?v.trim().toLowerCase().replace(/\s+/g,' '):JSON.stringify(v);}
-function _cpScore(c){let n=0;Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k)||k==='id'||k==='order')return;if(!_cpEmpty(c[k])&&c[k]!==false)n++;});return n+(c.status==='active'?2:0);}
+function _cpScore(c){let n=0;Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k)||k==='id'||k==='order'||k==='hoursTotal'||k==='hoursTotalAt')return;if(!_cpEmpty(c[k])&&c[k]!==false)n++;});return n+(c.status==='active'?2:0);}
 const CP_DATEF=new Set(['screeningExpDate','safeSportExpDate','complianceSeason']),CP_BOOLF=new Set(['screeningUpdated','safeSport']),CP_MAPF=new Set(['levels','currentLevels']);
 function _cpMergeRecords(L,C){
   const out={},conflicts=[],lWins=_cpScore(L)>_cpScore(C); // ties go to the cloud copy
@@ -2757,6 +2769,9 @@ function _cpMergeRecords(L,C){
     if(k.charAt(0)==='_'||k==='id'||CP_BLOBS.includes(k))return;
     const a=L[k],b=C[k];
     if(k==='order'){out[k]=typeof b==='number'?b:a;return;} // display position only: never a "disagreement"
+    if(k==='usaHockeyLevel'){const m=Math.max(parseInt(a,10)||0,parseInt(b,10)||0);out[k]=m?String(m):'';return;} // certifications only go up
+    if(k==='hoursTotal'){if(typeof a==='number'||typeof b==='number')out[k]=Math.max(typeof a==='number'?a:-Infinity,typeof b==='number'?b:-Infinity);return;}
+    if(k==='hoursTotalAt'){out[k]=String(a||'')>=String(b||'')?a:b;return;}
     if(CP_MAPF.has(k)){const o={};new Set(Object.keys(a||{}).concat(Object.keys(b||{}))).forEach(x=>{o[x]=(a&&a[x])||(b&&b[x])||(a&&a[x]!==undefined?a[x]:b&&b[x]);});out[k]=o;return;}
     if(CP_BOOLF.has(k)){out[k]=!!(a||b);return;}
     if(CP_DATEF.has(k)){out[k]=_cpEmpty(a)?b:_cpEmpty(b)?a:(String(a)>=String(b)?a:b);return;} // the later date / season
@@ -2849,6 +2864,69 @@ function _cpShowMergeReport(plan,report,link){
     +'<div style="text-align:right;margin-top:14px;"><button class="btn btn-gold btn-sm" onclick="document.getElementById(\'cp-report-ov\').remove()">Done</button></div>');
 }
 
+
+/* ---- USA Hockey coaches level + total hours on the coach card ---- */
+function _cpFmtHrs(n){n=Math.round((+n||0)*100)/100;return String(n);}
+// Total hours for a coach profile: LIVE from the linked Hours Grid coach (same number as the Season Summary);
+// if the coach is not on the grid (or was removed from it) the last saved total is shown instead.
+function cpHoursInfo(p){
+  const g=p&&p.payrollCoachId?coaches.find(x=>x.id===p.payrollCoachId):null;
+  if(g){
+    const by={};
+    Object.keys(g.hours||{}).forEach(k=>{const v=+g.hours[k]||0;if(!v)return;const mk=k.split('_')[0];by[mk]=(by[mk]||0)+v;});
+    const months=Object.keys(by).sort().map(mk=>{const m=(typeof SEASON_MONTHS!=='undefined'&&SEASON_MONTHS.find(x=>x.key===mk))||null;return{label:(m&&(m.short||m.label))||mk,hours:by[mk]};});
+    return{linked:true,total:coachSeasonHrs(g),months:months,saved:false};
+  }
+  if(p&&typeof p.hoursTotal==='number')return{linked:false,total:p.hoursTotal,months:[],saved:true};
+  return{linked:false,total:null,months:[],saved:false};
+}
+function _cpTileExtras(c){
+  const lv=c.usaHockeyLevel,info=cpHoursInfo(c);
+  const badges=[];
+  if(lv)badges.push('<span class="cp-badge ok">USAH Level '+_hrsEsc(lv)+'</span>');
+  else if((c.status||'active')==='active')badges.push('<span class="cp-badge stale">USAH Level \u2014</span>');
+  if(info.total!==null){
+    const tip=info.linked?(info.months.length?info.months.map(m=>m.label+': '+_cpFmtHrs(m.hours)).join('  \u00b7  '):'No hours logged yet'):'Last saved total \u2014 not on the Hours Grid right now';
+    badges.push('<span class="cp-badge ok" title="'+_hrsEsc(tip)+'">\u23F1 '+_cpFmtHrs(info.total)+' hrs'+(info.saved?' (saved)':'')+'</span>');
+  }
+  return badges.length?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;">'+badges.join('')+'</div>':'';
+}
+function _cpFillHoursField(c){
+  const t=document.getElementById('cpHoursTotal'),d=document.getElementById('cpHoursDetail');if(!t||!d)return;
+  const info=cpHoursInfo(c);
+  if(info.total===null){t.textContent='\u2014';d.textContent=(c&&c.status==='active')?'Not on the Hours Grid yet \u2014 use \u201cAdd to Hours Grid\u201d on the coach\'s card or the Link to Hours Grid button.':'Not on the Hours Grid.';return;}
+  t.textContent=_cpFmtHrs(info.total)+' hrs'+(info.saved?' (saved)':'');
+  d.textContent=info.linked?(info.months.length?info.months.map(m=>m.label+' '+_cpFmtHrs(m.hours)).join('  \u00b7  '):'No hours logged yet'):'Last saved total \u2014 this coach is not on the Hours Grid right now.';
+}
+var _cpHoursTimer=null,_cpKeptTimer=null;
+// Redraw everything that shows a total (the cards, and the open coach card) -- called whenever hours change, here or on another device.
+function _cpHoursRefresh(){
+  clearTimeout(_cpHoursTimer);
+  _cpHoursTimer=setTimeout(()=>{
+    try{
+      const pan=document.getElementById('panel-coaches');
+      if(pan&&pan.classList.contains('active')&&!_cpDragId)renderCoachProfiles();
+      if(editingCoachProfileId){const c=coachProfiles.find(x=>x.id===editingCoachProfileId);if(c)_cpFillHoursField(c);}
+    }catch(e){}
+  },120);
+}
+// Keep the total ON the coach's record (so it syncs with the coach and survives if they are taken off the grid).
+// Only runs when hours are edited on THIS device -- never from a sync -- so two devices can't fight over it.
+function _cpSyncKeptHours(){
+  let changed=false;const today=todayISO();
+  coachProfiles.forEach(p=>{
+    if(!p.payrollCoachId)return;
+    const g=coaches.find(x=>x.id===p.payrollCoachId);if(!g)return;
+    const t=Math.round(coachSeasonHrs(g)*100)/100;
+    if(p.hoursTotal!==t){p.hoursTotal=t;p.hoursTotalAt=today;changed=true;}
+  });
+  if(changed)saveCoachProfilesData();
+}
+function _cpHoursLocalEdit(){
+  _cpHoursRefresh();
+  clearTimeout(_cpKeptTimer);_cpKeptTimer=setTimeout(()=>{try{_cpSyncKeptHours();}catch(e){}},700);
+}
+
 /* ---- link profiles to the Hours Grid by name ---- */
 function relinkProfilesToGrid(){
   const byKey=new Map();
@@ -2861,7 +2939,7 @@ function relinkProfilesToGrid(){
     if(c.length){p.payrollCoachId=c.slice().sort((a,b)=>tot(b)-tot(a))[0].id;linked++;}
     else if(p.status==='active')noGrid.push(p.name);
   });
-  if(linked)saveCoachProfilesData();
+  if(linked){saveCoachProfilesData();try{_cpSyncKeptHours();}catch(e){}}
   return{linked:linked,already:already,noGrid:noGrid};
 }
 function linkProfilesToGridReport(){
