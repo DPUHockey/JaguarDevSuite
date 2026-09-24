@@ -406,7 +406,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V25</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V26</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -675,6 +675,9 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
       <div class="form-group"><span class="form-label">Total Hours <span style="text-transform:none;color:var(--white-dim);">(from the Hours Grid \u2014 updates live)</span></span>
         <div id="cpHoursTotal" style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;color:var(--gold-light);line-height:1.1;">\u2014</div>
         <div id="cpHoursDetail" style="font-size:11px;color:var(--white-dim);margin-top:2px;"></div></div>
+      <div class="form-group"><span class="form-label">Hours Grid row <span style="text-transform:none;color:var(--white-dim);">(which Hours Grid coach is this person)</span></span>
+        <select class="form-input" id="cpGridLink" onchange="_cpGridRenameHint()"></select>
+        <label id="cpGridRenameWrap" style="display:none;font-size:12px;color:var(--white-dim);margin-top:6px;cursor:pointer;"><input type="checkbox" id="cpGridRename" checked> Rename that Hours Grid row to match this coach&#39;s name</label></div>
       <div class="form-group"><span class="form-label">Zip Code <span style="text-transform:none;color:var(--white-dim);">(needed with DOB to verify on USA Hockey)</span></span><input class="form-input" id="cpZip" type="text" inputmode="numeric" maxlength="10" style="max-width:140px;"/></div>
       <div class="form-group">
         <span class="form-label">Screening Updated</span>
@@ -1366,6 +1369,7 @@ function addAllActiveToHoursGrid(){
   if(!confirm(`Add ${needsLinking.length} Active coach${needsLinking.length!==1?'es':''} to the Hours Grid now?\n\n${needsLinking.map(c=>c.name).join(', ')}`))return;
   needsLinking.forEach(c=>{
     let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+  if(!pc){pc=_cpGridByName(c.name,c.id);if(pc)c.payrollCoachId=pc.id;} // a row with this exact name already exists: use it, don't add a duplicate
     if(!pc){
       pc=mkC(c.name,'volunteer');
       coaches.push(pc);
@@ -1384,6 +1388,7 @@ function quickAddToHoursGrid(id){
   const c=coachProfiles.find(x=>x.id===id);
   if(!c)return;
   let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+  if(!pc){pc=_cpGridByName(c.name,c.id);if(pc)c.payrollCoachId=pc.id;} // a row with this exact name already exists: use it, don't add a duplicate
   if(!pc){
     pc=mkC(c.name,'volunteer');
     coaches.push(pc);
@@ -1416,6 +1421,7 @@ function openCoachProfileModal(id){
   document.getElementById('cpInsurance').value=c.usaHockeyId||'';
   document.getElementById('cpUsahLevel').value=c.usaHockeyLevel||'';
   _cpFillHoursField(c);
+  _cpFillGridLink(c);
   document.getElementById('cpCoachingExp').value=c.coachingExperience||'';
   document.getElementById('cpPlayingExp').value=c.playingExperience||'';
   document.getElementById('cpComplianceLabel').textContent=`Annual USA Hockey Compliance \u2014 ${currentSeasonLabel()} Season`;
@@ -1536,6 +1542,7 @@ function gatherCoachProfileFormFields(c){
   c.currentLevels=Object.assign({},cpCurrentLevelState);
   c.usaHockeyId=document.getElementById('cpInsurance').value.trim();
   c.usaHockeyLevel=document.getElementById('cpUsahLevel').value;
+  {const gl=document.getElementById('cpGridLink');if(gl&&gl.options.length)c.payrollCoachId=gl.value;}
   c.screeningUpdated=!!cpYNState.screeningUpdated;
   c.screeningExpDate=document.getElementById('cpScreeningExp').value;
   c.safeSport=!!cpYNState.safeSport;
@@ -1571,7 +1578,9 @@ function saveCoachProfileModal(){
   const c=getOrCreateEditingProfile();
   if(!c){toast('Coach profile not found','terror');return;}
   const wasNew=!editingCoachProfileId||c.id===editingCoachProfileId;
+  const oldName=c.name;
   gatherCoachProfileFormFields(c);
+  _cpApplyGridLink(c,oldName);
   saveCoachProfilesData();
   closeModal('modalCoachProfile');
   renderCoachProfiles();
@@ -1586,11 +1595,14 @@ function setCoachProfileStatus(newStatus){
   if(!name){toast('Name is required','terror');return;}
   const c=getOrCreateEditingProfile();
   if(!c){toast('Coach profile not found','terror');return;}
+  const oldName=c.name;
   gatherCoachProfileFormFields(c);
+  _cpApplyGridLink(c,oldName);
   c.status=newStatus;
 
   if(newStatus==='active'){
     let pc=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+  if(!pc){pc=_cpGridByName(c.name,c.id);if(pc)c.payrollCoachId=pc.id;} // a row with this exact name already exists: use it, don't add a duplicate
     if(!pc){
       pc=mkC(c.name,'volunteer');
       coaches.push(pc);
@@ -2944,7 +2956,40 @@ function _cpMTShow(k,v){
   const t=String(v);return t.length>70?t.slice(0,70)+'\u2026':t;
 }
 function _cpSlotLabel(colId){const p=String(colId).split('_');return p.length===5?p[1]+' '+p[2]+'/'+p[3]+' (slot '+((+p[4]||0)+1)+')':String(colId);}
-function _cpGridFor(p){return p&&p.payrollCoachId?(coaches.find(g=>g.id===p.payrollCoachId)||null):null;}
+function _cpGridByName(name,exceptProfileId){ // an Hours Grid row with exactly this name that no other coach card claims
+  const k=_cpKey(name);if(!k)return null;
+  const claimed=new Set(coachProfiles.filter(p=>p.payrollCoachId&&p.id!==exceptProfileId).map(p=>p.payrollCoachId));
+  const m=coaches.filter(g=>_cpKey(g.name)===k&&!claimed.has(g.id));
+  return m.length===1?m[0]:null;
+}
+function _cpGridFor(p){
+  if(!p)return null;
+  const byId=p.payrollCoachId?coaches.find(g=>g.id===p.payrollCoachId):null;
+  return byId||_cpGridByName(p.name,p.id)||null; // not linked yet, but a row with the same name exists: treat it as this coach's row
+}
+// Rename a Hours Grid row. The saved per-month coach order refers to coaches BY NAME, so it is updated too.
+function _cpRenameGrid(g,newName){
+  const old=g.name;if(!g||old===newName)return false;
+  g.name=newName;
+  const orders=loadMonthOrders();let ch=false;
+  Object.keys(orders).forEach(mk=>{
+    const seen=new Set(),arr=(orders[mk]||[]).map(n=>n===old?newName:n).filter(n=>{if(seen.has(n))return false;seen.add(n);return true;});
+    if(JSON.stringify(arr)!==JSON.stringify(orders[mk])){orders[mk]=arr;ch=true;}
+  });
+  if(ch)saveMonthOrders(orders);
+  return true;
+}
+function _cpTokens(n){return String(n||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean);}
+// Unlinked coach card -> the most likely unclaimed Hours Grid row ("Joe Andrews" ~ "Andrews": one name contains the other).
+function _cpSuggestGrid(p){
+  const claimed=new Set(coachProfiles.filter(x=>x.payrollCoachId&&x.id!==p.id&&coaches.some(g=>g.id===x.payrollCoachId)).map(x=>x.payrollCoachId));
+  const pt=_cpTokens(p.name);if(!pt.length)return[];
+  return coaches.filter(g=>{
+    if(claimed.has(g.id))return false;
+    const gt=_cpTokens(g.name);if(!gt.length)return false;
+    return gt.every(t=>pt.includes(t))||pt.every(t=>gt.includes(t));
+  });
+}
 function _cpHrsTotal(g){return Math.round(Object.values((g&&g.hours)||{}).reduce((a,b)=>a+(+b||0),0)*100)/100;}
 // Work out exactly what a merge would do (used for the preview and again when applying).
 function cpMergePlan(keepId,dropId,ch){
@@ -3149,6 +3194,52 @@ function _cpRepairShow(d){
   };
 }
 
+
+function _cpFillGridLink(c){
+  const sel=document.getElementById('cpGridLink');if(!sel)return;
+  const claimed={};coachProfiles.forEach(p=>{if(p.payrollCoachId&&p.id!==c.id)claimed[p.payrollCoachId]=p.name;});
+  const cur=c.payrollCoachId&&coaches.some(g=>g.id===c.payrollCoachId)?c.payrollCoachId:'';
+  const sug=new Set(cur?[]:_cpSuggestGrid(c).map(g=>g.id));
+  const list=coaches.slice().sort((a,b)=>{const x=(a.name||'').toLowerCase(),y=(b.name||'').toLowerCase();return x<y?-1:x>y?1:0;});
+  sel.innerHTML='<option value="">\u2014 Not on the Hours Grid \u2014</option>'+list.map(g=>{
+    const tag=sug.has(g.id)?'\u2605 ':'',note=claimed[g.id]?' \u2014 already linked to '+claimed[g.id]:(sug.has(g.id)?' \u2014 possible match':'');
+    return'<option value="'+_hrsEsc(g.id)+'"'+(g.id===cur?' selected':'')+'>'+tag+_hrsEsc(g.name||'(unnamed)')+' ('+_cpFmtHrs(_cpHrsTotal(g))+' hrs)'+_hrsEsc(note)+'</option>';
+  }).join('');
+  _cpGridRenameHint();
+}
+function _cpGridRenameHint(){
+  const sel=document.getElementById('cpGridLink'),wrap=document.getElementById('cpGridRenameWrap'),nm=document.getElementById('cpName');
+  if(!sel||!wrap)return;
+  const g=sel.value?coaches.find(x=>x.id===sel.value):null,name=nm?nm.value.trim():'';
+  wrap.style.display=(g&&name&&g.name!==name)?'block':'none';
+}
+// After a coach card is saved: keep the Hours Grid row's NAME in step with the card (unless the box was unticked).
+function _cpApplyGridLink(c,oldName){
+  const g=c.payrollCoachId?coaches.find(x=>x.id===c.payrollCoachId):null;
+  if(!g||g.name===c.name)return;
+  const chk=document.getElementById('cpGridRename'),wrap=document.getElementById('cpGridRenameWrap');
+  const shown=wrap&&wrap.style.display!=='none';
+  const rename=c.name!==oldName||(shown?(chk?chk.checked:true):true);
+  if(rename&&_cpRenameGrid(g,c.name)){saveCoaches();try{refreshAllCoachViews();}catch(e){}}
+}
+// One-click fixes used by the Link to Hours Grid report.
+function cpFixLink(profileId,gridId,rename){
+  const p=coachProfiles.find(x=>x.id===profileId),g=coaches.find(x=>x.id===gridId);if(!p||!g)return;
+  p.payrollCoachId=g.id;
+  if(rename&&g.name!==p.name)_cpRenameGrid(g,p.name);
+  saveCoaches();saveCoachProfilesData();try{_cpSyncKeptHours();}catch(e){}
+  try{refreshAllCoachViews();}catch(e){}try{renderCoachProfiles();}catch(e){}
+  const ov=document.getElementById('cp-link-ov');if(ov)ov.remove();
+  linkProfilesToGridReport();
+}
+function cpFixAllNames(){
+  let n=0;
+  coachProfiles.forEach(p=>{const g=p.payrollCoachId?coaches.find(x=>x.id===p.payrollCoachId):null;if(g&&g.name!==p.name&&_cpRenameGrid(g,p.name))n++;});
+  if(n){saveCoaches();try{refreshAllCoachViews();}catch(e){}}
+  const ov=document.getElementById('cp-link-ov');if(ov)ov.remove();
+  toast(n?('Renamed '+n+' Hours Grid row'+(n!==1?'s':'')+' to match the coach cards'):'Nothing to rename','ok');
+}
+
 /* ---- link profiles to the Hours Grid by name ---- */
 function relinkProfilesToGrid(){
   const byKey=new Map();
@@ -3169,12 +3260,21 @@ function linkProfilesToGridReport(){
   const linkedIds=new Set(coachProfiles.map(p=>p.payrollCoachId).filter(Boolean));
   const gridOnly=coaches.filter(g=>g.name&&g.name.trim()&&!linkedIds.has(g.id)).map(g=>g.name);
   _cpRefreshUI();
+  const mism=coachProfiles.filter(p=>{const g=p.payrollCoachId?coaches.find(x=>x.id===p.payrollCoachId):null;return g&&g.name!==p.name;});
+  const sugg=[];coachProfiles.forEach(p=>{if(p.status==='rejected')return;const linked=p.payrollCoachId&&coaches.some(g=>g.id===p.payrollCoachId);if(linked)return;const c=_cpSuggestGrid(p);if(c.length===1)sugg.push({p:p,g:c[0]});});
+  const fixHtml=(mism.length?'<div style="margin-top:12px;padding:10px 12px;background:#1d2128;border-radius:8px;font-size:13px;line-height:1.6;"><b>Names that don\'t match</b> (linked, but the Hours Grid uses a different name):'
+      +mism.map(p=>{const g=coaches.find(x=>x.id===p.payrollCoachId);return'<div>'+_hrsEsc(p.name)+' \u2194 grid \u201c'+_hrsEsc(g.name)+'\u201d</div>';}).join('')
+      +'<div style="margin-top:6px;"><button class="btn btn-gold btn-sm" onclick="cpFixAllNames()">Rename the grid rows to match the coach cards</button></div></div>':'')
+    +(sugg.length?'<div id="cp-suggest" style="margin-top:12px;padding:10px 12px;background:#1d2128;border-radius:8px;font-size:13px;line-height:1.6;"><b>Likely matches</b> (not linked yet):'
+      +sugg.map(x=>'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #2c313a;"><span>'+_hrsEsc(x.p.name)+' \u2194 grid \u201c'+_hrsEsc(x.g.name)+'\u201d ('+_cpFmtHrs(_cpHrsTotal(x.g))+' hrs)</span>'
+        +'<button class="btn btn-gold btn-sm" onclick="cpFixLink(\''+_hrsEsc(x.p.id)+'\',\''+_hrsEsc(x.g.id)+'\',true)">Link &amp; rename grid to \u201c'+_hrsEsc(x.p.name)+'\u201d</button>'
+        +(x.g.name!==x.p.name?'<button class="btn btn-outline btn-sm" onclick="cpFixLink(\''+_hrsEsc(x.p.id)+'\',\''+_hrsEsc(x.g.id)+'\',false)">Link only</button>':'')+'</div>').join('')+'</div>':'');
   _hrsModal('cp-link-ov',
     '<div style="font-size:22px;color:#C9A84C;margin-bottom:8px;">Coaches \u2194 Hours Grid</div>'
     +'<div style="font-size:14px;line-height:1.7;"><b>'+r.linked+'</b> profile'+(r.linked!==1?'s':'')+' newly linked by name \u00b7 <b>'+r.already+'</b> already linked.'
     +(r.noGrid.length?'<br><span style="color:#F0A050;"><b>'+r.noGrid.length+'</b> active coach'+(r.noGrid.length!==1?'es':'')+' with no Hours Grid entry: '+_hrsEsc(r.noGrid.join(', '))+'.</span><br><span style="opacity:.85;font-size:13px;">Use \u201cAdd All Active to Hours Grid\u201d to create them.</span>':'')
     +(gridOnly.length?'<br><span style="color:#F0A050;"><b>'+gridOnly.length+'</b> Hours Grid coach'+(gridOnly.length!==1?'es have':' has')+' no matching profile: '+_hrsEsc(gridOnly.join(', '))+'.</span>':'')
-    +(!r.noGrid.length&&!gridOnly.length?'<br><span style="color:#5CCC88;">Every coach profile and Hours Grid coach lines up.</span>':'')+'</div>'
+    +(!r.noGrid.length&&!gridOnly.length&&!mism.length&&!sugg.length?'<br><span style="color:#5CCC88;">Every coach profile and Hours Grid coach lines up.</span>':'')+'</div>'+fixHtml
     +'<div style="text-align:right;margin-top:14px;"><button class="btn btn-gold btn-sm" onclick="document.getElementById(\'cp-link-ov\').remove()">Done</button></div>');
 }
 
