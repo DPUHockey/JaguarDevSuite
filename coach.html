@@ -369,10 +369,34 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
   }catch(e){}
   if(window._coachPlanLoaded&&window._coachReloadAndRender) window._coachReloadAndRender();
 },err=>{console.warn('[coach FB]',err);});
+
+// ---- HOURS GRID CLOUD SYNC (node: jaguar_db/coach_hours) ----
+window._hoursFbDb=fbDb;window._hoursFbRef=ref;window._hoursFbSet=set;
+// Small status pill (bottom-right, left of the version badge) so a failed save is never silent.
+window._hrsStatus=function(state,msg){
+  try{
+    let el=document.getElementById('fb-status');
+    if(!el){el=document.createElement('div');el.id='fb-status';
+      el.style.cssText="position:fixed;bottom:6px;right:52px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;pointer-events:none;";
+      document.body.appendChild(el);}
+    const t=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+    const C={connected:['#5CCC88','\u2601 Connected'],saving:['#C9A84C','\u2601 Saving\u2026'],synced:['#5CCC88','\u2601 Synced '+t],
+             offline:['#F0A050','\u2601 Offline \u2014 will sync when back online'],error:['#F07050','\u2601 NOT SAVED TO CLOUD'+(msg?': '+msg:'')]};
+    const c=C[state]||C.connected;el.style.color=c[0];el.textContent=c[1];el.title=msg||'';window._hrsLastState=state;
+  }catch(e){}
+};
+onValue(ref(fbDb,'.info/connected'),s=>{
+  if(s.val()===true){if(window._hrsLastState!=='error'&&window._hrsLastState!=='saving')window._hrsStatus('connected');}
+  else window._hrsStatus('offline');
+});
+onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
+  const v=snap.val();
+  if(window._hoursOnCloud)window._hoursOnCloud(v);else window._hoursEarly={v:v};
+},err=>{window._hrsStatus('error',String((err&&err.message)||err).slice(0,90));});
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V17.6</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V18</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -447,6 +471,9 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
         <button class="btn btn-outline btn-sm" id="btnClearHours" onclick="clearMonthHours()">Clear Month</button>
         <button class="btn btn-outline btn-sm" onclick="mergeDuplicateCoaches()">Merge Duplicate Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="cleanOrphanedCoachHours()">Clean Up Orphaned Hours</button>
+        <button class="btn btn-outline btn-sm" onclick="showAllLoggedHours()" title="Read-only list of every hour stored on this device, including hours hidden because their date isn't active">Find All Hours</button>
+        <button class="btn btn-outline btn-sm" onclick="backupHoursFile()" title="Download all hours as a file">Backup Hours</button>
+        <button class="btn btn-outline btn-sm" onclick="restoreHoursFile()" title="Load hours from a backup file">Restore Hours</button>
         <button class="btn btn-outline btn-sm" id="btnArchivedCoaches" onclick="toggleArchivedCoachesPanel()">Archived Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="switchTab('coaches')" title="New coaches are onboarded on the Coaches tab, then added here via 'Add to Active'">New coaches: use Coaches tab &#8599;</button>
       </div>
@@ -886,6 +913,8 @@ function jagHome(){
   }
 }
 
+// hours-sync state: declared this early because saveActiveDates() can run during startup, before the sync code below is defined
+var _hrsTimer=null,_hrsSeq=0;
 let coaches=[];
 let currentMonthKey=SEASON_MONTHS[0].key;
 let currentAcctMonthKey=SEASON_MONTHS[0].key;
@@ -989,7 +1018,7 @@ function loadCoaches(){
   }catch(e){}
   coaches=[];
 }
-function saveCoaches(){localStorage.setItem('jag_coaches',JSON.stringify(coaches));}
+function saveCoaches(){localStorage.setItem('jag_coaches',JSON.stringify(coaches));_hrsMarkDirty();}
 // Coaches are only ever identified by a randomly-generated id, never by name -- so
 // there's nothing stopping the same person from being added twice if their name gets
 // typed into one of the always-present blank "add coach" rows more than once (e.g. in
@@ -1563,7 +1592,7 @@ function cleanOrphanedCoachHours(){
 function loadMonthOrders(){
   try{const s=localStorage.getItem('jag_month_orders');return s?JSON.parse(s):{};}catch(e){return{};}
 }
-function saveMonthOrders(mo){localStorage.setItem('jag_month_orders',JSON.stringify(mo));}
+function saveMonthOrders(mo){localStorage.setItem('jag_month_orders',JSON.stringify(mo));_hrsMarkDirty();}
 // Apply a saved order (array of names) to visible coaches for a month.
 // Uses a Map so each coach object appears exactly once.
 function applyMonthOrder(visibleCoaches,mk){
@@ -2281,7 +2310,7 @@ function slotKey(dk,dayDef,si){return`${dk}__${dayDef.day}__${si}`;}
 function loadActiveDates(){
   try{const s=localStorage.getItem('jag_active_dates');return s?new Set(JSON.parse(s)):null;}catch(e){return null;}
 }
-function saveActiveDates(set){localStorage.setItem('jag_active_dates',JSON.stringify([...set]));}
+function saveActiveDates(set){localStorage.setItem('jag_active_dates',JSON.stringify([...set]));_hrsMarkDirty();}
 
 function getActiveDates(){
   const stored=loadActiveDates();
@@ -2323,8 +2352,248 @@ function buildSchedule(){
 function loadFrozenMonths(){
   try{const s=localStorage.getItem('jag_frozen_months');return s?new Set(JSON.parse(s)):new Set();}catch(e){return new Set();}
 }
-function saveFrozenMonths(){localStorage.setItem('jag_frozen_months',JSON.stringify([...frozenMonths]));}
+function saveFrozenMonths(){localStorage.setItem('jag_frozen_months',JSON.stringify([...frozenMonths]));_hrsMarkDirty();}
 let frozenMonths=loadFrozenMonths();
+
+/* =====================================================================
+   HOURS GRID CLOUD SYNC
+   The hours grid (coaches[].hours), which dates are active, per-month coach order and frozen months used to live in this
+   browser only. They are now kept in the cloud (jaguar_db/coach_hours) with a version stamp on every save, so every device
+   shows the same hours. Coach PROFILES (birthdates, phones, photos, resumes) are deliberately NOT synced.
+   ===================================================================== */
+function _hrsDeviceId(){
+  let id='';try{id=localStorage.getItem('jaguar_device_id')||'';}catch(e){}
+  if(!id){id='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);try{localStorage.setItem('jaguar_device_id',id);}catch(e){}}
+  return id;
+}
+function _hrsLocalSync(){try{const x=JSON.parse(localStorage.getItem('jag_hours_sync_v1')||'null');if(x&&x.rev)return{rev:+x.rev,by:String(x.by||'')};}catch(e){}return{rev:0,by:''};}
+function _hrsSetLocalSync(m){try{localStorage.setItem('jag_hours_sync_v1',JSON.stringify({rev:m.rev,by:m.by}));}catch(e){}}
+function _hrsToArr(v){if(!v)return[];return Array.isArray(v)?v:Object.values(v);}
+function _hrsCanon(v){ // same normalisation the cloud applies (drops null / empty), keys sorted, internal "_" fields ignored
+  if(v===null||v===undefined)return undefined;
+  if(Array.isArray(v)){const o=v.map(_hrsCanon).filter(x=>x!==undefined);return o.length?o:undefined;}
+  if(typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>{if(k.charAt(0)==='_')return;const c=_hrsCanon(v[k]);if(c!==undefined)o[k]=c;});return Object.keys(o).length?o:undefined;}
+  return v;
+}
+function _hrsClean(v){ // the cloud rejects a whole save if any field name is empty or contains . $ # [ ] /
+  if(Array.isArray(v))return v.map(_hrsClean);
+  if(v&&typeof v==='object'){const o={};Object.keys(v).forEach(k=>{if(k==='')return;const nk=k.replace(/[.$#\[\]\/\u0000-\u001f\u007f]/g,'_');if(!(nk in o))o[nk]=_hrsClean(v[k]);});return o;}
+  return v;
+}
+function _hrsSnapshot(){
+  let am=[],fm=[];
+  try{am=[...activeDates].sort();}catch(e){}
+  try{fm=[...frozenMonths].sort();}catch(e){}
+  return{coaches:coaches,activeDates:am,monthOrders:loadMonthOrders(),frozenMonths:fm};
+}
+function _hrsHasLocal(){
+  try{return coaches.some(c=>(c&&c.name&&String(c.name).trim())||Object.values((c&&c.hours)||{}).some(v=>v>0));}catch(e){return false;}
+}
+function _hrsCloudNormalized(cloud){
+  return{coaches:_hrsToArr(cloud.coaches).map(sanitizeCoach),activeDates:_hrsToArr(cloud.activeDates).slice().sort(),
+         monthOrders:cloud.monthOrders||{},frozenMonths:_hrsToArr(cloud.frozenMonths).slice().sort()};
+}
+function _hrsSame(cloud){
+  try{return JSON.stringify(_hrsCanon(_hrsSnapshot()))===JSON.stringify(_hrsCanon(_hrsCloudNormalized(cloud)));}catch(e){return false;}
+}
+function _hrsIsDirty(){try{return localStorage.getItem('jag_hours_dirty')==='1';}catch(e){return false;}}
+function _hrsMarkDirty(){
+  window._hrsFailed=false; // a fresh edit is allowed to try again after an earlier failed save
+  _hrsSeq++;
+  try{localStorage.setItem('jag_hours_dirty','1');}catch(e){}
+  clearTimeout(_hrsTimer);_hrsTimer=setTimeout(_hrsPushNow,600);
+}
+function _hrsFail(e){
+  const msg=String((e&&e.message)||e).slice(0,90);
+  console.warn('[hours cloud save FAILED]',e);
+  window._hrsFailed=true; // no automatic retry loop: the cloud's rollback of a rejected save must not trigger another save
+  const first=window._hrsLastState!=='error';
+  if(window._hrsStatus)window._hrsStatus('error',msg);
+  if(first&&typeof toast==='function')toast('NOT saved to the cloud \u2014 your other devices will not get these hours. '+msg,'err');
+}
+function _hrsPushNow(){
+  if(!window._hoursFbDb||!window._hoursCloudReady||window._hrsFirstSync)return;
+  clearTimeout(_hrsTimer); // a save right now replaces any pending delayed one
+  if(!_hrsHasLocal()&&_hrsLocalSync().rev===0)return; // nothing to send from a blank device that has never synced
+  const seq=_hrsSeq;let payload;
+  try{
+    const meta={rev:Math.max(_hrsLocalSync().rev,window._hrsCloudRev||0)+1,by:_hrsDeviceId(),at:Date.now()};
+    const sn=_hrsSnapshot();
+    // JSON round-trip strips undefined values (the cloud rejects a save containing one); _hrsClean fixes illegal field names
+    payload=_hrsClean(JSON.parse(JSON.stringify({meta:meta,coaches:sn.coaches,activeDates:sn.activeDates,monthOrders:sn.monthOrders,frozenMonths:sn.frozenMonths})));
+  }catch(e){_hrsFail(e);return;}
+  _hrsSetLocalSync(payload.meta);window._hrsCloudRev=payload.meta.rev;
+  let p=null;
+  window._hrsPushing=(window._hrsPushing||0)+1; // our own save echoes back synchronously inside set(); ignore it while in flight
+  try{
+    if(window._hrsStatus)window._hrsStatus('saving');
+    p=window._hoursFbSet(window._hoursFbRef(window._hoursFbDb,'jaguar_db/coach_hours'),payload);
+  }catch(e){_hrsFail(e);}
+  if(p)p.then(()=>{
+    window._hrsPushing--;window._hrsFailed=false;
+    if(seq===_hrsSeq){try{localStorage.removeItem('jag_hours_dirty');}catch(e){}}
+    if(window._hrsStatus)window._hrsStatus('synced');
+  }).catch(e=>{window._hrsPushing--;_hrsFail(e);});
+  else window._hrsPushing--;
+}
+// Take the cloud copy as this device's hours. The previous local copy is kept in localStorage ('jag_hours_prev_local_v1').
+function _hrsAdopt(cloud){
+  try{localStorage.setItem('jag_hours_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),snapshot:_hrsSnapshot()}));}catch(e){}
+  const n=_hrsCloudNormalized(cloud);
+  coaches=n.coaches.filter(c=>c.name.trim()||Object.values(c.hours).some(v=>v>0));
+  coaches.forEach(c=>{if(!c.id)c.id='c'+Date.now()+Math.random().toString(36).slice(2,6);});
+  activeDates=new Set(n.activeDates);
+  frozenMonths=new Set(n.frozenMonths);
+  try{
+    localStorage.setItem('jag_coaches',JSON.stringify(coaches));
+    localStorage.setItem('jag_active_dates',JSON.stringify([...activeDates]));
+    localStorage.setItem('jag_month_orders',JSON.stringify(n.monthOrders));
+    localStorage.setItem('jag_frozen_months',JSON.stringify([...frozenMonths]));
+    localStorage.removeItem('jag_hours_dirty');
+  }catch(e){}
+  try{buildSchedule();}catch(e){}
+  try{refreshAllCoachViews();}catch(e){}
+}
+function _hrsModal(id,html){
+  const ov=document.createElement('div');ov.id=id;
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML='<div style="background:#14171c;color:#f2f2f2;border:1px solid rgba(201,168,76,.5);border-radius:10px;max-width:640px;width:100%;max-height:86vh;overflow:auto;padding:20px;font-family:Barlow,Arial,sans-serif;">'+html+'</div>';
+  document.body.appendChild(ov);return ov;
+}
+function _hrsEsc(t){return String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+// Both this device and the cloud hold hours the other lacks: ask which is correct instead of guessing.
+function _hrsAsk(cloud,cm,conflict){
+  window._hrsFirstSync=cm;window._hrsPendingCloud=cloud;
+  if(document.getElementById('hrs-firstsync-ov'))return;
+  const when=cm&&cm.at?new Date(cm.at).toLocaleString():'earlier';
+  const btn='width:100%;padding:12px 10px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;line-height:1.35;';
+  const ov=_hrsModal('hrs-firstsync-ov',
+    '<div style="font-size:24px;letter-spacing:1px;color:#C9A84C;margin-bottom:8px;text-align:center;">'+(conflict?'Hours changed on two devices':'First sync of the Hours Grid')+'</div>'
+    +'<div style="font-size:14px;line-height:1.6;margin-bottom:18px;text-align:center;">'
+    +(conflict?'This device and another device both have hours changes the other doesn\'t have.':'The cloud already holds an Hours Grid saved from another device.')
+    +' (cloud copy saved '+_hrsEsc(when)+')<br><br><b>Which copy is correct?</b></div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<button id="hrs-fs-cloud" style="'+btn+'background:#232830;color:#f2f2f2;border:1px solid #555;">Use the cloud copy<br><small style="font-weight:400;opacity:.8;">replaces this device\'s hours (a safety copy is kept)</small></button>'
+    +'<button id="hrs-fs-keep" style="'+btn+'background:#7a1f1f;color:#fff;border:none;">Keep THIS device\'s hours<br><small style="font-weight:400;opacity:.85;">sends them to the cloud and to your other devices</small></button>'
+    +'</div>');
+  const done=()=>{window._hrsFirstSync=null;ov.remove();};
+  document.getElementById('hrs-fs-cloud').onclick=()=>{
+    const cl=window._hrsPendingCloud||cloud,c2=(cl&&cl.meta)||cm;
+    _hrsAdopt(cl);_hrsSetLocalSync({rev:c2.rev,by:c2.by});done();
+    if(typeof toast==='function')toast('Now using the cloud copy of the hours','ok');
+  };
+  document.getElementById('hrs-fs-keep').onclick=()=>{
+    done();_hrsMarkDirty();_hrsPushNow();
+    if(typeof toast==='function')toast('This device\'s hours sent to the cloud','ok');
+  };
+}
+// Called for every cloud update of the hours node (first one = the initial read).
+window._hoursOnCloud=function(cloud){
+  window._hoursCloudReady=true;
+  const cm=cloud&&cloud.meta,lm=_hrsLocalSync(),hasLocal=_hrsHasLocal(),dirty=_hrsIsDirty()&&hasLocal;
+  if(cm&&cm.rev)window._hrsCloudRev=Math.max(window._hrsCloudRev||0,cm.rev);
+  if(window._hrsFirstSync){ // a question is open: never change anything, just keep it pointing at the newest cloud copy
+    if(cm&&cm.rev>=window._hrsFirstSync.rev){window._hrsPendingCloud=cloud;window._hrsFirstSync=cm;}
+    return;
+  }
+  if(!cloud||!cm||!cm.rev){ // nothing in the cloud yet: send this device's hours up
+    if((hasLocal||dirty||lm.rev>0)&&!window._hrsFailed)_hrsPushNow();
+    return;
+  }
+  const mine=cm.by===_hrsDeviceId();
+  if(mine&&window._hrsPushing>0)return;             // echo of a save that is still in flight
+  if(mine&&cm.rev===lm.rev&&!dirty)return;          // already in sync
+  const cloudNewer=lm.rev===0||cm.rev>lm.rev||(cm.rev===lm.rev&&cm.by!==lm.by);
+  if(cloudNewer){
+    if(_hrsSame(cloud)){_hrsSetLocalSync({rev:cm.rev,by:cm.by});try{localStorage.removeItem('jag_hours_dirty');}catch(e){}return;}
+    if(!hasLocal||(lm.rev>0&&!dirty)){_hrsAdopt(cloud);_hrsSetLocalSync({rev:cm.rev,by:cm.by});return;}
+    _hrsAsk(cloud,cm,lm.rev>0);return;
+  }
+  if((cm.rev<lm.rev||dirty)&&!window._hrsFailed)_hrsPushNow();
+};
+if(window._hoursEarly){const _e=window._hoursEarly;window._hoursEarly=null;setTimeout(()=>window._hoursOnCloud(_e.v),0);}
+
+/* ---- FIND ALL HOURS (read-only) ---- */
+function _hrsAllLogged(){
+  const rows=[];
+  coaches.forEach(c=>Object.entries(c.hours||{}).forEach(([colId,v])=>{
+    if(!(v>0))return;
+    const p=colId.split('_');
+    if(p.length!==5){rows.push({coach:c,colId:colId,hours:v,label:'unrecognized entry ('+colId+')',order:'9999',sk:null,hidden:true});return;}
+    const mk=p[0],day=p[1],mm=p[2],dd=p[3],si=p[4],yr=mk.split('-')[0];
+    const mm2=mm.padStart(2,'0'),dd2=dd.padStart(2,'0');
+    const sk=yr+'-'+mm2+'-'+dd2+'__'+day+'__'+si;
+    rows.push({coach:c,colId:colId,hours:v,label:day+' '+mm+'/'+dd,order:yr+'-'+mm2+'-'+dd2+'_'+si,sk:sk,hidden:!activeDates.has(sk)});
+  }));
+  return rows.sort((a,b)=>a.order<b.order?-1:a.order>b.order?1:0);
+}
+function showAllLoggedHours(){
+  const rows=_hrsAllLogged();
+  const total=rows.reduce((t,r)=>t+r.hours,0),hidden=rows.filter(r=>r.hidden);
+  const byDate=new Map();
+  rows.forEach(r=>{const k=r.order+'|'+r.label;if(!byDate.has(k))byDate.set(k,{label:r.label,hidden:r.hidden,items:[]});byDate.get(k).items.push((r.coach.name||'(unnamed)')+' '+r.hours+'h');});
+  let body='';
+  byDate.forEach(g=>{body+='<tr style="border-top:1px solid #2c313a;"><td style="padding:6px 8px;white-space:nowrap;font-weight:600;">'+_hrsEsc(g.label)+'</td><td style="padding:6px 8px;font-size:13px;">'+g.items.map(_hrsEsc).join(', ')+'</td><td style="padding:6px 8px;white-space:nowrap;font-size:12px;color:'+(g.hidden?'#F07050':'#5CCC88')+';">'+(g.hidden?'HIDDEN (date not active)':'shown on grid')+'</td></tr>';});
+  const ov=_hrsModal('hrs-find-ov',
+    '<div style="font-size:22px;letter-spacing:1px;color:#C9A84C;margin-bottom:4px;">All logged hours on this device</div>'
+    +'<div style="font-size:13px;opacity:.85;margin-bottom:12px;">'+rows.length+' entries \u00b7 '+total+' total hours \u00b7 '+hidden.length+' hidden from the grid. Read-only \u2014 nothing here is changed or deleted.</div>'
+    +(rows.length?'<table style="width:100%;border-collapse:collapse;">'+body+'</table>':'<div style="padding:16px;text-align:center;opacity:.8;">No hours are stored on this device.</div>')
+    +'<div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap;">'
+    +(hidden.some(r=>r.sk)?'<button id="hrs-find-show" class="btn btn-gold btn-sm">Show hidden dates on the grid</button>':'')
+    +'<button id="hrs-find-close" class="btn btn-outline btn-sm">Close</button></div>');
+  document.getElementById('hrs-find-close').onclick=()=>ov.remove();
+  const sb=document.getElementById('hrs-find-show');
+  if(sb)sb.onclick=()=>{
+    let n=0;rows.forEach(r=>{if(r.hidden&&r.sk&&!activeDates.has(r.sk)){activeDates.add(r.sk);n++;}});
+    if(n){saveActiveDates(activeDates);try{buildSchedule();}catch(e){}try{refreshAllCoachViews();}catch(e){}}
+    ov.remove();toast(n?('Made '+n+' hidden date slot'+(n!==1?'s':'')+' active \u2014 their hours now show on the grid'):'Nothing to change','ok');
+  };
+}
+
+/* ---- BACKUP / RESTORE (a file you can keep or move to another computer) ---- */
+function backupHoursFile(){
+  try{
+    const sn=_hrsSnapshot(),d=new Date();
+    const blob=new Blob([JSON.stringify({app:'jaguar-coach-hours',v:2,exported:d.toISOString(),coaches:sn.coaches,activeDates:sn.activeDates,monthOrders:sn.monthOrders,frozenMonths:sn.frozenMonths},null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='jaguar-coach-hours-backup-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+    toast('Hours backup downloaded','ok');
+  }catch(e){toast('Backup failed: '+e.message,'err');}
+}
+function restoreHoursFile(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';
+  inp.onchange=()=>{
+    const f=inp.files&&inp.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{try{_hrsRestore(JSON.parse(r.result));}catch(e){alert('That file could not be read as a Jaguar hours backup.');}};
+    r.readAsText(f);
+  };
+  inp.click();
+}
+function _hrsRestore(d){
+  if(!d||!Array.isArray(d.coaches))throw new Error('not an hours backup');
+  const hrs=d.coaches.reduce((t,c)=>t+Object.values((c&&c.hours)||{}).reduce((a,b)=>a+(+b||0),0),0);
+  if(!confirm('Replace this device\'s hours with the backup?\n\n'+d.coaches.length+' coaches, '+hrs+' hours (backup made '+(d.exported||'unknown')+').\n\nThis device\'s current hours are kept as a safety copy, and the restored hours are sent to your other devices.'))return;
+  try{localStorage.setItem('jag_hours_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),snapshot:_hrsSnapshot()}));}catch(e){}
+  coaches=d.coaches.map(sanitizeCoach).filter(c=>c.name.trim()||Object.values(c.hours).some(v=>v>0));
+  coaches.forEach(c=>{if(!c.id)c.id='c'+Date.now()+Math.random().toString(36).slice(2,6);});
+  if(Array.isArray(d.activeDates))activeDates=new Set(d.activeDates);
+  if(Array.isArray(d.frozenMonths))frozenMonths=new Set(d.frozenMonths);
+  try{
+    localStorage.setItem('jag_coaches',JSON.stringify(coaches));
+    if(Array.isArray(d.activeDates))localStorage.setItem('jag_active_dates',JSON.stringify([...activeDates]));
+    if(d.monthOrders&&typeof d.monthOrders==='object')localStorage.setItem('jag_month_orders',JSON.stringify(d.monthOrders));
+    if(Array.isArray(d.frozenMonths))localStorage.setItem('jag_frozen_months',JSON.stringify([...frozenMonths]));
+  }catch(e){}
+  _hrsMarkDirty();
+  try{buildSchedule();}catch(e){}
+  try{refreshAllCoachViews();}catch(e){}
+  toast('Hours restored from backup','ok');
+}
+
 
 function toggleFreeze(mk,e){
   e.stopPropagation();
@@ -2654,7 +2923,8 @@ function _coachFbPush(){
   try{
     window._coachFbSet(window._coachFbRef(window._coachFbDb,'jaguar_db/coach_plan'),
       {planData:cleanPlanData,planConfig,blockedDates:[...blockedDates]})
-      .catch(e=>{console.error('[coach FB push]',e);});
+      .then(()=>{if(window._hrsStatus)window._hrsStatus('synced');})
+      .catch(e=>{console.error('[coach FB push]',e);if(window._hrsStatus)window._hrsStatus('error',String((e&&e.message)||e).slice(0,90));});
   }finally{window._coachFbLocalWrite=false;}
 }
 
