@@ -48,6 +48,11 @@ input,select,button{font-family:'Barlow',sans-serif}
 .cp-filter-pill.active{background:rgba(201,168,76,.15);border-color:var(--gold-dark);color:var(--gold-light)}
 .cp-card{background:var(--gray-dark);border:1px solid var(--gray-border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .15s}
 .cp-card:hover{border-color:var(--gold-dark)}
+.cp-card{position:relative}
+.cp-drag-handle{display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--gray-light);cursor:grab;user-select:none;line-height:1;padding:4px 2px;margin-left:-6px}
+.cp-drag-handle:hover{color:var(--gold-light)}
+.cp-card.cp-dragging{opacity:.45}
+.cp-card.cp-drag-over{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
 .cp-card-top{display:flex;gap:12px;align-items:center;margin-bottom:12px}
 .cp-photo{width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--gray-mid);border:2px solid var(--gray-border);flex-shrink:0}
 .cp-photo-placeholder{width:56px;height:56px;border-radius:50%;background:var(--gray-mid);border:2px solid var(--gray-border);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);flex-shrink:0}
@@ -401,7 +406,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V20</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V22</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -457,6 +462,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
         <button class="btn btn-outline btn-sm" onclick="migrateExistingCoachesToProfiles()">Migrate Existing Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="addAllActiveToHoursGrid()">Add All Active to Hours Grid</button>
         <button class="btn btn-outline btn-sm" onclick="linkProfilesToGridReport()" title="Match each coach profile to the Hours Grid coach with the same name">Link to Hours Grid</button>
+        <button class="btn btn-outline btn-sm" onclick="cpResetOrder()" title="Put the coach cards back in alphabetical order">Sort A\u2013Z</button>
         <button class="btn btn-outline btn-sm" onclick="storageCheck()" title="See how full this browser's storage is and what is using it">Storage Check</button>
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
         <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
@@ -1181,6 +1187,77 @@ let cpYNState={};
 
 let cpStatusFilter='active';
 function setCpStatusFilter(s){ cpStatusFilter=s; renderCoachProfiles(); }
+// Sort key: last name, first name, full name, id -- fully deterministic, so two devices always agree even on ties.
+// Handles "Last, First" as well as "First Last" (and "First Middle Last").
+function _cpSortKey(c){
+  const raw=String((c&&c.name)||'').trim().toLowerCase().replace(/\s+/g,' ');
+  let last,first;
+  if(raw.indexOf(',')>=0){const p=raw.split(',');last=p[0].trim();first=p.slice(1).join(' ').trim();}
+  else{const t=raw.split(' ');last=t.length>1?t[t.length-1]:(t[0]||'');first=t.length>1?t.slice(0,-1).join(' '):'';}
+  return last+'\u0001'+first+'\u0001'+raw+'\u0001'+String((c&&c.id)||'');
+}
+// Display order: coaches you have dragged into place (they carry an "order" number that syncs with the coach), then
+// anyone without one alphabetically. Deterministic, so every device shows the same list.
+function _cpCmp(a,b){
+  const ao=typeof a.order==='number',bo=typeof b.order==='number';
+  if(ao&&bo&&a.order!==b.order)return a.order<b.order?-1:1;
+  if(ao!==bo)return ao?-1:1;
+  const x=_cpSortKey(a),y=_cpSortKey(b);return x<y?-1:x>y?1:0;
+}
+function _cpVisibleProfiles(){return coachProfiles.filter(c=>(c.status||'active')===cpStatusFilter).sort(_cpCmp);}
+function _cpEnsureOrders(){ // give everyone an order number, continuing from how the list is displayed right now
+  let next=coachProfiles.reduce((m,c)=>typeof c.order==='number'&&c.order>m?c.order:m,0);
+  coachProfiles.slice().sort(_cpCmp).forEach(c=>{if(typeof c.order!=='number'){next+=1000;c.order=next;}});
+}
+function _cpRenumber(){coachProfiles.slice().sort(_cpCmp).forEach((c,i)=>{c.order=(i+1)*1000;});}
+// Move one coach to the spot of another (dragged down -> lands after it, dragged up -> lands before it).
+function cpMoveProfile(dragId,targetId,_retry){
+  if(typeof canEdit==='function'&&!canEdit())return;
+  _cpEnsureOrders();
+  const vis=_cpVisibleProfiles(),from=vis.findIndex(c=>c.id===dragId),to=vis.findIndex(c=>c.id===targetId);
+  if(from<0||to<0||from===to)return;
+  const rest=vis.filter(c=>c.id!==dragId);
+  let at=rest.findIndex(c=>c.id===targetId);if(from<to)at++;
+  const prev=rest[at-1],next=rest[at],moved=coachProfiles.find(c=>c.id===dragId);
+  let val;
+  if(prev&&next){
+    if(next.order-prev.order<1e-6&&!_retry){_cpRenumber();return cpMoveProfile(dragId,targetId,true);} // gaps used up: spread everyone out again
+    val=(prev.order+next.order)/2;
+  }else if(prev)val=prev.order+1000;else if(next)val=next.order-1000;else val=1000;
+  moved.order=val;
+  try{logAudit('Reordered coach list','edit');}catch(e){}
+  saveCoachProfilesData();renderCoachProfiles();
+}
+function cpResetOrder(){
+  if(!coachProfiles.some(c=>typeof c.order==='number')){toast('The coach list is already in alphabetical order');return;}
+  if(!confirm('Put the coach list back in alphabetical order (by last name) on every device?'))return;
+  coachProfiles.forEach(c=>{delete c.order;});
+  try{logAudit('Reset coach list to alphabetical','edit');}catch(e){}
+  saveCoachProfilesData();renderCoachProfiles();toast('Coach list is alphabetical again','ok');
+}
+let _cpDragId=null;
+function _cpInitDnD(){
+  const g=document.getElementById('coachProfilesGrid');if(!g||g._cpDnD)return;g._cpDnD=true;
+  const clear=()=>g.querySelectorAll('.cp-dragging,.cp-drag-over').forEach(el=>el.classList.remove('cp-dragging','cp-drag-over'));
+  g.addEventListener('dragstart',e=>{
+    const h=e.target&&e.target.closest?e.target.closest('.cp-drag-handle'):null;if(!h)return;
+    _cpDragId=h.getAttribute('data-id');
+    try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',_cpDragId);}catch(x){}
+    const card=h.closest('.cp-card');setTimeout(()=>{if(card&&_cpDragId)card.classList.add('cp-dragging');},0);
+  });
+  g.addEventListener('dragend',()=>{_cpDragId=null;clear();});
+  g.addEventListener('dragover',e=>{
+    if(!_cpDragId)return;e.preventDefault();
+    const card=e.target.closest?e.target.closest('.cp-card'):null;
+    g.querySelectorAll('.cp-drag-over').forEach(el=>{if(el!==card)el.classList.remove('cp-drag-over');});
+    if(card&&card.getAttribute('data-id')!==_cpDragId)card.classList.add('cp-drag-over');
+  });
+  g.addEventListener('drop',e=>{
+    if(!_cpDragId)return;e.preventDefault();
+    const card=e.target.closest?e.target.closest('.cp-card'):null,id=_cpDragId;_cpDragId=null;clear();
+    if(card&&card.getAttribute('data-id')!==id)cpMoveProfile(id,card.getAttribute('data-id'));
+  });
+}
 function renderCoachProfiles(){
   const grid=document.getElementById('coachProfilesGrid');
   const filterBar=document.getElementById('cpStatusFilterBar');
@@ -1195,13 +1272,15 @@ function renderCoachProfiles(){
       {k:'archived',label:'Archived'}
     ].map(f=>`<div class="cp-filter-pill ${cpStatusFilter===f.k?'active':''}" onclick="setCpStatusFilter('${f.k}')">${f.label} (${counts[f.k]||0})</div>`).join('');
   }
-  const filtered=coachProfiles.filter(c=>(c.status||'active')===cpStatusFilter);
+  // Same order on every device: by last name, then first name (only the display is sorted; the stored list is untouched).
+  const filtered=_cpVisibleProfiles();
   if(!filtered.length){
     const emptyMsgs={active:'No active coaches. Click "+ Add Coach" to onboard someone, or check Pending Approval.',pending:'No coaches pending approval.',rejected:'No rejected applicants.',archived:'No archived coaches.'};
     grid.innerHTML=`<div style="grid-column:1/-1;text-align:center;color:var(--white-dim);padding:40px;">${emptyMsgs[cpStatusFilter]||'Nothing here.'}</div>`;
     return;
   }
   const season=currentSeasonLabel();
+  _cpInitDnD();
   grid.innerHTML=filtered.map(c=>{
     const stale=c.complianceSeason&&c.complianceSeason!==season;
     const noCompliance=!c.complianceSeason;
@@ -1210,8 +1289,9 @@ function renderCoachProfiles(){
     const today=todayISO();
     const screeningExpired=c.screeningExpDate&&c.screeningExpDate<today;
     const safeSportExpired=c.safeSportExpDate&&c.safeSportExpDate<today;
-    return`<div class="cp-card" style="${pendingBorder}" onclick="openCoachProfileModal('${c.id}')">
+    return`<div class="cp-card" data-id="${c.id}" style="${pendingBorder}" onclick="openCoachProfileModal('${c.id}')">
       <div class="cp-card-top">
+        ${(typeof canEdit==='function'&&canEdit())?`<div class="cp-drag-handle" draggable="true" data-id="${c.id}" title="Drag to reorder" onclick="event.stopPropagation()">\u283F</div>`:''}
         ${c.photo?`<img src="${c.photo}" class="cp-photo" alt=""/>`:`<div class="cp-photo-placeholder">${(c.name||'?').charAt(0)}</div>`}
         <div>
           <div class="cp-name">${c.name||'(unnamed)'}</div>
@@ -2669,13 +2749,14 @@ if(window._cpEarly){const _c=window._cpEarly;window._cpEarly=null;setTimeout(()=
 /* ---- the merge ---- */
 function _cpEmpty(v){return v===undefined||v===null||v===''||(typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===0);}
 function _cpNorm(v){return typeof v==='string'?v.trim().toLowerCase().replace(/\s+/g,' '):JSON.stringify(v);}
-function _cpScore(c){let n=0;Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k)||k==='id')return;if(!_cpEmpty(c[k])&&c[k]!==false)n++;});return n+(c.status==='active'?2:0);}
+function _cpScore(c){let n=0;Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k)||k==='id'||k==='order')return;if(!_cpEmpty(c[k])&&c[k]!==false)n++;});return n+(c.status==='active'?2:0);}
 const CP_DATEF=new Set(['screeningExpDate','safeSportExpDate','complianceSeason']),CP_BOOLF=new Set(['screeningUpdated','safeSport']),CP_MAPF=new Set(['levels','currentLevels']);
 function _cpMergeRecords(L,C){
   const out={},conflicts=[],lWins=_cpScore(L)>_cpScore(C); // ties go to the cloud copy
   new Set(Object.keys(L).concat(Object.keys(C))).forEach(k=>{
     if(k.charAt(0)==='_'||k==='id'||CP_BLOBS.includes(k))return;
     const a=L[k],b=C[k];
+    if(k==='order'){out[k]=typeof b==='number'?b:a;return;} // display position only: never a "disagreement"
     if(CP_MAPF.has(k)){const o={};new Set(Object.keys(a||{}).concat(Object.keys(b||{}))).forEach(x=>{o[x]=(a&&a[x])||(b&&b[x])||(a&&a[x]!==undefined?a[x]:b&&b[x]);});out[k]=o;return;}
     if(CP_BOOLF.has(k)){out[k]=!!(a||b);return;}
     if(CP_DATEF.has(k)){out[k]=_cpEmpty(a)?b:_cpEmpty(b)?a:(String(a)>=String(b)?a:b);return;} // the later date / season
