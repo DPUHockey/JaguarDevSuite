@@ -381,7 +381,7 @@ window._hrsStatus=function(state,msg){
       document.body.appendChild(el);}
     const t=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
     const C={connected:['#5CCC88','\u2601 Connected'],saving:['#C9A84C','\u2601 Saving\u2026'],synced:['#5CCC88','\u2601 Synced '+t],
-             offline:['#F0A050','\u2601 Offline \u2014 will sync when back online'],error:['#F07050','\u2601 NOT SAVED TO CLOUD'+(msg?': '+msg:'')]};
+             offline:['#F0A050','\u2601 Offline \u2014 will sync when back online'],storage:['#F07050','\u26A0 This browser\'s storage is full \u2014 Coaches \u2192 Storage Check'],error:['#F07050','\u2601 NOT SAVED TO CLOUD'+(msg?': '+msg:'')]};
     const c=C[state]||C.connected;el.style.color=c[0];el.textContent=c[1];el.title=msg||'';window._hrsLastState=state;
   }catch(e){}
 };
@@ -401,7 +401,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V19</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V20</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -457,6 +457,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
         <button class="btn btn-outline btn-sm" onclick="migrateExistingCoachesToProfiles()">Migrate Existing Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="addAllActiveToHoursGrid()">Add All Active to Hours Grid</button>
         <button class="btn btn-outline btn-sm" onclick="linkProfilesToGridReport()" title="Match each coach profile to the Hours Grid coach with the same name">Link to Hours Grid</button>
+        <button class="btn btn-outline btn-sm" onclick="storageCheck()" title="See how full this browser's storage is and what is using it">Storage Check</button>
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
         <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
       </div>
@@ -1024,7 +1025,7 @@ function loadCoaches(){
   }catch(e){}
   coaches=[];
 }
-function saveCoaches(){localStorage.setItem('jag_coaches',JSON.stringify(coaches));_hrsMarkDirty();}
+function saveCoaches(){_lsSet('jag_coaches',JSON.stringify(coaches));_hrsMarkDirty();}
 // Coaches are only ever identified by a randomly-generated id, never by name -- so
 // there's nothing stopping the same person from being added twice if their name gets
 // typed into one of the always-present blank "add coach" rows more than once (e.g. in
@@ -1170,7 +1171,7 @@ function loadCoachProfiles(){
   }catch(e){}
   return[];
 }
-function saveCoachProfilesData(){localStorage.setItem('jag_coach_profiles',JSON.stringify(coachProfiles));_cpMarkDirty();}
+function saveCoachProfilesData(){_lsSet('jag_coach_profiles',JSON.stringify(coachProfiles));_cpMarkDirty();}
 let coachProfiles=loadCoachProfiles();
 let editingCoachProfileId=null;
 let cpPendingPhoto=null;
@@ -1598,7 +1599,7 @@ function cleanOrphanedCoachHours(){
 function loadMonthOrders(){
   try{const s=localStorage.getItem('jag_month_orders');return s?JSON.parse(s):{};}catch(e){return{};}
 }
-function saveMonthOrders(mo){localStorage.setItem('jag_month_orders',JSON.stringify(mo));_hrsMarkDirty();}
+function saveMonthOrders(mo){_lsSet('jag_month_orders',JSON.stringify(mo));_hrsMarkDirty();}
 // Apply a saved order (array of names) to visible coaches for a month.
 // Uses a Map so each coach object appears exactly once.
 function applyMonthOrder(visibleCoaches,mk){
@@ -2316,7 +2317,7 @@ function slotKey(dk,dayDef,si){return`${dk}__${dayDef.day}__${si}`;}
 function loadActiveDates(){
   try{const s=localStorage.getItem('jag_active_dates');return s?new Set(JSON.parse(s)):null;}catch(e){return null;}
 }
-function saveActiveDates(set){localStorage.setItem('jag_active_dates',JSON.stringify([...set]));_hrsMarkDirty();}
+function saveActiveDates(set){_lsSet('jag_active_dates',JSON.stringify([...set]));_hrsMarkDirty();}
 
 function getActiveDates(){
   const stored=loadActiveDates();
@@ -2358,7 +2359,7 @@ function buildSchedule(){
 function loadFrozenMonths(){
   try{const s=localStorage.getItem('jag_frozen_months');return s?new Set(JSON.parse(s)):new Set();}catch(e){return new Set();}
 }
-function saveFrozenMonths(){localStorage.setItem('jag_frozen_months',JSON.stringify([...frozenMonths]));_hrsMarkDirty();}
+function saveFrozenMonths(){_lsSet('jag_frozen_months',JSON.stringify([...frozenMonths]));_hrsMarkDirty();}
 let frozenMonths=loadFrozenMonths();
 
 /* =====================================================================
@@ -2367,13 +2368,57 @@ let frozenMonths=loadFrozenMonths();
    browser only. They are now kept in the cloud (jaguar_db/coach_hours) with a version stamp on every save, so every device
    shows the same hours. Coach PROFILES (birthdates, phones, photos, resumes) are deliberately NOT synced.
    ===================================================================== */
+
+/* ---- BROWSER STORAGE GUARD ----
+   All apps on this site share one ~5 MB browser storage allowance, and coach profiles with resume files use a lot of it.
+   A write that fails must never be silent (that made the coach merge look "unfinished" and ask again, forever). */
+const LS_SAFETY_KEYS=['jaguar_prev_local_v1','jag_hours_prev_local_v1','jag_profiles_prev_local_v1']; // optional safety copies only
+function _lsFull(key){
+  window._lsFailedKeys=window._lsFailedKeys||[];
+  if(!window._lsFailedKeys.includes(key))window._lsFailedKeys.push(key);
+  if(window._hrsStatus)window._hrsStatus('storage',key);
+  if(typeof toast==='function')toast('Browser storage is full \u2014 a change could not be saved on this device. Open Coaches \u2192 Storage Check.','err');
+}
+function _lsSet(key,val){
+  try{localStorage.setItem(key,val);return true;}catch(e){}
+  try{ // full: drop the optional safety copies this app made, then try once more
+    LS_SAFETY_KEYS.forEach(k=>{if(k!==key)localStorage.removeItem(k);});
+    localStorage.setItem(key,val);return true;
+  }catch(e2){_lsFull(key);return false;}
+}
+function _lsUsage(){
+  const rows=[];let total=0;
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i),n=k.length+(localStorage.getItem(k)||'').length;total+=n;rows.push({key:k,size:n});}}catch(e){}
+  rows.sort((a,b)=>b.size-a.size);return{total:total,rows:rows};
+}
+function storageCheck(){
+  const u=_lsUsage(),LIMIT=5000000,pct=Math.round(u.total/LIMIT*100);
+  const NAMES={jag_coach_profiles:'Coach profiles (includes resume files and photos)',jag_coaches:'Hours Grid',jaguar_prev_local_v1:'Optional safety copy of Dev Check In data',jag_hours_prev_local_v1:'Optional safety copy of Hours Grid',
+    jag_profiles_prev_local_v1:'Optional safety copy of coach list',jaguar_master_v1:'Dev Check In master list',jaguar_season_v1:'Dev Check In session data',adm_roster_v1:'ADM roster',ih_roster_v2:'InHouse roster',jag_audit:'Coach app activity log'};
+  const kb=n=>(n/1000).toFixed(n>=100000?0:1)+' KB';
+  const safety=LS_SAFETY_KEYS.reduce((t,k)=>t+((u.rows.find(r=>r.key===k)||{size:0}).size),0);
+  const body=u.rows.slice(0,12).map(r=>'<tr style="border-top:1px solid #2c313a;"><td style="padding:5px 8px;font-size:13px;">'+_hrsEsc(NAMES[r.key]||r.key)+(NAMES[r.key]?' <span style="opacity:.55;font-size:11px;">('+_hrsEsc(r.key)+')</span>':'')+'</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;">'+kb(r.size)+'</td></tr>').join('');
+  const ov=_hrsModal('ls-check-ov',
+    '<div style="font-size:22px;color:#C9A84C;margin-bottom:4px;">Storage Check</div>'
+    +'<div style="font-size:13px;line-height:1.6;margin-bottom:10px;">This browser is using about <b>'+kb(u.total)+'</b> of roughly 5,000 KB shared by every Jaguar app ('+pct+'%).'
+    +(pct>=85?' <span style="color:#F07050;">Nearly full \u2014 saves can fail.</span>':'')
+    +(window._lsFailedKeys&&window._lsFailedKeys.length?'<br><span style="color:#F07050;">Could not be saved on this device: '+_hrsEsc(window._lsFailedKeys.join(', '))+'</span>':'')+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;">'+body+'</table>'
+    +'<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;flex-wrap:wrap;">'
+    +(safety>0?'<button id="ls-free" class="btn btn-gold btn-sm">Delete optional safety copies ('+kb(safety)+')</button>':'')
+    +'<button id="ls-close" class="btn btn-outline btn-sm">Close</button></div>'
+    +'<div style="font-size:12px;opacity:.75;margin-top:10px;">Safety copies are extra backups made automatically before a merge or sync; deleting them frees space and does not touch your coaches, hours or players. Resume files and photos inside coach profiles are usually the biggest item.</div>');
+  document.getElementById('ls-close').onclick=()=>ov.remove();
+  const fb=document.getElementById('ls-free');
+  if(fb)fb.onclick=()=>{LS_SAFETY_KEYS.forEach(k=>localStorage.removeItem(k));ov.remove();toast('Safety copies deleted \u2014 '+kb(safety)+' freed','ok');};
+}
 function _hrsDeviceId(){
   let id='';try{id=localStorage.getItem('jaguar_device_id')||'';}catch(e){}
   if(!id){id='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);try{localStorage.setItem('jaguar_device_id',id);}catch(e){}}
   return id;
 }
-function _hrsLocalSync(){try{const x=JSON.parse(localStorage.getItem('jag_hours_sync_v1')||'null');if(x&&x.rev)return{rev:+x.rev,by:String(x.by||'')};}catch(e){}return{rev:0,by:''};}
-function _hrsSetLocalSync(m){try{localStorage.setItem('jag_hours_sync_v1',JSON.stringify({rev:m.rev,by:m.by}));}catch(e){}}
+function _hrsLocalSync(){if(window._hrsSyncMem)return window._hrsSyncMem;try{const x=JSON.parse(localStorage.getItem('jag_hours_sync_v1')||'null');if(x&&x.rev)return{rev:+x.rev,by:String(x.by||'')};}catch(e){}return{rev:0,by:''};}
+function _hrsSetLocalSync(m){window._hrsSyncMem={rev:m.rev,by:m.by};_lsSet('jag_hours_sync_v1',JSON.stringify({rev:m.rev,by:m.by}));}
 function _hrsToArr(v){if(!v)return[];return Array.isArray(v)?v:Object.values(v);}
 function _hrsCanon(v){ // same normalisation the cloud applies (drops null / empty), keys sorted, internal "_" fields ignored
   if(v===null||v===undefined)return undefined;
@@ -2444,19 +2489,17 @@ function _hrsPushNow(){
 }
 // Take the cloud copy as this device's hours. The previous local copy is kept in localStorage ('jag_hours_prev_local_v1').
 function _hrsAdopt(cloud){
-  try{localStorage.setItem('jag_hours_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),snapshot:_hrsSnapshot()}));}catch(e){}
+  try{_lsSet('jag_hours_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),snapshot:_hrsSnapshot()}));}catch(e){}
   const n=_hrsCloudNormalized(cloud);
   coaches=n.coaches.filter(c=>c.name.trim()||Object.values(c.hours).some(v=>v>0));
   coaches.forEach(c=>{if(!c.id)c.id='c'+Date.now()+Math.random().toString(36).slice(2,6);});
   activeDates=new Set(n.activeDates);
   frozenMonths=new Set(n.frozenMonths);
-  try{
-    localStorage.setItem('jag_coaches',JSON.stringify(coaches));
-    localStorage.setItem('jag_active_dates',JSON.stringify([...activeDates]));
-    localStorage.setItem('jag_month_orders',JSON.stringify(n.monthOrders));
-    localStorage.setItem('jag_frozen_months',JSON.stringify([...frozenMonths]));
-    localStorage.removeItem('jag_hours_dirty');
-  }catch(e){}
+  _lsSet('jag_coaches',JSON.stringify(coaches));
+  _lsSet('jag_active_dates',JSON.stringify([...activeDates]));
+  _lsSet('jag_month_orders',JSON.stringify(n.monthOrders));
+  _lsSet('jag_frozen_months',JSON.stringify([...frozenMonths]));
+  try{localStorage.removeItem('jag_hours_dirty');}catch(e){}
   try{buildSchedule();}catch(e){}
   try{refreshAllCoachViews();}catch(e){}
 }
@@ -2528,8 +2571,12 @@ if(window._hoursEarly){const _e=window._hoursEarly;window._hoursEarly=null;setTi
    by name (birthdate must not disagree) instead of choosing one.
    ===================================================================== */
 const CP_BLOBS=['photo','resumeFileName','resumeFileData'];
-function _cpMeta(){try{return JSON.parse(localStorage.getItem('jag_profiles_meta_v1')||'{}')||{};}catch(e){return{};}}
-function _cpSaveMeta(m){try{localStorage.setItem('jag_profiles_meta_v1',JSON.stringify(m));}catch(e){}}
+// The sync marker is also kept in memory, so even if the browser refuses to store it, this page never forgets a merge happened.
+function _cpMeta(){
+  if(window._cpMetaMem)return JSON.parse(JSON.stringify(window._cpMetaMem));
+  try{return JSON.parse(localStorage.getItem('jag_profiles_meta_v1')||'{}')||{};}catch(e){return{};}
+}
+function _cpSaveMeta(m){window._cpMetaMem=JSON.parse(JSON.stringify(m));_lsSet('jag_profiles_meta_v1',JSON.stringify(m));}
 function _cpStrip(c){const o={};Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k))return;o[k]=c[k];});return o;}
 function _cpHash(c){return JSON.stringify(_hrsCanon(_cpStrip(c)));}
 function _cpKey(n){return String(n||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');} // "Smith, John" == "John Smith"
@@ -2579,7 +2626,7 @@ function _cpPushChanges(){
   }).catch(e=>{window._cpPushing--;_cpFail(e);});
 }
 function _cpRefreshUI(){
-  try{localStorage.setItem('jag_coach_profiles',JSON.stringify(coachProfiles));}catch(e){}
+  _lsSet('jag_coach_profiles',JSON.stringify(coachProfiles));
   try{if(document.getElementById('coachProfilesGrid'))renderCoachProfiles();}catch(e){}
   try{refreshAllCoachViews();}catch(e){}
 }
@@ -2608,7 +2655,7 @@ window._cpOnCloud=function(all){
   window._cpCloudR={};Object.keys(all).forEach(id=>{window._cpCloudR[id]=(all[id]&&+all[id]._r)||0;});
   if(window._cpMergeOpen||window._cpHold)return;
   const ids=Object.keys(all),metaEmpty=!Object.keys(_cpMeta()).length;
-  if(metaEmpty&&coachProfiles.length){
+  if(metaEmpty&&coachProfiles.length&&!window._cpMergedDone){
     const live=ids.filter(id=>all[id]&&!all[id]._deleted);
     if(!live.length){_cpPushChanges();return;}   // nothing (usable) in the cloud yet: upload this device's coaches
     _cpOfferMerge(all);return;                   // both sides have coaches and this device never synced: merge them
@@ -2682,8 +2729,8 @@ function _cpOfferMerge(all){
 }
 function _cpApplyMerge(plan){
   const all=plan.all,stripped=coachProfiles.map(_cpStrip);
-  try{ // keep a safety copy: in the browser and as a downloaded file
-    localStorage.setItem('jag_profiles_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),profiles:stripped}));
+  try{ // keep a safety copy: in the browser (if there is room) and as a downloaded file
+    try{localStorage.setItem('jag_profiles_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),profiles:stripped}));}catch(e){}
     const d=new Date(),blob=new Blob([JSON.stringify({app:'jaguar-coach-profiles-backup',v:1,exported:d.toISOString(),profiles:stripped},null,2)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);
     a.download='jaguar-coach-profiles-before-merge-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
@@ -2700,7 +2747,7 @@ function _cpApplyMerge(plan){
   plan.onlyLocal.forEach(L=>merged.push(L)); // no meta -> sent as a new record
   plan.onlyCloud.forEach(o=>{merged.push(o.rec);meta[o.rec.id]={r:+o.cr._r||0,u:+o.cr._u||0,h:_cpHash(o.rec),d:false};});
   Object.keys(all).forEach(id=>{if(all[id]&&all[id]._deleted&&!meta[id])meta[id]={r:+all[id]._r||0,u:+all[id]._u||0,h:'',d:true};});
-  coachProfiles=merged;_cpSaveMeta(meta);
+  coachProfiles=merged;window._cpMergedDone=true;_cpSaveMeta(meta);
   window._cpMergeOpen=false;
   const link=relinkProfilesToGrid();
   _cpRefreshUI();_cpPushChanges();
@@ -2710,8 +2757,10 @@ function _cpShowMergeReport(plan,report,link){
   const fld=v=>_hrsEsc(typeof v==='object'?JSON.stringify(v):String(v)).slice(0,60);
   const rows=report.slice(0,40).map(r=>'<div style="margin:6px 0;"><b>'+_hrsEsc(r.name)+'</b><div style="font-size:12px;opacity:.9;">'+r.conflicts.map(c=>_hrsEsc(c.field)+': kept "'+fld(c.kept)+'" (other record had "'+fld(c.other)+'")').join('<br>')+'</div></div>').join('');
   const nconf=report.reduce((t,r)=>t+r.conflicts.length,0);
+  const full=window._lsFailedKeys&&window._lsFailedKeys.length;
   _hrsModal('cp-report-ov',
     '<div style="font-size:22px;color:#C9A84C;margin-bottom:8px;">Coaches merged and syncing</div>'
+    +(full?'<div style="margin-bottom:10px;padding:10px 12px;border:1px solid #F07050;border-radius:8px;color:#F07050;font-size:13px;line-height:1.5;"><b>This browser\'s storage is full</b>, so it could not keep the merged list on this device (the cloud has it). Open <b>Coaches \u2192 Storage Check</b>, free some space, then reload this page.</div>':'')
     +'<div style="font-size:14px;line-height:1.6;">'+plan.pairs.length+' matched \u2192 combined \u00b7 '+plan.onlyLocal.length+' added from this device \u00b7 '+plan.onlyCloud.length+' added from the cloud.<br>'
     +'<b>Hours Grid:</b> '+link.linked+' newly linked by name, '+link.already+' already linked'+(link.noGrid.length?'; <span style="color:#F0A050;">'+link.noGrid.length+' active coach'+(link.noGrid.length!==1?'es have':' has')+' no Hours Grid entry ('+_hrsEsc(link.noGrid.slice(0,8).join(', '))+(link.noGrid.length>8?'\u2026':'')+')</span>':'')+'.</div>'
     +'<div style="margin-top:12px;font-size:13px;"><b>'+nconf+' field'+(nconf!==1?'s':'')+' where the two records disagreed</b> (fix any in the coach\'s card):</div>'
