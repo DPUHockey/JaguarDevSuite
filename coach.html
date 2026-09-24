@@ -353,7 +353,7 @@ tr.row-drag-over td{box-shadow:inset 0 2px 0 var(--gold)}
 </style>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, set, onValue, goOffline, goOnline } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, set, update, onValue, goOffline, goOnline } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 const cfg={apiKey:"AIzaSyBs66mz9EZia_MS9QYVwSUr13cNJr4PrNY",authDomain:"jaguardevsuite.firebaseapp.com",databaseURL:"https://jaguardevsuite-default-rtdb.firebaseio.com",projectId:"jaguardevsuite",storageBucket:"jaguardevsuite.firebasestorage.app",messagingSenderId:"383805859949",appId:"1:383805859949:web:e33d21ee74036e75b43764"};
 const fbApp=initializeApp(cfg);
 const fbDb=getDatabase(fbApp);
@@ -389,6 +389,11 @@ onValue(ref(fbDb,'.info/connected'),s=>{
   if(s.val()===true){if(window._hrsLastState!=='error'&&window._hrsLastState!=='saving')window._hrsStatus('connected');}
   else window._hrsStatus('offline');
 });
+window._cpFbUpdate=update;
+onValue(ref(fbDb,'jaguar_db/coach_profiles'),snap=>{
+  const v=snap.val();
+  if(window._cpOnCloud)window._cpOnCloud(v);else window._cpEarly={v:v};
+},err=>{window._hrsStatus('error',String((err&&err.message)||err).slice(0,90));});
 onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
   const v=snap.val();
   if(window._hoursOnCloud)window._hoursOnCloud(v);else window._hoursEarly={v:v};
@@ -396,7 +401,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
 </script>
 </head>
 <body>
-<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V18</div>
+<div id="app-ver-badge" style="position:fixed;bottom:6px;right:8px;z-index:99999;font-family:'Barlow Condensed',sans-serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.55);pointer-events:none;" onclick="if(confirm('Force refresh to latest version?')){caches&&caches.keys().then(function(ks){Promise.all(ks.map(function(k){return caches.delete(k);})).then(function(){location.reload(true);});}).catch(function(){location.reload(true);});}" title="Tap to force refresh">V19</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -451,6 +456,7 @@ onValue(ref(fbDb,'jaguar_db/coach_hours'),snap=>{
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-outline btn-sm" onclick="migrateExistingCoachesToProfiles()">Migrate Existing Coaches</button>
         <button class="btn btn-outline btn-sm" onclick="addAllActiveToHoursGrid()">Add All Active to Hours Grid</button>
+        <button class="btn btn-outline btn-sm" onclick="linkProfilesToGridReport()" title="Match each coach profile to the Hours Grid coach with the same name">Link to Hours Grid</button>
         <button class="btn btn-outline btn-sm" onclick="window.print()">Print Blank Application</button>
         <button class="btn btn-gold btn-sm" onclick="openCoachProfileModal()">+ Add Coach</button>
       </div>
@@ -914,7 +920,7 @@ function jagHome(){
 }
 
 // hours-sync state: declared this early because saveActiveDates() can run during startup, before the sync code below is defined
-var _hrsTimer=null,_hrsSeq=0;
+var _hrsTimer=null,_hrsSeq=0,_cpTimer=null;
 let coaches=[];
 let currentMonthKey=SEASON_MONTHS[0].key;
 let currentAcctMonthKey=SEASON_MONTHS[0].key;
@@ -1164,7 +1170,7 @@ function loadCoachProfiles(){
   }catch(e){}
   return[];
 }
-function saveCoachProfilesData(){localStorage.setItem('jag_coach_profiles',JSON.stringify(coachProfiles));}
+function saveCoachProfilesData(){localStorage.setItem('jag_coach_profiles',JSON.stringify(coachProfiles));_cpMarkDirty();}
 let coachProfiles=loadCoachProfiles();
 let editingCoachProfileId=null;
 let cpPendingPhoto=null;
@@ -2512,6 +2518,235 @@ window._hoursOnCloud=function(cloud){
   if((cm.rev<lm.rev||dirty)&&!window._hrsFailed)_hrsPushNow();
 };
 if(window._hoursEarly){const _e=window._hoursEarly;window._hoursEarly=null;setTimeout(()=>window._hoursOnCloud(_e.v),0);}
+
+
+/* =====================================================================
+   COACH PROFILES CLOUD SYNC  (jaguar_db/coach_profiles/<id> -- one record per coach)
+   Each coach is its own record, so edits to different coaches on different devices never overwrite each other and every
+   save sends only what changed. Photos and resume files stay on each device (they can be 5 MB each); everything else syncs.
+   The first time a device that already has its own coaches meets coaches in the cloud, it asks, then MERGES the two lists
+   by name (birthdate must not disagree) instead of choosing one.
+   ===================================================================== */
+const CP_BLOBS=['photo','resumeFileName','resumeFileData'];
+function _cpMeta(){try{return JSON.parse(localStorage.getItem('jag_profiles_meta_v1')||'{}')||{};}catch(e){return{};}}
+function _cpSaveMeta(m){try{localStorage.setItem('jag_profiles_meta_v1',JSON.stringify(m));}catch(e){}}
+function _cpStrip(c){const o={};Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k))return;o[k]=c[k];});return o;}
+function _cpHash(c){return JSON.stringify(_hrsCanon(_cpStrip(c)));}
+function _cpKey(n){return String(n||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');} // "Smith, John" == "John Smith"
+function _cpToCloud(c,m){const o=_hrsClean(JSON.parse(JSON.stringify(_cpStrip(c))));o._r=m.r;o._u=m.u;o._by=_hrsDeviceId();return o;}
+function _cpFromCloud(id,r){const o={};Object.keys(r).forEach(k=>{if(k.charAt(0)!=='_')o[k]=r[k];});return Object.assign(mkCoachProfile(),o,{id:id});}
+function _cpMarkDirty(){window._cpFailed=false;clearTimeout(_cpTimer);_cpTimer=setTimeout(_cpPushChanges,400);}
+function _cpFail(e){
+  window._cpFailed=true;
+  const msg=String((e&&e.message)||e).slice(0,90);console.warn('[coach profiles cloud save FAILED]',e);
+  const first=window._hrsLastState!=='error';
+  if(window._hrsStatus)window._hrsStatus('error',msg);
+  if(first&&typeof toast==='function')toast('NOT saved to the cloud \u2014 your other devices will not get this coach change. '+msg,'err');
+}
+function _cpPushChanges(){
+  if(!window._hoursFbDb||!window._cpFbUpdate||!window._cpCloudReady||window._cpHold||window._cpMergeOpen)return;
+  clearTimeout(_cpTimer);
+  const meta=_cpMeta(),now=Date.now(),dev=_hrsDeviceId(),out={},sent={},seen=new Set(),cr=window._cpCloudR||{};
+  let n=0;
+  coachProfiles.forEach(c=>{
+    if(!c||!c.id)return;seen.add(c.id);
+    const h=_cpHash(c),m=meta[c.id];
+    if(!m||m.d||m.h!==h){ // new or edited
+      const r=Math.max(m?(m.r||0):0,cr[c.id]||0)+1;
+      meta[c.id]={r:r,u:now,h:h,d:false,p:true};out[c.id]=_cpToCloud(c,meta[c.id]);sent[c.id]=r;n++;
+    }else if(m.p&&!window._cpPushing){ // sent before but never confirmed (and nothing in flight right now): send again as-is
+      out[c.id]=_cpToCloud(c,m);sent[c.id]=m.r;n++;
+    }
+  });
+  Object.keys(meta).forEach(id=>{ // removed here -> tell every other device
+    if(seen.has(id))return;const m=meta[id];
+    if(m.d&&(!m.p||window._cpPushing))return;
+    const r=m.d?(m.r||0):Math.max(m.r||0,cr[id]||0)+1;
+    meta[id]={r:r,u:m.d?m.u:now,h:'',d:true,p:true};out[id]={_deleted:true,_r:r,_u:meta[id].u,_by:dev};sent[id]=r;n++;
+  });
+  if(!n)return;
+  _cpSaveMeta(meta);
+  window._cpPushing=(window._cpPushing||0)+1;
+  let p=null;
+  try{
+    if(window._hrsStatus)window._hrsStatus('saving');
+    p=window._cpFbUpdate(window._hoursFbRef(window._hoursFbDb,'jaguar_db/coach_profiles'),out);
+  }catch(e){window._cpPushing--;_cpFail(e);return;}
+  p.then(()=>{
+    window._cpPushing--;window._cpFailed=false;
+    const m2=_cpMeta();Object.keys(sent).forEach(id=>{if(m2[id]&&m2[id].r===sent[id])delete m2[id].p;});_cpSaveMeta(m2);
+    if(window._hrsStatus)window._hrsStatus('synced');
+  }).catch(e=>{window._cpPushing--;_cpFail(e);});
+}
+function _cpRefreshUI(){
+  try{localStorage.setItem('jag_coach_profiles',JSON.stringify(coachProfiles));}catch(e){}
+  try{if(document.getElementById('coachProfilesGrid'))renderCoachProfiles();}catch(e){}
+  try{refreshAllCoachViews();}catch(e){}
+}
+// Apply whatever the cloud holds that is newer than what this device last saw (per coach).
+function _cpApplyIncoming(all){
+  const meta=_cpMeta(),me=_hrsDeviceId();let changed=false;
+  Object.keys(all).forEach(id=>{
+    const r=all[id];if(!r||typeof r!=='object')return;
+    const m=meta[id],cr=+r._r||0,cu=+r._u||0;
+    const newer=!m||cr>(m.r||0)||(cr===(m.r||0)&&r._by!==me&&cu>(m.u||0));
+    if(!newer)return;
+    if(r._deleted){
+      if(coachProfiles.some(x=>x.id===id)){coachProfiles=coachProfiles.filter(x=>x.id!==id);changed=true;}
+      meta[id]={r:cr,u:cu,h:'',d:true};return;
+    }
+    const rec=_cpFromCloud(id,r),local=coachProfiles.find(x=>x.id===id);
+    if(local){CP_BLOBS.forEach(k=>{if(local[k])rec[k]=local[k];});coachProfiles[coachProfiles.indexOf(local)]=rec;}
+    else coachProfiles.push(rec);
+    meta[id]={r:cr,u:cu,h:_cpHash(rec),d:false};changed=true;
+  });
+  _cpSaveMeta(meta);
+  return changed;
+}
+window._cpOnCloud=function(all){
+  window._cpCloudReady=true;all=all||{};
+  window._cpCloudR={};Object.keys(all).forEach(id=>{window._cpCloudR[id]=(all[id]&&+all[id]._r)||0;});
+  if(window._cpMergeOpen||window._cpHold)return;
+  const ids=Object.keys(all),metaEmpty=!Object.keys(_cpMeta()).length;
+  if(metaEmpty&&coachProfiles.length){
+    const live=ids.filter(id=>all[id]&&!all[id]._deleted);
+    if(!live.length){_cpPushChanges();return;}   // nothing (usable) in the cloud yet: upload this device's coaches
+    _cpOfferMerge(all);return;                   // both sides have coaches and this device never synced: merge them
+  }
+  const changed=_cpApplyIncoming(all);
+  if(changed)_cpRefreshUI();
+  if(!window._cpFailed)_cpPushChanges();
+};
+if(window._cpEarly){const _c=window._cpEarly;window._cpEarly=null;setTimeout(()=>window._cpOnCloud(_c.v),0);}
+
+/* ---- the merge ---- */
+function _cpEmpty(v){return v===undefined||v===null||v===''||(typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===0);}
+function _cpNorm(v){return typeof v==='string'?v.trim().toLowerCase().replace(/\s+/g,' '):JSON.stringify(v);}
+function _cpScore(c){let n=0;Object.keys(c).forEach(k=>{if(k.charAt(0)==='_'||CP_BLOBS.includes(k)||k==='id')return;if(!_cpEmpty(c[k])&&c[k]!==false)n++;});return n+(c.status==='active'?2:0);}
+const CP_DATEF=new Set(['screeningExpDate','safeSportExpDate','complianceSeason']),CP_BOOLF=new Set(['screeningUpdated','safeSport']),CP_MAPF=new Set(['levels','currentLevels']);
+function _cpMergeRecords(L,C){
+  const out={},conflicts=[],lWins=_cpScore(L)>_cpScore(C); // ties go to the cloud copy
+  new Set(Object.keys(L).concat(Object.keys(C))).forEach(k=>{
+    if(k.charAt(0)==='_'||k==='id'||CP_BLOBS.includes(k))return;
+    const a=L[k],b=C[k];
+    if(CP_MAPF.has(k)){const o={};new Set(Object.keys(a||{}).concat(Object.keys(b||{}))).forEach(x=>{o[x]=(a&&a[x])||(b&&b[x])||(a&&a[x]!==undefined?a[x]:b&&b[x]);});out[k]=o;return;}
+    if(CP_BOOLF.has(k)){out[k]=!!(a||b);return;}
+    if(CP_DATEF.has(k)){out[k]=_cpEmpty(a)?b:_cpEmpty(b)?a:(String(a)>=String(b)?a:b);return;} // the later date / season
+    if(k==='status'){
+      if(a===b)out[k]=a;else if(_cpEmpty(a)||a==='pending')out[k]=b||a;else if(_cpEmpty(b)||b==='pending')out[k]=a;
+      else{out[k]=lWins?a:b;conflicts.push({field:k,kept:out[k],other:lWins?b:a});}
+      return;
+    }
+    const ea=_cpEmpty(a),eb=_cpEmpty(b);
+    if(ea&&eb)out[k]=a!==undefined?a:b;
+    else if(ea)out[k]=b;else if(eb)out[k]=a;
+    else if(_cpNorm(a)===_cpNorm(b))out[k]=b;
+    else{out[k]=lWins?a:b;conflicts.push({field:k,kept:out[k],other:lWins?b:a});}
+  });
+  out.id=C.id;
+  return{rec:Object.assign(mkCoachProfile(),out,{id:C.id}),conflicts:conflicts};
+}
+function _cpPlanMerge(all){
+  const cloudList=Object.keys(all).filter(id=>all[id]&&!all[id]._deleted).map(id=>({rec:_cpFromCloud(id,all[id]),cr:all[id]}));
+  const locals=coachProfiles.slice(),pairs=[],usedL=new Set(),usedC=new Set();
+  const agree=(L,C)=>{ // -1 = clearly different people
+    const dL=(L.dob||'').trim(),dC=(C.dob||'').trim();
+    if(dL&&dC&&dL!==dC)return -1;
+    let sc=0;if(dL&&dC&&dL===dC)sc+=3;
+    if(L.email&&C.email&&L.email.trim().toLowerCase()===C.email.trim().toLowerCase())sc+=3;
+    const pl=String(L.phone||'').replace(/\D/g,''),pc=String(C.phone||'').replace(/\D/g,'');if(pl&&pl===pc)sc+=2;
+    return sc;
+  };
+  const cand=[];
+  locals.forEach((L,i)=>cloudList.forEach((C,j)=>{if(_cpKey(L.name)&&_cpKey(L.name)===_cpKey(C.rec.name)){const a=agree(L,C.rec);if(a>=0)cand.push({i:i,j:j,a:a});}}));
+  cand.sort((x,y)=>y.a-x.a);
+  cand.forEach(c=>{if(usedL.has(c.i)||usedC.has(c.j))return;usedL.add(c.i);usedC.add(c.j);pairs.push({L:locals[c.i],C:cloudList[c.j].rec,cr:cloudList[c.j].cr});});
+  return{pairs:pairs,onlyLocal:locals.filter((_,i)=>!usedL.has(i)),onlyCloud:cloudList.filter((_,j)=>!usedC.has(j)),all:all};
+}
+function _cpOfferMerge(all){
+  window._cpMergeOpen=true;
+  const plan=_cpPlanMerge(all);
+  const btn='padding:11px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;';
+  const ov=_hrsModal('cp-merge-ov',
+    '<div style="font-size:24px;letter-spacing:1px;color:#C9A84C;margin-bottom:8px;text-align:center;">Merge coach lists</div>'
+    +'<div style="font-size:14px;line-height:1.6;margin-bottom:14px;">The cloud already has a coach list from another device, and this device has its own. They will be <b>merged into one list</b> \u2014 nobody is deleted.'
+    +'<div style="margin:12px 0;padding:10px 12px;background:#1d2128;border-radius:8px;font-size:13px;">'
+    +'<b>'+plan.pairs.length+'</b> coach'+(plan.pairs.length!==1?'es':'')+' appear on both (matched by name) \u2192 combined into one record each<br>'
+    +'<b>'+plan.onlyLocal.length+'</b> only on this device \u2192 added<br><b>'+plan.onlyCloud.length+'</b> only in the cloud \u2192 added here</div>'
+    +'Where both records have a value and they disagree, the more complete record\'s value is kept and every difference is listed afterwards. A backup file of this device\'s coaches downloads first. Photos and resume files stay on the device they were uploaded on.</div>'
+    +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'
+    +'<button id="cp-merge-go" style="'+btn+'background:#7a1f1f;color:#fff;border:none;">Merge the lists</button>'
+    +'<button id="cp-merge-later" style="'+btn+'background:#232830;color:#f2f2f2;border:1px solid #555;">Not now</button></div>');
+  document.getElementById('cp-merge-later').onclick=()=>{window._cpMergeOpen=false;window._cpHold=true;ov.remove();toast('Coach sync is on hold on this device until you merge (reload to be asked again)');};
+  document.getElementById('cp-merge-go').onclick=()=>{ov.remove();_cpApplyMerge(plan);};
+}
+function _cpApplyMerge(plan){
+  const all=plan.all,stripped=coachProfiles.map(_cpStrip);
+  try{ // keep a safety copy: in the browser and as a downloaded file
+    localStorage.setItem('jag_profiles_prev_local_v1',JSON.stringify({saved:new Date().toISOString(),profiles:stripped}));
+    const d=new Date(),blob=new Blob([JSON.stringify({app:'jaguar-coach-profiles-backup',v:1,exported:d.toISOString(),profiles:stripped},null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='jaguar-coach-profiles-before-merge-'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.json';
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }catch(e){}
+  const meta={},merged=[],report=[];
+  plan.pairs.forEach(pr=>{
+    const m=_cpMergeRecords(pr.L,pr.C);
+    CP_BLOBS.forEach(k=>{if(pr.L[k])m.rec[k]=pr.L[k];});
+    merged.push(m.rec);
+    meta[pr.C.id]={r:+pr.cr._r||0,u:+pr.cr._u||0,h:_cpHash(pr.C),d:false}; // "as the cloud has it" -> the merged result registers as a change and is sent
+    if(m.conflicts.length)report.push({name:m.rec.name,conflicts:m.conflicts});
+  });
+  plan.onlyLocal.forEach(L=>merged.push(L)); // no meta -> sent as a new record
+  plan.onlyCloud.forEach(o=>{merged.push(o.rec);meta[o.rec.id]={r:+o.cr._r||0,u:+o.cr._u||0,h:_cpHash(o.rec),d:false};});
+  Object.keys(all).forEach(id=>{if(all[id]&&all[id]._deleted&&!meta[id])meta[id]={r:+all[id]._r||0,u:+all[id]._u||0,h:'',d:true};});
+  coachProfiles=merged;_cpSaveMeta(meta);
+  window._cpMergeOpen=false;
+  const link=relinkProfilesToGrid();
+  _cpRefreshUI();_cpPushChanges();
+  _cpShowMergeReport(plan,report,link);
+}
+function _cpShowMergeReport(plan,report,link){
+  const fld=v=>_hrsEsc(typeof v==='object'?JSON.stringify(v):String(v)).slice(0,60);
+  const rows=report.slice(0,40).map(r=>'<div style="margin:6px 0;"><b>'+_hrsEsc(r.name)+'</b><div style="font-size:12px;opacity:.9;">'+r.conflicts.map(c=>_hrsEsc(c.field)+': kept "'+fld(c.kept)+'" (other record had "'+fld(c.other)+'")').join('<br>')+'</div></div>').join('');
+  const nconf=report.reduce((t,r)=>t+r.conflicts.length,0);
+  _hrsModal('cp-report-ov',
+    '<div style="font-size:22px;color:#C9A84C;margin-bottom:8px;">Coaches merged and syncing</div>'
+    +'<div style="font-size:14px;line-height:1.6;">'+plan.pairs.length+' matched \u2192 combined \u00b7 '+plan.onlyLocal.length+' added from this device \u00b7 '+plan.onlyCloud.length+' added from the cloud.<br>'
+    +'<b>Hours Grid:</b> '+link.linked+' newly linked by name, '+link.already+' already linked'+(link.noGrid.length?'; <span style="color:#F0A050;">'+link.noGrid.length+' active coach'+(link.noGrid.length!==1?'es have':' has')+' no Hours Grid entry ('+_hrsEsc(link.noGrid.slice(0,8).join(', '))+(link.noGrid.length>8?'\u2026':'')+')</span>':'')+'.</div>'
+    +'<div style="margin-top:12px;font-size:13px;"><b>'+nconf+' field'+(nconf!==1?'s':'')+' where the two records disagreed</b> (fix any in the coach\'s card):</div>'
+    +'<div style="margin-top:6px;max-height:34vh;overflow:auto;border-top:1px solid #2c313a;">'+(rows||'<div style="padding:8px 0;opacity:.8;">No disagreements.</div>')+'</div>'
+    +'<div style="text-align:right;margin-top:14px;"><button class="btn btn-gold btn-sm" onclick="document.getElementById(\'cp-report-ov\').remove()">Done</button></div>');
+}
+
+/* ---- link profiles to the Hours Grid by name ---- */
+function relinkProfilesToGrid(){
+  const byKey=new Map();
+  coaches.forEach(g=>{const k=_cpKey(g.name);if(!k)return;if(!byKey.has(k))byKey.set(k,[]);byKey.get(k).push(g);});
+  const tot=g=>Object.values(g.hours||{}).reduce((a,b)=>a+(+b||0),0);
+  let linked=0,already=0;const noGrid=[];
+  coachProfiles.forEach(p=>{
+    if(p.payrollCoachId&&coaches.some(g=>g.id===p.payrollCoachId)){already++;return;}
+    const c=byKey.get(_cpKey(p.name))||[];
+    if(c.length){p.payrollCoachId=c.slice().sort((a,b)=>tot(b)-tot(a))[0].id;linked++;}
+    else if(p.status==='active')noGrid.push(p.name);
+  });
+  if(linked)saveCoachProfilesData();
+  return{linked:linked,already:already,noGrid:noGrid};
+}
+function linkProfilesToGridReport(){
+  const r=relinkProfilesToGrid();
+  const linkedIds=new Set(coachProfiles.map(p=>p.payrollCoachId).filter(Boolean));
+  const gridOnly=coaches.filter(g=>g.name&&g.name.trim()&&!linkedIds.has(g.id)).map(g=>g.name);
+  _cpRefreshUI();
+  _hrsModal('cp-link-ov',
+    '<div style="font-size:22px;color:#C9A84C;margin-bottom:8px;">Coaches \u2194 Hours Grid</div>'
+    +'<div style="font-size:14px;line-height:1.7;"><b>'+r.linked+'</b> profile'+(r.linked!==1?'s':'')+' newly linked by name \u00b7 <b>'+r.already+'</b> already linked.'
+    +(r.noGrid.length?'<br><span style="color:#F0A050;"><b>'+r.noGrid.length+'</b> active coach'+(r.noGrid.length!==1?'es':'')+' with no Hours Grid entry: '+_hrsEsc(r.noGrid.join(', '))+'.</span><br><span style="opacity:.85;font-size:13px;">Use \u201cAdd All Active to Hours Grid\u201d to create them.</span>':'')
+    +(gridOnly.length?'<br><span style="color:#F0A050;"><b>'+gridOnly.length+'</b> Hours Grid coach'+(gridOnly.length!==1?'es have':' has')+' no matching profile: '+_hrsEsc(gridOnly.join(', '))+'.</span>':'')
+    +(!r.noGrid.length&&!gridOnly.length?'<br><span style="color:#5CCC88;">Every coach profile and Hours Grid coach lines up.</span>':'')+'</div>'
+    +'<div style="text-align:right;margin-top:14px;"><button class="btn btn-gold btn-sm" onclick="document.getElementById(\'cp-link-ov\').remove()">Done</button></div>');
+}
 
 /* ---- FIND ALL HOURS (read-only) ---- */
 function _hrsAllLogged(){
